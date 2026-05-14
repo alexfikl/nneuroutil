@@ -1,0 +1,179 @@
+PYTHON := 'python -X dev'
+
+_default:
+    @just --list
+
+# {{{ formatting
+
+alias fmt: format
+
+[doc('Reformat all source code')]
+format: isort black pyproject justfmt
+
+[doc('Run ruff isort fixes over the source code')]
+isort:
+    ruff check --fix --select=I src examples tests
+    ruff check --fix --select=RUF022 src examples tests
+    @echo -e "\e[1;32mruff isort clean!\e[0m"
+
+[doc('Run ruff format over the source code')]
+black:
+    ruff format src examples tests
+    @echo -e "\e[1;32mruff format clean!\e[0m"
+
+[doc('Run pyproject-fmt over the configuration')]
+pyproject:
+    {{ PYTHON }} -m pyproject_fmt \
+        --indent 4 --max-supported-python "3.14" \
+        pyproject.toml
+    @echo -e "\e[1;32mpyproject clean!\e[0m"
+
+[doc('Run just --fmt over the justfile')]
+justfmt:
+    just --unstable --fmt
+    @echo -e "\e[1;32mjust --fmt clean!\e[0m"
+
+# }}}
+# {{{ linting
+
+[doc('Run all linting checks over the source code')]
+lint: typos reuse ruff ty
+
+[doc('Run typos over the source code and documentation')]
+typos:
+    typos --sort
+    @echo -e "\e[1;32mtypos clean!\e[0m"
+
+[doc('Check REUSE license compliance')]
+reuse:
+    {{ PYTHON }} -m reuse lint
+    @echo -e "\e[1;32mREUSE compliant!\e[0m"
+
+[doc('Run ruff checks over the source code')]
+ruff:
+    ruff check
+    @echo -e "\e[1;32mruff clean!\e[0m"
+
+[doc('Run ty checks over the source code')]
+ty:
+    ty check src examples tests
+    @echo -e "\e[1;32mty clean!\e[0m"
+
+# }}}
+# {{{ pin
+
+REQUIREMENTS_DIR := ".ci"
+
+[private]
+requirements_build_txt:
+    uv pip compile --upgrade --universal --python-version "3.10" \
+        -o {{ REQUIREMENTS_DIR }}/requirements-build.txt \
+        {{ REQUIREMENTS_DIR }}/requirements-build.in
+
+[private]
+requirements_test_txt:
+    uv pip compile --upgrade --universal --python-version '3.10' \
+        --group test \
+        --group codegen \
+        --group backends \
+        --group clustering \
+        --group visualization \
+        -o {{ REQUIREMENTS_DIR }}/requirements-test.txt \
+        pyproject.toml
+
+[private]
+requirements_txt:
+    uv pip compile --upgrade --universal --python-version '3.10' \
+        -o requirements.txt pyproject.toml
+
+[doc('Pin dependency versions to requirements.txt')]
+pin: requirements_txt requirements_build_txt requirements_test_txt
+
+# }}}
+# {{{ develop
+
+[doc('Install project in editable mode')]
+develop:
+    @rm -rf build
+    @rm -rf dist
+    {{ PYTHON }} -m pip install \
+        --verbose \
+        --no-build-isolation \
+        --editable .
+
+[doc("Editable install using pinned dependencies from requirements-test.txt")]
+ci-install venv=".venv":
+    #!/usr/bin/env bash
+
+    # build a virtual environment
+    python -m venv {{ venv }}
+    source {{ venv }}/bin/activate
+
+    # install build dependencies (need to be first due to  --no-build-isolation)
+    {{ PYTHON }} -m pip install --requirement {{ REQUIREMENTS_DIR }}/requirements-build.txt
+
+    # install all pinned dependencies
+    {{ PYTHON }} -m pip install \
+        --verbose \
+        --requirement {{ REQUIREMENTS_DIR }}/requirements-test.txt \
+        --no-build-isolation \
+        --editable .
+
+    echo -e "\e[1;32mvenv setup completed: '{{ venv }}'!\e[0m"
+
+[doc("Show information about the environment")]
+ci-info:
+    #!/usr/bin/env bash
+
+    set -o errexit -o errtrace -o nounset -o pipefail
+
+    echo "-----------------------------------------------"
+    echo "CWD:          $(pwd)"
+    echo "OS:           $(uname -nrm)"
+    echo "Python:       $(python --version)"
+    echo "git rev:      $(git rev-parse --short HEAD)"
+
+    if [[ -f /proc/cpuinfo ]]; then
+        echo "CPU:         $(grep 'model name' /proc/cpuinfo | head -n 1 | cut -d ':' -f 2)"
+    fi
+
+    echo "-----------------------------------------------"
+
+[doc("Remove various build artifacts")]
+clean:
+    rm -rf build dist
+    rm -rf docs/_build
+
+[doc("Remove various temporary files")]
+purge: clean
+    rm -rf .ruff_cache .pytest_cache tags
+
+[doc("Regenerate ctags")]
+ctags:
+    ctags --recurse=yes \
+        --tag-relative=yes \
+        --exclude=.git \
+        --exclude=docs \
+        --python-kinds=-i \
+        --language-force=python
+
+# }}}
+# {{{ tests
+
+[doc("Run pytest tests")]
+test *PYTEST_ADDOPTS:
+    {{ PYTHON }} -m pytest {{ PYTEST_ADDOPTS }}
+
+[doc("Run examples with default options")]
+examples:
+    #!/usr/bin/env bash
+
+    set -o errexit -o errtrace -o nounset -o pipefail
+
+    for ex in `ls examples/*.py`; do
+        echo "::group::Running ${ex}";
+        {{ PYTHON }} ${ex};
+        echo "::endgroup::";
+    done
+
+# }}}

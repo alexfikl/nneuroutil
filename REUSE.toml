@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Alexandru Fikl <alexfikl@gmail.com>
+# SPDX-License-Identifier: CC0-1.0
+
+version = 1
+SPDX-PackageName = "nneuroutil"
+SPDX-PackageSupplier = "Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/alexfikl/nneuroutil"
+
+[[annotations]]
+path = [".gitignore", ".github/**.yml"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ["pyproject.toml", "**justfile", "README.rst"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ["requirements.txt", ".ci/requirements*"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"
