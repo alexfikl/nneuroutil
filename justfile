@@ -66,24 +66,22 @@ REQUIREMENTS_DIR := ".ci"
 
 [private]
 requirements_build_txt:
-    uv pip compile --upgrade --universal --python-version "3.10" \
+    uv pip compile --upgrade --universal --python-version "3.11" \
         -o {{ REQUIREMENTS_DIR }}/requirements-build.txt \
         {{ REQUIREMENTS_DIR }}/requirements-build.in
 
 [private]
 requirements_test_txt:
-    uv pip compile --upgrade --universal --python-version '3.10' \
+    uv pip compile --upgrade --universal --python-version '3.11' \
         --group test \
-        --group codegen \
-        --group backends \
-        --group clustering \
+        --group docs \
         --group visualization \
         -o {{ REQUIREMENTS_DIR }}/requirements-test.txt \
         pyproject.toml
 
 [private]
 requirements_txt:
-    uv pip compile --upgrade --universal --python-version '3.10' \
+    uv pip compile --upgrade --universal --python-version '3.11' \
         -o requirements.txt pyproject.toml
 
 [doc('Pin dependency versions to requirements.txt')]
