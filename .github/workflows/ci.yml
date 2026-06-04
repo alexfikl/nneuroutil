@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    tags: [ v** ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '30 12 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reuse:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    name: Licensing (REUSE)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: fsfe/reuse-action@v6
+
+  typos:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    name: Spelling (typos)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: crate-ci/typos@master
+
+  ruff:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    name: Linting (ruff)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: extractions/setup-just@v4
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.14'
+        cache: 'pip'
+        cache-dependency-path: '.ci/requirements-test.txt'
+    - name: Main Script
+      run: |
+        just ci-install .venv && source .venv/bin/activate
+        just ruff
+
+  ty:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    name: Annotations (ty)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: extractions/setup-just@v4
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.14'
+        cache: 'pip'
+        cache-dependency-path: '.ci/requirements-test.txt'
+    - name: Main Script
+      run: |
+        just ci-install .venv && source .venv/bin/activate
+        just ty
+
+  pytest:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    name: Tests (pytest-${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v6
+    - uses: extractions/setup-just@v4
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: '.ci/requirements-test.txt'
+    - name: Run tests
+      run: |
+        just ci-info
+        just ci-install .venv && source .venv/bin/activate
+        just test
+
+# vim: set ts=2 sw=2 et:
