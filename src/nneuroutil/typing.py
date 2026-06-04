@@ -18,17 +18,20 @@ PathLike: TypeAlias = os.PathLike[str] | str
 ShapeT = TypeVar("ShapeT", bound=tuple[int, ...], default=tuple[Any, ...])
 """An invariant type alias for ``tuple[int, ...]``."""
 
-Array0D = TypeVar("Array0D")
+# FIXME: maybe https://github.com/data-apis/array-api-typing will work some day.
+# Now, it seems pretty empty, so not sure it's worth doing more than this..
+
+Array0D: TypeAlias = Any
 """A type variable for a 0-dimensional array."""
-Array1D = TypeVar("Array1D")
+Array1D: TypeAlias = Any
 """A type variable for a 1-dimensional array."""
-Array2D = TypeVar("Array2D")
+Array2D: TypeAlias = Any
 """A type variable for a 2-dimensional array."""
-Array3D = TypeVar("Array3D")
+Array3D: TypeAlias = Any
 """A type variable for a 3-dimensional array."""
-Array4D = TypeVar("Array4D")
+Array4D: TypeAlias = Any
 """A type variable for a 4-dimensional array."""
-ArrayND = TypeVar("ArrayND")
+ArrayND: TypeAlias = Any
 """A type variable for a n-dimensional array."""
 
 
