@@ -40,6 +40,7 @@ dependencies = [
     "numpy>=2.1",
     "rich>=10",
     "scipy>=1.14",
+    "typing-extensions>=4.10",
 ]
 urls.Repository = "https://github.com/alexfikl/nneuroutil"
 

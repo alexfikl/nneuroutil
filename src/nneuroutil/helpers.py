@@ -268,3 +268,25 @@ class BlockTimer:
 
 
 # }}}
+
+
+# {{{ slugify
+
+
+def slugify(stem: str, separator: str = "_") -> str:
+    """
+    :returns: an ASCII slug representing *stem*, with all the unicode cleaned up
+        and all non-standard separators replaced.
+    """
+    import re
+    import unicodedata
+
+    stem = unicodedata.normalize("NFKD", stem)
+    stem = stem.encode("ascii", "ignore").decode().lower()
+    stem = re.sub(r"[^a-z0-9]+", separator, stem)
+    stem = re.sub(rf"[{separator}]+", separator, stem.strip(separator))
+
+    return stem
+
+
+# }}}
