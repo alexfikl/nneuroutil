@@ -54,6 +54,13 @@ class DMD:
         """The size of the full model."""
         return self.Vh.shape[1]
 
+    def eigendecomposition(self) -> tuple[Array1D, Array2D]:
+        """Compute the eigendecomposition of :attr:`Ahat`."""
+        xp = array_api_compat.array_namespace(self.Ahat)
+
+        eigs, eigenvectors = xp.linalg.eig(self.Ahat)
+        return eigs, eigenvectors
+
     def encode(self, x: ArrayND) -> ArrayND:
         """Project the full state *x* to the reduced coordinates."""
         assert x.shape[0] == self.full_size
@@ -80,8 +87,36 @@ class DMD:
         return self.evolve(x)
 
     def __call__(self, x: Array1D) -> Array1D:
-        """Evolve the full model using the reduced-order decomposition."""
-        return self.decode(self.evolve(self.encode(x)))
+        """Evolve the reduced-order model."""
+        return self.evolve(x)
+
+
+def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
+    """
+    :arg x0: initial condition for the system. If this is the size of the
+        reduced system, we assume that it represents the amplitudes of the DMD
+        modes of the initial condition. Otherwise, the initial condition is
+        projected onto the DMD modes.
+    :arg steps: number of steps to compute.
+    """
+    xp = array_api_compat.array_namespace(x0, dmd.Ahat)
+
+    # determine the DMD modes
+    lambdas, vs = dmd.eigendecomposition()
+    Phi = dmd.decode(vs)
+
+    # project the initial condition on the modes by least squares
+    if x0.shape == (dmd.reduced_size,):
+        b = x0
+    else:
+        b, _, _, _ = xp.linalg.lstsq(Phi, x0)
+
+    # compute all iterations of the operator
+    n = xp.arange(steps, dtype=x0.dtype)
+    Lambda = lambdas[None, :] ** n
+
+    # apply the operator
+    return (Lambda * b[None, :]) @ Phi.conj().T
 
 
 # }}}
