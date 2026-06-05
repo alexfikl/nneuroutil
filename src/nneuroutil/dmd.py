@@ -214,7 +214,7 @@ def build_dmd_classic(
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
-    return DMD(Ahat, U, S, Vh)
+    return DMD(Ahat, U=U, S=S, Vh=Vh)
 
 
 # }}}
