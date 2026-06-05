@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import pathlib
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -287,6 +288,21 @@ def slugify(stem: str, separator: str = "_") -> str:
     stem = re.sub(rf"[{separator}]+", separator, stem.strip(separator))
 
     return stem
+
+
+# }}}
+
+
+# {{{ jax
+
+
+def set_jax_config() -> None:
+    if "jax" not in sys.modules:
+        return
+
+    import jax
+
+    jax.config.update("jax_enable_x64", val=True)
 
 
 # }}}
