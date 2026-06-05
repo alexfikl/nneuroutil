@@ -36,7 +36,7 @@ def test_dmd_classic_linear() -> None:
         X[i] = A @ X[i - 1]
 
     eps = 1.0e-10
-    dmd = build_dmd_classic(X, eps=eps)
+    dmd = build_dmd_classic(X[:, :-1], X[:, 1:], eps=eps)
 
     X = rng.standard_normal(ndim)
     X_ref = A @ X

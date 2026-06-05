@@ -122,26 +122,25 @@ def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
 # }}}
 
 
-# {{{ classic DMD
+# {{{ total-least-squares
 
 
-def build_dmd_classic(
+def total_least_squares(
     X: Array2D,
+    Y: Array2D,
     *,
     rank: int | None = None,
     eps: float | None = None,
-) -> DMD:
-    """Construct a DMD approximation of the system with snapshots *X*.
+) -> tuple[Array2D, Array2D]:
+    nsnapshots, dim = X.shape
+    if X.shape != Y.shape:
+        raise ValueError(
+            f"inputs 'X' and outputs 'Y' have different shape: {X.shape} and {Y.shape}"
+        )
+    xp = array_api_compat.array_namespace(X, Y)
 
-    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
-    :arg rank: if given, the desired fixed rank of the approximation.
-    :arg eps: if given, the smallest desired singular value threshold.
-    """
-    xp = array_api_compat.array_namespace(X)
-    _, ndim = X.shape
-
-    if rank is not None and not 0 < rank < ndim:
-        raise ValueError(f"'rank' must be in [0, {ndim}]: {rank}")
+    if rank is not None and not 0 < rank < dim:
+        raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
 
     if eps is None:
         eps = 10 * xp.finfo(X.dtype).eps
@@ -149,10 +148,59 @@ def build_dmd_classic(
     if eps is not None and eps <= 0.0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
-    X1 = X[:-1]
-    X2 = X[1:]
+    U, S, Vh = xp.linalg.svd(X, full_matrices=False)
+    S = xp.astype(S, X.dtype)
 
-    U, S, Vh = xp.linalg.svd(X1, full_matrices=False)
+    Z = xp.concatenate([X, Y], axis=1)
+    assert Z.shape == (nsnapshots, 2 * dim)
+
+    U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
+    S = xp.astype(S, X.dtype)
+
+    if rank is not None:
+        U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+
+    mask = xp.abs(S) > eps
+    U, Vh = U[:, mask], Vh[mask, :]
+
+    X = U @ xp.diag(S) @ Vh[:, :dim]
+    Y = U @ xp.diag(S) @ Vh[:, dim:]
+
+    return X, Y
+
+
+# }}}
+
+
+# {{{ classic DMD
+
+
+def build_dmd_classic(
+    X: Array2D,
+    Y: Array2D,
+    *,
+    rank: int | None = None,
+    eps: float | None = None,
+) -> DMD:
+    """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
+
+    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg rank: if given, the desired fixed rank of the approximation.
+    :arg eps: if given, the smallest desired singular value threshold.
+    """
+    xp = array_api_compat.array_namespace(X)
+    _, dim = X.shape
+
+    if rank is not None and not 0 < rank < dim:
+        raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
+
+    if eps is None:
+        eps = 10 * xp.finfo(X.dtype).eps
+
+    if eps is not None and eps <= 0.0:
+        raise ValueError(f"'eps' must be positive: {eps}")
+
+    U, S, Vh = xp.linalg.svd(X, full_matrices=False)
     S = xp.astype(S, X.dtype)
 
     if rank is not None:
@@ -162,7 +210,7 @@ def build_dmd_classic(
     U, Vh = U[:, mask], Vh[mask, :]
 
     # construct reduced order model
-    Ahat = Vh[mask, :] @ xp.conjugate(X2).T @ U[:, mask] @ xp.diag(1 / S[mask])
+    Ahat = Vh[mask, :] @ xp.conjugate(Y).T @ U[:, mask] @ xp.diag(1 / S[mask])
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
