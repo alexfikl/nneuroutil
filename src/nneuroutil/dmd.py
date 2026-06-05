@@ -130,7 +130,6 @@ def total_least_squares(
     Y: Array2D,
     *,
     rank: int | None = None,
-    eps: float | None = None,
 ) -> tuple[Array2D, Array2D]:
     nsnapshots, dim = X.shape
     if X.shape != Y.shape:
@@ -141,12 +140,6 @@ def total_least_squares(
 
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
-
-    if eps is None:
-        eps = 10 * xp.finfo(X.dtype).eps
-
-    if eps is not None and eps <= 0.0:
-        raise ValueError(f"'eps' must be positive: {eps}")
 
     U, S, Vh = xp.linalg.svd(X, full_matrices=False)
     S = xp.astype(S, X.dtype)
@@ -159,9 +152,6 @@ def total_least_squares(
 
     if rank is not None:
         U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
-
-    mask = xp.abs(S) > eps
-    U, Vh = U[:, mask], Vh[mask, :]
 
     X = U @ xp.diag(S) @ Vh[:, :dim]
     Y = U @ xp.diag(S) @ Vh[:, dim:]
@@ -180,13 +170,11 @@ def build_dmd_classic(
     Y: Array2D,
     *,
     rank: int | None = None,
-    eps: float | None = None,
 ) -> DMD:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
-    :arg eps: if given, the smallest desired singular value threshold.
     """
     xp = array_api_compat.array_namespace(X)
     _, dim = X.shape
@@ -194,23 +182,14 @@ def build_dmd_classic(
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
 
-    if eps is None:
-        eps = 10 * xp.finfo(X.dtype).eps
-
-    if eps is not None and eps <= 0.0:
-        raise ValueError(f"'eps' must be positive: {eps}")
-
     U, S, Vh = xp.linalg.svd(X, full_matrices=False)
     S = xp.astype(S, X.dtype)
 
     if rank is not None:
         U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
 
-    mask = xp.abs(S) > eps
-    U, Vh = U[:, mask], Vh[mask, :]
-
     # construct reduced order model
-    Ahat = Vh[mask, :] @ xp.conjugate(Y).T @ U[:, mask] @ xp.diag(1 / S[mask])
+    Ahat = Vh @ xp.conjugate(Y).T @ U @ xp.diag(1 / S)
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
