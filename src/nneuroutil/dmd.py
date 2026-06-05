@@ -80,7 +80,7 @@ class DMD:
         assert x.shape[0] == self.reduced_size
 
         xp = array_api_compat.array_namespace(x, self.Vh)
-        return xp.einsum("ij,i...->j...", xp.conjugate(self.Vh), x)
+        return xp.einsum("ij,i...->j...", xp.conj(self.Vh), x)
 
     def __matmul__(self, x: ArrayND) -> ArrayND:
         """Evolve the reduced-order model."""
@@ -189,7 +189,7 @@ def build_dmd_classic(
         U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
 
     # construct reduced order model
-    Ahat = Vh @ xp.conjugate(Y).T @ U @ xp.diag(1 / S)
+    Ahat = Vh @ xp.conj(Y).T @ U @ xp.diag(1 / S)
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
