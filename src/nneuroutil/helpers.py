@@ -298,7 +298,7 @@ def slugify(stem: str, separator: str = "_") -> str:
 # {{{ jax
 
 
-_PENDING_JAX_PYTREE_REGISTER = []
+_PENDING_JAX_REGISTER_DATACLASS = []
 
 
 def set_jax_config() -> None:
@@ -313,8 +313,8 @@ def set_jax_config() -> None:
     import jax
 
     jax.config.update("jax_enable_x64", val=True)
-    while _PENDING_JAX_PYTREE_REGISTER:
-        jax.tree_util.register_dataclass(_PENDING_JAX_PYTREE_REGISTER.pop())
+    while _PENDING_JAX_REGISTER_DATACLASS:
+        jax.tree_util.register_dataclass(_PENDING_JAX_REGISTER_DATACLASS.pop())
 
 
 def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT]:
@@ -323,7 +323,9 @@ def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT
 
         jax.tree_util.register_dataclass(cls)
     else:
-        _PENDING_JAX_PYTREE_REGISTER.append(cls)
+        _PENDING_JAX_REGISTER_DATACLASS.append(cls)
+
+    # TODO: Anyone else need to register dataclasses?
 
     return cls
 
