@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from nneuroutil.typing import DataclassInstanceT
+
 if TYPE_CHECKING:
     from types import TracebackType
 
@@ -296,13 +298,34 @@ def slugify(stem: str, separator: str = "_") -> str:
 # {{{ jax
 
 
+_PENDING_JAX_PYTREE_REGISTER = []
+
+
 def set_jax_config() -> None:
+    """Set up any :mod:`jax` related functionality.
+
+    This should be called after JAX is imported. It will mainly enable ``float64``
+    mode, register any required PyTrees, etc.
+    """
     if "jax" not in sys.modules:
         return
 
     import jax
 
     jax.config.update("jax_enable_x64", val=True)
+    while _PENDING_JAX_PYTREE_REGISTER:
+        jax.tree_util.register_dataclass(_PENDING_JAX_PYTREE_REGISTER.pop())
+
+
+def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT]:
+    if "jax" in sys.modules:
+        import jax
+
+        jax.tree_util.register_dataclass(cls)
+    else:
+        _PENDING_JAX_PYTREE_REGISTER.append(cls)
+
+    return cls
 
 
 # }}}

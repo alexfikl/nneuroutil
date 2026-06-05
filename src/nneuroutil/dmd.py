@@ -9,7 +9,7 @@ from typing import Any
 import array_api_compat
 import numpy as np
 
-from nneuroutil.helpers import module_logger
+from nneuroutil.helpers import module_logger, register_dataclass
 from nneuroutil.typing import Array1D, Array2D, ArrayND
 
 log = module_logger(__name__)
@@ -18,6 +18,7 @@ log = module_logger(__name__)
 # {{{ DMD
 
 
+@register_dataclass
 @dataclass(frozen=True)
 class DMD:
     Ahat: Array2D

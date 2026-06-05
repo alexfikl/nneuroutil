@@ -22,22 +22,18 @@ set_plotting_defaults()
 
 
 @pytest.mark.parametrize("backend", ["numpy", "jax", "torch"])
-def test_dmd_classic_linear(backend: str) -> None:
-    from nneuroutil.dmd import DMD, build_dmd_classic
-
+@pytest.mark.parametrize("tls", [True, False])
+def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     rng = np.random.default_rng(seed=42)
     ndim = 8
     nsnapshots = 64
 
+    # set up backend
     if backend == "jax":
-        pytest.importorskip("jax")
+        jax = pytest.importorskip("jax")
+
         set_jax_config()
-
-        import jax.numpy as jnp
-        from jax.tree_util import register_dataclass
-
-        xp = jnp
-        register_dataclass(DMD)
+        xp = jax.numpy
     elif backend == "torch":
         xp = pytest.importorskip("torch")
     elif backend == "numpy":
@@ -45,9 +41,10 @@ def test_dmd_classic_linear(backend: str) -> None:
     else:
         raise ValueError(f"unknown backend: {backend!r}")
 
+    from nneuroutil.dmd import build_dmd_classic, total_least_squares
+
     # construct a random stable-ish linear map and evolve an initial condition
     A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
-    xp = array_api_compat.array_namespace(A)
 
     xs = [xp.asarray(rng.standard_normal(ndim))]
     for _ in range(nsnapshots - 1):
@@ -55,7 +52,12 @@ def test_dmd_classic_linear(backend: str) -> None:
     X = xp.stack(xs)
 
     # build DMD approximation
-    dmd = build_dmd_classic(X[:-1], X[1:])
+    xp = array_api_compat.array_namespace(A)
+    X1 = X[:-1]
+    X2 = X[1:]
+    if tls:
+        X1, X2 = total_least_squares(X1, X2, xp=xp)
+    dmd = build_dmd_classic(X1, X2, xp=xp)
 
     # ensure the implementation can be compiled
     if backend == "jax":
@@ -74,14 +76,19 @@ def test_dmd_classic_linear(backend: str) -> None:
     x_ref = A @ x
     x_dmd = dmd.decode(dmd.evolve(dmd.encode(x)))
 
-    error = xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref)
+    error = float(xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref))
     log.info(
         "[%s] DMD classic relative error: %.3e (rank=%d)",
         backend,
-        float(error),
+        error,
         dmd.reduced_size,
     )
-    assert float(error) < 1.0e-14
+    assert error < 1.0e-14
+
+    # check eigenvalues
+    lambdas, _ = dmd.eigendecomposition()
+    assert xp.all(xp.abs(lambdas) < 1.0 + 1.0e-10)
+    log.info("[%s] Largest eigenvalue: %.3e", backend, xp.max(xp.abs(lambdas)))
 
 
 # }}}
