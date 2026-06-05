@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pathlib
 
+import array_api_compat
 import numpy as np
 import pytest
 
@@ -20,7 +21,7 @@ set_plotting_defaults()
 # {{{ test_dmd_classic
 
 
-@pytest.mark.parametrize("backend", ["numpy", "jax"])
+@pytest.mark.parametrize("backend", ["numpy", "jax", "torch"])
 def test_dmd_classic_linear(backend: str) -> None:
     from nneuroutil.dmd import DMD, build_dmd_classic
 
@@ -37,11 +38,16 @@ def test_dmd_classic_linear(backend: str) -> None:
 
         xp = jnp
         register_dataclass(DMD)
-    else:
+    elif backend == "torch":
+        xp = pytest.importorskip("torch")
+    elif backend == "numpy":
         xp = np
+    else:
+        raise ValueError(f"unknown backend: {backend!r}")
 
     # construct a random stable-ish linear map and evolve an initial condition
     A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
+    xp = array_api_compat.array_namespace(A)
 
     xs = [xp.asarray(rng.standard_normal(ndim))]
     for _ in range(nsnapshots - 1):
@@ -55,7 +61,13 @@ def test_dmd_classic_linear(backend: str) -> None:
     if backend == "jax":
         import jax
 
-        _ = jax.jit(build_dmd_classic)(X[:-1], X[1:])
+        _ = jax.jit(build_dmd_classic, static_argnames=("rank", "xp"))(
+            X[:-1], X[1:], xp=xp
+        )
+    elif backend == "torch":
+        import torch
+
+        _ = torch.compile(build_dmd_classic)(X[:-1], X[1:], xp=xp)
 
     # check DMD approximation on a random state
     x = xp.asarray(rng.standard_normal(ndim))
@@ -64,7 +76,7 @@ def test_dmd_classic_linear(backend: str) -> None:
 
     error = xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref)
     log.info(
-        "DMD classic relative error [%s]: %.3e (rank=%d)",
+        "[%s] DMD classic relative error: %.3e (rank=%d)",
         backend,
         float(error),
         dmd.reduced_size,

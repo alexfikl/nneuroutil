@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import array_api_compat
 import numpy as np
@@ -130,13 +131,16 @@ def total_least_squares(
     Y: Array2D,
     *,
     rank: int | None = None,
+    xp: Any = None,
 ) -> tuple[Array2D, Array2D]:
     nsnapshots, dim = X.shape
     if X.shape != Y.shape:
         raise ValueError(
             f"inputs 'X' and outputs 'Y' have different shape: {X.shape} and {Y.shape}"
         )
-    xp = array_api_compat.array_namespace(X, Y)
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X, Y)
 
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
@@ -170,17 +174,20 @@ def build_dmd_classic(
     Y: Array2D,
     *,
     rank: int | None = None,
+    xp: Any = None,
 ) -> DMD:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     """
-    xp = array_api_compat.array_namespace(X)
     _, dim = X.shape
 
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X)
 
     U, S, Vh = xp.linalg.svd(X, full_matrices=False)
     S = xp.astype(S, X.dtype)
