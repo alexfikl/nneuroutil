@@ -46,7 +46,7 @@ urls.Repository = "https://github.com/alexfikl/nneuroutil"
 dev = [ "pyproject-fmt", "reuse", "typos", "uv" ]
 test = [ "pytest", "ruff", "scipy-stubs", "ty" ]
 docs = [ "sphinx>=6", "sphinx-book-theme" ]
-jax = [ "jax", "flax" ]
+jax = [ "flax", "jax" ]
 torch = [ "pytorch>=2" ]
 visualization = [ "matplotlib", "scienceplots" ]
 

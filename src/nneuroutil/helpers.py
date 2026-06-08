@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import array_api_compat
+import numpy as np
 
 from nneuroutil.typing import Array1D, DataclassInstanceT
 
@@ -347,6 +348,42 @@ def spectrum_error(eig_a: Array1D, eig_b: Array1D, *, xp: Any | None = None) -> 
     row, col = linear_sum_assignment(M)
 
     return xp.linalg.norm(eig_a[row] - eig_b[col]) / xp.linalg.norm(eig_b)
+
+
+# }}}
+
+
+# {{{ to_real + to_complex
+
+
+_REAL_TO_COMPLEX_DTYPE = {
+    np.dtype(np.float32): np.dtype(np.complex64),
+    np.dtype(np.float64): np.dtype(np.complex128),
+    np.dtype(np.longdouble): np.dtype(np.clongdouble),
+}
+_COMPLEX_TO_REAL_DTYPE = {v: k for k, v in _REAL_TO_COMPLEX_DTYPE.items()}
+
+
+def to_real(dtype: Any) -> np.dtype[np.floating[Any]]:
+    dtype = np.dtype(dtype)
+    if dtype.kind == "f":
+        return dtype
+
+    try:
+        return _COMPLEX_TO_REAL_DTYPE[dtype]
+    except KeyError:
+        raise TypeError(f"no real counterpart for dtype {dtype!r}") from None
+
+
+def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
+    dtype = np.dtype(dtype)
+    if dtype.kind == "c":
+        return dtype  # ty: ignore[invalid-return-type]
+
+    try:
+        return _REAL_TO_COMPLEX_DTYPE[dtype]  # ty: ignore[invalid-return-type]
+    except KeyError:
+        raise TypeError(f"no complex counterpart for dtype {dtype!r}") from None
 
 
 # }}}
