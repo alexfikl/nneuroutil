@@ -137,19 +137,16 @@ def total_least_squares(
     nsnapshots, dim = X.shape
     if X.shape != Y.shape:
         raise ValueError(
-            f"inputs 'X' and outputs 'Y' have different shape: {X.shape} and {Y.shape}"
+            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
         )
 
     if xp is None:
         xp = array_api_compat.array_namespace(X, Y)
 
     if rank is not None and not 0 < rank < dim:
-        raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
+        raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
 
-    U, S, Vh = xp.linalg.svd(X, full_matrices=False)
-    S = xp.astype(S, X.dtype)
-
-    Z = xp.concatenate([X, Y], axis=1)
+    Z = xp.concat([X, Y], axis=1)
     assert Z.shape == (nsnapshots, 2 * dim)
 
     U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
@@ -170,7 +167,7 @@ def total_least_squares(
 # {{{ classic DMD
 
 
-def build_dmd_classic(
+def build_dmd(
     X: Array2D,
     Y: Array2D,
     *,
@@ -185,7 +182,7 @@ def build_dmd_classic(
     _, dim = X.shape
 
     if rank is not None and not 0 < rank < dim:
-        raise ValueError(f"'rank' must be in [0, {dim}]: {rank}")
+        raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
 
     if xp is None:
         xp = array_api_compat.array_namespace(X)

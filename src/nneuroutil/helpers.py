@@ -11,9 +11,11 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from nneuroutil.typing import DataclassInstanceT
+import array_api_compat
+
+from nneuroutil.typing import Array1D, DataclassInstanceT
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -328,6 +330,23 @@ def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT
     # TODO: Anyone else need to register dataclasses?
 
     return cls
+
+
+# }}}
+
+# {{{ match_spectrum
+
+
+def spectrum_error(eig_a: Array1D, eig_b: Array1D, *, xp: Any | None = None) -> float:
+    if xp is None:
+        xp = array_api_compat.array_namespace(eig_a, eig_b)
+
+    from scipy.optimize import linear_sum_assignment
+
+    M = xp.abs(eig_a[:, None] - eig_b[None, :])
+    row, col = linear_sum_assignment(M)
+
+    return xp.linalg.norm(eig_a[row] - eig_b[col]) / xp.linalg.norm(eig_b)
 
 
 # }}}
