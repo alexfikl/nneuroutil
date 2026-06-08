@@ -137,6 +137,7 @@ def test_dmd_tls(sigma: float) -> None:
     log.info("Noise %.3f Error DMD %.5e TLS %.5e", sigma, error_dmd, error_tls)
     assert error_tls < error_dmd
 
+
 # {{{
 
 
