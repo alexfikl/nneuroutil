@@ -176,6 +176,9 @@ def build_dmd(
 ) -> DMD:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
 
+    For robust results, it is recommended to apply the :func:`total_least_squares`
+    algorithm to the snapshots, so that the noise is handled consistently.
+
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     """
