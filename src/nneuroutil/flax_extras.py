@@ -95,11 +95,11 @@ class ComplexLinear(nnx.Module):
         # x: [batch, 2 * in_features]
         x_re, x_im = jnp.split(x, 2, axis=-1)
 
-        result_re = x_re @ self.kernel.value.T
+        result_re = x_re @ self.kernel.value
         if self.bias_re is not None:
             result_re = result_re + self.bias_re.value  # noqa: PLR6104
 
-        result_im = x_im @ self.kernel.value.T
+        result_im = x_im @ self.kernel.value
         if self.bias_im is not None:
             result_im = result_im + self.bias_im.value  # noqa: PLR6104
 
