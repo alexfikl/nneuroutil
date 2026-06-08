@@ -134,7 +134,7 @@ def kaiming_uniform_(
             x,
             a=param,
             mode=mode,
-            nonlinearity=nonlinearity,  # ty: ignore[invalid-argument-type]
+            nonlinearity=nonlinearity,
             generator=generator,
         )
 
@@ -179,7 +179,7 @@ def kaiming_normal_(
             x,
             a=param,
             mode=mode,
-            nonlinearity=nonlinearity,  # ty: ignore[invalid-argument-type]
+            nonlinearity=nonlinearity,
             generator=generator,
         )
 
