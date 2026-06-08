@@ -8,6 +8,8 @@ from typing import Literal
 
 import pytest
 
+torch = pytest.importorskip("torch")
+
 from nneuroutil.helpers import module_logger
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -20,8 +22,6 @@ log = module_logger(__name__)
 
 
 def test_quadratic() -> None:
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import Quadratic
 
     x = torch.randn(5, 5)
@@ -33,8 +33,6 @@ def test_quadratic() -> None:
 
 
 def test_leaky_quadratic() -> None:
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import LeakyQuadratic
 
     alpha = 0.2
@@ -48,8 +46,6 @@ def test_leaky_quadratic() -> None:
 
 
 def test_complex_tanh() -> None:
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import ComplexTanh
 
     x_real = torch.randn(5, 5)
@@ -70,8 +66,6 @@ def test_complex_tanh() -> None:
 
 
 def test_bias() -> None:
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import Bias
 
     size = 10
@@ -83,8 +77,6 @@ def test_bias() -> None:
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import ComplexLinear
 
     in_features = 4
@@ -133,8 +125,6 @@ def test_kaiming_init(
     param: float | None,
     mode: Literal["fan_in", "fan_out"],
 ) -> None:
-    torch = pytest.importorskip("torch")
-
     from nneuroutil.torch_extras import kaiming_normal_, kaiming_uniform_
 
     shape = (10, 10)

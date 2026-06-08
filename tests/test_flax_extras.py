@@ -15,21 +15,6 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 
-from nneuroutil.flax_extras import (
-    Bias,
-    ComplexLinear,
-    ComplexTanh,
-    LeakyQuadratic,
-    Quadratic,
-    complex_tanh,
-    leaky_quadratic,
-    leaky_quadratic_normal,
-    leaky_quadratic_uniform,
-    quadratic,
-    quadratic_normal,
-    quadratic_uniform,
-)
-
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
@@ -40,6 +25,8 @@ log = module_logger(__name__)
 
 
 def test_quadratic() -> None:
+    from nneuroutil.flax_extras import Quadratic, quadratic
+
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
     mod = Quadratic()
     res_mod = mod(x)
@@ -50,6 +37,8 @@ def test_quadratic() -> None:
 
 
 def test_leaky_quadratic() -> None:
+    from nneuroutil.flax_extras import LeakyQuadratic, leaky_quadratic
+
     alpha = 0.2
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
 
@@ -63,6 +52,8 @@ def test_leaky_quadratic() -> None:
 
 
 def test_complex_tanh() -> None:
+    from nneuroutil.flax_extras import ComplexTanh, complex_tanh
+
     key1, key2 = jax.random.split(jax.random.PRNGKey(0))
     x_real = jax.random.normal(key1, (5, 5))
     x_imag = jax.random.normal(key2, (5, 5))
@@ -84,6 +75,8 @@ def test_complex_tanh() -> None:
 
 
 def test_bias() -> None:
+    from nneuroutil.flax_extras import Bias
+
     size = 10
     mod = Bias(size)
     assert mod.bias.value.shape == (size,)
@@ -92,6 +85,8 @@ def test_bias() -> None:
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
+    from nneuroutil.flax_extras import ComplexLinear
+
     in_features = 4
     out_features = 6
     batch_size = 3
@@ -133,6 +128,13 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 
 @pytest.mark.parametrize("alpha", [1.0, 0.5])
 def test_kaiming_init(alpha: float) -> None:
+    from nneuroutil.flax_extras import (
+        leaky_quadratic_normal,
+        leaky_quadratic_uniform,
+        quadratic_normal,
+        quadratic_uniform,
+    )
+
     shape = (10, 10)
     key = jax.random.PRNGKey(0)
 
