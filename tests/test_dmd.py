@@ -65,7 +65,7 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
 
         _ = jax.jit(build_dmd, static_argnames=("rank", "xp"))(X[:-1], X[1:], xp=xp)
     elif backend == "torch":
-        import torch
+        import torch  # ty: ignore[unresolved-import,unused-ignore-comment]
 
         _ = torch.compile(build_dmd)(X[:-1], X[1:], xp=xp)
 
