@@ -20,7 +20,7 @@ log = module_logger(__name__)
 
 class Quadratic(nnx.Module):
     def __call__(self, x: jax.Array) -> jax.Array:
-        return x * x
+        return quadratic(x)
 
 
 class LeakyQuadratic(nnx.Module):
@@ -28,12 +28,25 @@ class LeakyQuadratic(nnx.Module):
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return self.alpha * x + (1.0 - self.alpha) * x * x
+        return leaky_quadratic(x, alpha=self.alpha)
+
+
+class ComplexQuadratic(nnx.Module):
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return complex_quadratic(x)
+
+
+class ComplexLeakyQuadratic(nnx.Module):
+    def __init__(self, alpha: float = 0.1) -> None:
+        self.alpha = alpha
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return complex_leaky_quadratic(x, alpha=self.alpha)
 
 
 class ComplexTanh(nnx.Module):
     def __call__(self, x: jax.Array) -> jax.Array:
-        return jnp.tanh(x.real) + 1j * jnp.tanh(x.imag)
+        return complex_tanh(x)
 
 
 def quadratic(x: jax.Array) -> jax.Array:
@@ -42,6 +55,15 @@ def quadratic(x: jax.Array) -> jax.Array:
 
 def leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
     return alpha * x + (1 - alpha) * x * x
+
+
+def complex_quadratic(x: jax.Array) -> jax.Array:
+    x_re, x_im = jnp.split(x, 2, axis=-1)
+    return jnp.concatenate([x_re * x_re + x_im * x_im, 2.0 * x_re * x_im], axis=-1)
+
+
+def complex_leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+    return alpha * x + (1 - alpha) * complex_quadratic(x)
 
 
 def complex_tanh(x: jax.Array) -> jax.Array:
