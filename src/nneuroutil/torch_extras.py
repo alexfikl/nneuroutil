@@ -18,7 +18,7 @@ log = module_logger(__name__)
 
 
 def complex_quadratic(x: torch.Tensor) -> torch.Tensor:
-    x_re, x_im = torch.split(x, 2, dim=-1)
+    x_re, x_im = torch.chunk(x, 2, dim=-1)
     return torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
 
 
