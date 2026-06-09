@@ -114,7 +114,7 @@ def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
         b, _, _, _ = xp.linalg.lstsq(Phi, x0)
 
     # compute all iterations of the operator
-    n = xp.arange(steps, dtype=x0.dtype)
+    n = xp.arange(steps, device=x0.device, dtype=x0.dtype)
     Lambda = lambdas[None, :] ** n
 
     # apply the operator
