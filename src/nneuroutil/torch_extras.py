@@ -17,9 +17,22 @@ log = module_logger(__name__)
 # {{{ activation functions
 
 
+def csquared(x: torch.Tensor) -> torch.Tensor:
+    d = x.shape[-1] // 2
+    x_re = x[..., :d]
+    x_im = x[..., d:]
+
+    return torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
+
+
 class Quadratic(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
         return x * x
+
+
+class ComplexQuadratic(nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+        return csquared(x)
 
 
 class LeakyQuadratic(nn.Module):
@@ -30,6 +43,16 @@ class LeakyQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.alpha * x + (1.0 - self.alpha) * x * x
+
+
+class ComplexLeakyQuadratic(nn.Module):
+    def __init__(self, alpha: float = 0.1) -> None:
+        super().__init__()
+
+        self.alpha = alpha
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.alpha * x + (1.0 - self.alpha) * csquared(x)
 
 
 class ComplexTanh(nn.Module):
