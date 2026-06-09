@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Literal
+from collections.abc import Callable
+from typing import Any, Literal, TypeVar
 
 import torch
+import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch import nn
+from torch.utils._python_dispatch import TorchDispatchMode  # noqa: PLC2701
 
 from nneuroutil.helpers import module_logger
 
@@ -205,6 +208,35 @@ def kaiming_normal_(
             nonlinearity=nonlinearity,
             generator=generator,
         )
+
+
+# }}}
+
+
+# {{{ DeviceCheckMode
+
+
+R = TypeVar("R")
+
+
+class DeviceCheckMode(TorchDispatchMode):
+    def __init__(self, device: str | torch.device) -> None:
+        self.device = torch.device(device)
+
+    def __torch_dispatch__(  # noqa: PLW3201
+        self,
+        func: Callable[..., R],
+        types: tuple[type, ...],
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+    ) -> R:
+        for tensor in pytree.tree_leaves((args, kwargs)):
+            if isinstance(tensor, torch.Tensor) and tensor.device != self.device:
+                raise RuntimeError(
+                    f"{func}: tensor on {tensor.device}, expected {self.device}"
+                )
+
+        return func(*args, **(kwargs or {}))
 
 
 # }}}
