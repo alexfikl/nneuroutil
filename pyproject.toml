@@ -109,7 +109,7 @@ default.extend-words.inh = "inh"
 default.extend-words.ND = "ND"
 
 [tool.ty]
-analysis.allowed-unresolved-imports = [ "torch.**" ]
+analysis.replace-imports-with-any = [ "torch.**" ]
 
 [tool.pytest]
 ini_options.testpaths = "tests"

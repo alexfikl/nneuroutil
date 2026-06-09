@@ -132,8 +132,19 @@ def total_least_squares(
     Y: Array2D,
     *,
     rank: int | None = None,
+    eps: int | None = None,
     xp: Any = None,
 ) -> tuple[Array2D, Array2D]:
+    """Apply Total Least Squares de-biasing to the dataset.
+
+    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
+    :arg rank: if given, the desired fixed rank of the approximation.
+    :arg eps: a minimum absolute tolerance for singular values. Note that this
+        is a data-dependent slice and some frameworks (e.g. :mod:`jax`) will not
+        be able to compile it.
+    """
+    _, dim = X.shape
     nsnapshots, dim = X.shape
     if X.shape != Y.shape:
         raise ValueError(
@@ -155,6 +166,10 @@ def total_least_squares(
     if rank is not None:
         U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
 
+    if eps is not None:
+        mask = xp.abs(S) > eps
+        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+
     X = U @ xp.diag(S) @ Vh[:, :dim]
     Y = U @ xp.diag(S) @ Vh[:, dim:]
 
@@ -172,6 +187,7 @@ def build_dmd(
     Y: Array2D,
     *,
     rank: int | None = None,
+    eps: int | None = None,
     xp: Any = None,
 ) -> DMD:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
@@ -180,7 +196,11 @@ def build_dmd(
     algorithm to the snapshots, so that the noise is handled consistently.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
+    :arg eps: a minimum absolute tolerance for singular values. Note that this
+        is a data-dependent slice and some frameworks (e.g. :mod:`jax`) will not
+        be able to compile it.
     """
     _, dim = X.shape
 
@@ -195,6 +215,10 @@ def build_dmd(
 
     if rank is not None:
         U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+
+    if eps is not None:
+        mask = xp.abs(S) > eps
+        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
     # construct reduced order model
     Ahat = Vh @ xp.conj(Y).T @ U @ xp.diag(1 / S)
