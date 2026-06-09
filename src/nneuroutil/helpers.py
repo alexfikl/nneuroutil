@@ -179,7 +179,7 @@ class TicTocTimer:
 
     def __str__(self) -> str:
         # NOTE: this matches how MATLAB shows the time from `toc`.
-        return f"Elapsed time is {self.t_wall:.5f} seconds."
+        return f"Elapsed time is {self.t_wall:.5f} seconds"
 
     def stats(self) -> str:
         """Aggregate statistics across multiple calls to :meth:`toc`."""
