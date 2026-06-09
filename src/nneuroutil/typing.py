@@ -22,17 +22,20 @@ ShapeT = TypeVar("ShapeT", bound=tuple[int, ...], default=tuple[Any, ...])
 # Now, it seems pretty empty, so not sure it's worth doing more than this..
 
 Array0D: TypeAlias = Any
-"""A type variable for a 0-dimensional array."""
+"""An 0-dimensional array."""
 Array1D: TypeAlias = Any
-"""A type variable for a 1-dimensional array."""
+"""An 1-dimensional array."""
 Array2D: TypeAlias = Any
-"""A type variable for a 2-dimensional array."""
+"""A 2-dimensional array."""
 Array3D: TypeAlias = Any
-"""A type variable for a 3-dimensional array."""
+"""A 3-dimensional array."""
 Array4D: TypeAlias = Any
-"""A type variable for a 4-dimensional array."""
+"""A 4-dimensional array."""
 ArrayND: TypeAlias = Any
-"""A type variable for a n-dimensional array."""
+"""An n-dimensional array."""
+
+DTypeLike: TypeAlias = Any
+"""A :class:`numpy.dtype` like object."""
 
 
 class DataclassInstance(Protocol):
