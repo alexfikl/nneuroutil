@@ -132,7 +132,7 @@ def total_least_squares(
     Y: Array2D,
     *,
     rank: int | None = None,
-    eps: int | None = None,
+    eps: float | None = None,
     xp: Any = None,
 ) -> tuple[Array2D, Array2D]:
     """Apply Total Least Squares de-biasing to the dataset.
@@ -187,7 +187,7 @@ def build_dmd(
     Y: Array2D,
     *,
     rank: int | None = None,
-    eps: int | None = None,
+    eps: float | None = None,
     xp: Any = None,
 ) -> DMD:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
