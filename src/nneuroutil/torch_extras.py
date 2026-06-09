@@ -48,6 +48,9 @@ class Bias(nn.Module):
         super().__init__()
         self.bias = nn.Parameter(torch.zeros(size, dtype=dtype))
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.bias
+
 
 class ComplexLinear(nn.Module):
     def __init__(
