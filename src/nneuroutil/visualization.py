@@ -324,3 +324,24 @@ def savefig(
 
 
 # }}}
+
+
+# {{{ make_colorbar_axis
+
+
+def make_colorbar_axes(
+    ax: mp.Axes,
+    *,
+    position: str = "right",
+    size: str = "5%",
+    pad: float = 0.1,
+) -> mp.Axes:
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes(position, size=size, pad=pad)
+
+    return cax
+
+
+# }}}
