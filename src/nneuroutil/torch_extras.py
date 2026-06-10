@@ -213,6 +213,21 @@ def kaiming_normal_(
 # }}}
 
 
+# {{{ available_devices
+
+def available_devices() -> frozenset[torch.device]:
+    """Get a list of all supported devices."""
+
+    devices = [torch.device("cpu")]
+    devices += [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
+    if torch.backends.mps.is_available():
+        devices.append(torch.device("mps"))
+
+    return frozenset(devices)
+
+# }}}
+
+
 # {{{ DeviceCheckMode
 
 
