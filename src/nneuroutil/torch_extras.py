@@ -220,7 +220,10 @@ R = TypeVar("R")
 
 
 class DeviceCheckMode(TorchDispatchMode):
-    def __init__(self, device: str | torch.device) -> None:
+    def __init__(self, device: str | torch.device | None = None) -> None:
+        if device is None:
+            device = torch.get_default_device()
+
         self.device = torch.device(device)
 
     def __torch_dispatch__(  # noqa: PLW3201
