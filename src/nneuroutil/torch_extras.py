@@ -234,6 +234,11 @@ def available_devices() -> frozenset[torch.device]:
     return frozenset(devices)
 
 
+def available_device_names() -> frozenset[str]:
+    """Get a list of available device names."""
+    return frozenset([d.type for d in available_devices()])
+
+
 # }}}
 
 
