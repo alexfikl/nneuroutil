@@ -215,6 +215,7 @@ def kaiming_normal_(
 
 # {{{ available_devices
 
+
 def available_devices() -> frozenset[torch.device]:
     """Get a list of all supported devices."""
 
@@ -231,6 +232,7 @@ def available_devices() -> frozenset[torch.device]:
         devices.append(torch.device("xpu"))
 
     return frozenset(devices)
+
 
 # }}}
 

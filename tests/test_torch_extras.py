@@ -22,13 +22,21 @@ log = module_logger(__name__)
 
 
 def test_quadratic() -> None:
-    from nneuroutil.torch_extras import Quadratic
+    from nneuroutil.torch_extras import ComplexQuadratic, Quadratic
 
+    # test real only
     x = torch.randn(5, 5)
 
     mod = Quadratic()
     res = mod(x)
+    assert torch.allclose(res, x * x)
 
+    # test complex
+    x = torch.randn(5, 10)
+    x[:, 5:] = 0.0
+
+    mod = ComplexQuadratic()
+    res = mod(x)
     assert torch.allclose(res, x * x)
 
 
@@ -147,6 +155,39 @@ def test_kaiming_init(
     )
     assert res_normal.shape == shape
     assert not torch.allclose(res_normal, torch.zeros_like(res_normal))
+
+
+# }}}
+
+
+# {{{ test_device_check_mode
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU backend not available")
+def test_device_check_mode() -> None:
+    from nneuroutil.torch_extras import DeviceCheckMode, DeviceMismatchError
+
+    torch.set_default_device("cuda")
+    device = torch.get_default_device()
+
+    with DeviceCheckMode(device):
+        # this should pass
+        x = torch.linspace(0.0, 1.0, 32, device=device)
+        assert x.device.type.startswith("cuda")
+
+        # this should also pass, since it's all on the default device
+        y = 2 * x
+        assert y is not None
+
+    with pytest.raises(DeviceMismatchError):  # noqa: SIM117,PT012
+        with DeviceCheckMode():
+            # this should pass
+            x = torch.linspace(0.0, 1.0, 32, device="cpu")
+            assert x.device.type == "cpu"
+
+            # this goes through the backend and will get caught by DeviceCheckMode
+            y = 2 * x
+            assert y is not None
 
 
 # }}}
