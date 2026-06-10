@@ -241,7 +241,21 @@ def available_devices() -> frozenset[torch.device]:
 R = TypeVar("R")
 
 
+class DeviceMismatchError(RuntimeError):
+    """Error raised when a Tensor's device does not match the expected one."""
+
+
 class DeviceCheckMode(TorchDispatchMode):
+    """A context manager that can be used to check that all operations are taking
+    places on a given device.
+
+    .. code:: python
+
+        with DeviceCheckMode("cuda:0"):
+            x = torch.linspace(0.0, 1.0, 32, device="cuda:0")
+            y = 2 * x
+    """
+
     def __init__(self, device: str | torch.device | None = None) -> None:
         if device is None:
             device = torch.get_default_device()
@@ -257,7 +271,7 @@ class DeviceCheckMode(TorchDispatchMode):
     ) -> R:
         for tensor in pytree.tree_leaves((args, kwargs)):
             if isinstance(tensor, torch.Tensor) and tensor.device != self.device:
-                raise RuntimeError(
+                raise DeviceMismatchError(
                     f"{func}: tensor on {tensor.device}, expected {self.device}"
                 )
 
