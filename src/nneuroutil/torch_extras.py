@@ -220,8 +220,15 @@ def available_devices() -> frozenset[torch.device]:
 
     devices = [torch.device("cpu")]
     devices += [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
+
     if torch.backends.mps.is_available():
         devices.append(torch.device("mps"))
+
+    if torch.backends.mtia.is_available():
+        devices.append(torch.device("mtia"))
+
+    if torch.backends.xpu.is_available():
+        devices.append(torch.device("xpu"))
 
     return frozenset(devices)
 
