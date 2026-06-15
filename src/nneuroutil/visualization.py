@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pathlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +15,39 @@ if TYPE_CHECKING:
     import matplotlib.pyplot as mp
 
 log = module_logger(__name__)
+
+# {{{ load_scienceplots_styles
+
+
+class Styles:
+    def __init__(self, styles: dict[str, str]) -> None:
+        self.styles = styles
+
+    def get(self, styles: str | Sequence[str]) -> tuple[str, ...]:
+        if isinstance(styles, str):
+            styles = [styles]
+
+        # NOTE: this silently does nothing if the styles are incorrectly named or
+        # if scienceplots does not actually exist. This should be fine..
+        return tuple(self.styles[style] for style in styles if style in self.styles)
+
+
+def load_scienceplots_styles() -> Styles:
+    from importlib.util import find_spec
+
+    spec = find_spec("scienceplots")
+    if spec is None:
+        return Styles({})
+
+    if spec.submodule_search_locations is None:
+        return Styles({})
+
+    styles_root = pathlib.Path(spec.submodule_search_locations[0]) / "styles"
+    return Styles({f.stem: str(f) for f in styles_root.rglob("*") if f.is_file()})
+
+
+# }}}
+
 
 # {{{ set_plotting_defaults
 
@@ -100,14 +133,12 @@ def set_plotting_defaults(
             "NNEUROUTIL_SAVEFIG", mp.rcParams["savefig.format"]
         ).lower()
 
-    from contextlib import suppress
-
     # NOTE: preserve existing colors (the ones in "science" are ugly)
     prop_cycle = mp.rcParams["axes.prop_cycle"]
-    with suppress(ImportError):
-        import scienceplots  # noqa: F401
 
-        mp.style.use(["science", "ieee"])
+    # try to load scienceplots styles
+    scienceplots = load_scienceplots_styles()
+    mp.style.use(scienceplots.get(["science", "ieee"]))
 
     # NOTE: the 'petroff10' style is available for version >= 3.10.0 and changes
     # the 'prop_cycle' to the 10 colors that are more accessible
