@@ -320,6 +320,16 @@ class FuzzyChoiceAction(argparse.Action):
 
     For example, when using ``("cpu", "cuda:0", "cuda:1")`` as choices and passing
     ``--device cuda``, the action will select the first match.
+
+    .. code:: python
+
+        parser.add_argument(
+            "--device",
+            action=FuzzyChoiceAction,
+            choices=("cpu", "cuda:0", "cuda:1"),
+            default="cpu",
+            help="the default device",
+        )
     """
 
     def __init__(
