@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import pathlib
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -293,6 +294,59 @@ def slugify(stem: str, separator: str = "_") -> str:
     stem = re.sub(rf"[{separator}]+", separator, stem.strip(separator))
 
     return stem
+
+
+# }}}
+
+
+# {{{ FuzzyChoiceAction
+
+
+def _fuzzy_choice_matcher(options: Sequence[str]) -> Callable[[str], str]:
+    def match(value: str) -> str:
+        matches = [o for o in options if o.startswith(value)]
+        if not matches:
+            raise argparse.ArgumentTypeError(
+                f"invalid choice {value!r} (choose from {options})"
+            )
+
+        return matches[0]
+
+    return match
+
+
+class FuzzyChoiceAction(argparse.Action):
+    """A custom action for :mod:`argparse` that handles suffix choices.
+
+    For example, when using ``("cpu", "cuda:0", "cuda:1")`` as choices and passing
+    ``--device cuda``, the action will select the first match.
+    """
+
+    def __init__(
+        self,
+        option_strings: Sequence[str],
+        dest: str,
+        choices: Iterable[Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if choices is None:
+            raise ValueError(f"'choices' not provided for {type(self).__name__!r}")
+
+        choices = list(choices)
+        metavar = ",".join(choices)
+
+        kwargs.setdefault("metavar", f"{{{metavar}}}")
+        kwargs.setdefault("type", _fuzzy_choice_matcher(choices))
+        super().__init__(option_strings, dest, choices=None, **kwargs)
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
+        setattr(namespace, self.dest, values)
 
 
 # }}}
