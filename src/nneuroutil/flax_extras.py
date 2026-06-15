@@ -77,8 +77,24 @@ def complex_tanh(x: jax.Array) -> jax.Array:
 
 
 class Bias(nnx.Module):
-    def __init__(self, size: int, *, dtype: Any = None) -> None:
-        self.bias = nnx.Param(jnp.zeros((size,), dtype=dtype))
+    def __init__(
+        self,
+        size: int,
+        *,
+        dtype: Any = None,
+        init: Initializer | None = None,
+        rngs: nnx.Rngs | None = None,
+    ) -> None:
+        if init is None:
+            init = nnx.initializers.zeros_init()
+
+        if rngs is None:
+            rngs = nnx.Rngs(0)
+
+        self.bias = nnx.Param(init(rngs.params(), (size,), dtype))
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return x + self.bias
 
 
 class ComplexLinear(nnx.Module):
@@ -91,8 +107,11 @@ class ComplexLinear(nnx.Module):
         dtype: Any | None = None,
         kernel_init: Initializer | None = None,
         bias_init: Initializer | None = None,
-        rngs: nnx.Rngs,
+        rngs: nnx.Rngs | None = None,
     ) -> None:
+        if rngs is None:
+            rngs = nnx.Rngs(0)
+
         if kernel_init is None:
             kernel_init = nnx.initializers.lecun_normal()
 
