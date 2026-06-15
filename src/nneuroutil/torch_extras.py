@@ -225,10 +225,10 @@ def available_devices() -> frozenset[torch.device]:
     if torch.backends.mps.is_available():
         devices.append(torch.device("mps"))
 
-    if torch.backends.mtia.is_available():
+    if hasattr(torch.backends, "mtia") and torch.backends.mtia.is_available():
         devices.append(torch.device("mtia"))
 
-    if torch.backends.xpu.is_available():
+    if hasattr(torch.backends, "xpu") and torch.backends.xpu.is_available():
         devices.append(torch.device("xpu"))
 
     return frozenset(devices)
@@ -236,7 +236,10 @@ def available_devices() -> frozenset[torch.device]:
 
 def available_device_names() -> frozenset[str]:
     """Get a list of available device names."""
-    return frozenset([d.type for d in available_devices()])
+    return frozenset([
+        d.type if d.index is None else f"{d.type}:{d.index}"
+        for d in available_devices()
+    ])
 
 
 # }}}
