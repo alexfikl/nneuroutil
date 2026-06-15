@@ -94,7 +94,7 @@ class Bias(nnx.Module):
         self.bias = nnx.Param(init(rngs.params(), (size,), dtype))
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return x + self.bias
+        return x + self.bias  # ty: ignore[unsupported-operator]
 
 
 class ComplexLinear(nnx.Module):
