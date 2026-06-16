@@ -362,26 +362,10 @@ class FuzzyChoiceAction(argparse.Action):
 # }}}
 
 
-# {{{ jax
+# {{{ register dataclasses
 
 
 _PENDING_JAX_REGISTER_DATACLASS = []
-
-
-def set_jax_config() -> None:
-    """Set up any ``jax`` related functionality.
-
-    This should be called after JAX is imported. It will mainly enable ``float64``
-    mode, register any required PyTrees, etc.
-    """
-    if "jax" not in sys.modules:
-        return
-
-    import jax
-
-    jax.config.update("jax_enable_x64", val=True)
-    while _PENDING_JAX_REGISTER_DATACLASS:
-        jax.tree_util.register_dataclass(_PENDING_JAX_REGISTER_DATACLASS.pop())
 
 
 def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT]:

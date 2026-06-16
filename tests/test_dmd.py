@@ -9,7 +9,7 @@ import array_api_compat
 import numpy as np
 import pytest
 
-from nneuroutil.helpers import module_logger, set_jax_config, spectrum_error
+from nneuroutil.helpers import module_logger, spectrum_error
 from nneuroutil.visualization import set_plotting_defaults
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -31,6 +31,8 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     # set up backend
     if backend == "jax":
         jax = pytest.importorskip("jax")
+
+        from nneuroutil.flax_extras import set_jax_config
 
         set_jax_config()
         xp = jax.numpy

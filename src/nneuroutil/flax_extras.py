@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import jax
@@ -250,6 +252,74 @@ def leaky_quadratic_normal(
         batch_axis=batch_axis,
         dtype=dtype,
     )
+
+
+# }}}
+
+
+# {{{ available_device_names
+
+
+class UnknownDeviceError(RuntimeError):
+    """Error raised when a device is not known."""
+
+
+def available_device_names() -> frozenset[str]:
+    return frozenset([f"{d.platform}:{d.id}" for d in jax.devices()])
+
+
+@contextmanager
+def jax_default_device(device: str) -> Iterator[None]:
+    if ":" in device:
+        platform, ids = device.split(":", maxsplit=1)
+        if ids:
+            try:
+                dev_id = int(ids)
+            except ValueError as exc:
+                raise UnknownDeviceError(f"could not parse device {device:r}") from exc
+        else:
+            dev_id = 0
+    else:
+        platform = device
+        dev_id = 0
+
+    try:
+        devices = jax.devices(platform)
+    except RuntimeError as exc:
+        raise UnknownDeviceError(
+            f"cannot set device {device!r}: unknown platform"
+        ) from exc
+
+    if not 0 <= dev_id < len(devices):
+        raise UnknownDeviceError(
+            f"cannot set device {device!r}: id out of bounds for {len(devices)} devices"
+        )
+
+    prev_device = jax.config.jax_default_device  # ty: ignore[unresolved-attribute]
+    jax.config.update("jax_default_device", devices[dev_id])
+    try:
+        yield
+    finally:
+        jax.config.update("jax_default_device", prev_device)
+
+
+def set_jax_config(
+    *,
+    platform: str | None = None,
+) -> None:
+    """Set up any ``jax`` related functionality.
+
+    This should be called after JAX is imported. It will mainly enable ``float64``
+    mode, register any required PyTrees, etc.
+    """
+    if platform is not None:
+        jax.config.update("jax_platform_name", platform)
+
+    from nneuroutil.helpers import _PENDING_JAX_REGISTER_DATACLASS
+
+    jax.config.update("jax_enable_x64", val=True)
+    while _PENDING_JAX_REGISTER_DATACLASS:
+        jax.tree_util.register_dataclass(_PENDING_JAX_REGISTER_DATACLASS.pop())
 
 
 # }}}
