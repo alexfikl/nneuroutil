@@ -265,11 +265,19 @@ class UnknownDeviceError(RuntimeError):
 
 
 def available_device_names() -> frozenset[str]:
+    """
+    :returns: a set of ``platform:id`` device names supported by ``jax``. If
+        a device object list is needed, just use :func:`jax.devices`.
+    """
     return frozenset([f"{d.platform}:{d.id}" for d in jax.devices()])
 
 
 @contextmanager
 def jax_default_device(device: str) -> Iterator[None]:
+    """A context manager similar to :func:`jax.default_device`.
+
+    :arg device: a device name in the form ``platform[:id]``.
+    """
     if ":" in device:
         platform, ids = device.split(":", maxsplit=1)
         if ids:
