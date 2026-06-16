@@ -61,7 +61,7 @@ def leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
 
 def complex_quadratic(x: jax.Array) -> jax.Array:
     x_re, x_im = jnp.split(x, 2, axis=-1)
-    return jnp.concatenate([x_re * x_re + x_im * x_im, 2.0 * x_re * x_im], axis=-1)
+    return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
 
 
 def complex_leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
