@@ -23,3 +23,12 @@ path = ["requirements.txt", ".ci/requirements*"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
 SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = [
+    "docs/*.rst",
+    "docs/justfile",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"

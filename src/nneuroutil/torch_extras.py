@@ -27,11 +27,13 @@ def complex_quadratic(x: torch.Tensor) -> torch.Tensor:
 
 class Quadratic(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+        """Define the computation performed at every call."""
         return x * x
 
 
 class ComplexQuadratic(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+        """Define the computation performed at every call."""
         return complex_quadratic(x)
 
 
@@ -42,6 +44,7 @@ class LeakyQuadratic(nn.Module):
         self.alpha = alpha
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         return self.alpha * x + (1.0 - self.alpha) * x * x
 
 
@@ -52,11 +55,13 @@ class ComplexLeakyQuadratic(nn.Module):
         self.alpha = alpha
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         return self.alpha * x + (1.0 - self.alpha) * complex_quadratic(x)
 
 
 class ComplexTanh(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+        """Define the computation performed at every call."""
         return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
 
 
@@ -72,6 +77,7 @@ class Bias(nn.Module):
         self.bias = nn.Parameter(torch.zeros(size, dtype=dtype))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         return x + self.bias
 
 
@@ -104,6 +110,7 @@ class ComplexLinear(nn.Module):
         nn.init.kaiming_uniform_(self.weight, math.sqrt(5))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         # x: [batch, 2 * in_features]
         x_re, x_im = x.chunk(2, dim=-1)
 

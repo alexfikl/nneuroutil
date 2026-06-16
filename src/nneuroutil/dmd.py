@@ -22,7 +22,9 @@ log = module_logger(__name__)
 @dataclass(frozen=True)
 class DMD:
     Ahat: Array2D
-    """Reduced-order model operator of shape :math:`(r, r)` with rank :attr:`rank`."""
+    """Reduced-order model operator of shape :math:`(r, r)` with rank
+    :attr:`reduced_size`.
+    """
 
     U: Array2D
     """Temporal modes as an array of shape :math:`(n - 1, r)`."""
@@ -141,7 +143,7 @@ def total_least_squares(
     :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     :arg eps: a minimum absolute tolerance for singular values. Note that this
-        is a data-dependent slice and some frameworks (e.g. :mod:`jax`) will not
+        is a data-dependent slice and some frameworks (e.g. ``jax``) will not
         be able to compile it.
     """
     _, dim = X.shape
@@ -199,7 +201,7 @@ def build_dmd(
     :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     :arg eps: a minimum absolute tolerance for singular values. Note that this
-        is a data-dependent slice and some frameworks (e.g. :mod:`jax`) will not
+        is a data-dependent slice and some frameworks (e.g. ``jax``) will not
         be able to compile it.
     """
     _, dim = X.shape

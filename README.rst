@@ -16,6 +16,12 @@ data from neuroscience. The focus is mainly on AI implementations of various
 models and pipelines. It will mainly grow as various needs arise and it does
 not aim to be a general framework for such problems, as the field is too vast.
 
+There are many frameworks and libraries that can be used for this sort of stuff.
+For some Python examples, see
+
+* `Braindecode <https://github.com/braindecode/braindecode>`__:  Deep learning
+  software to decode EEG, ECG or MEG signals
+
 Links
 -----
 

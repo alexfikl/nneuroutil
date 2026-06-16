@@ -369,7 +369,7 @@ _PENDING_JAX_REGISTER_DATACLASS = []
 
 
 def set_jax_config() -> None:
-    """Set up any :mod:`jax` related functionality.
+    """Set up any ``jax`` related functionality.
 
     This should be called after JAX is imported. It will mainly enable ``float64``
     mode, register any required PyTrees, etc.
