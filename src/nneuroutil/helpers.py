@@ -22,6 +22,8 @@ from nneuroutil.typing import Array1D, DataclassInstanceT
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from rich.table import Table
+
 # {{{ environment
 
 
@@ -294,6 +296,25 @@ def slugify(stem: str, separator: str = "_") -> str:
     stem = re.sub(rf"[{separator}]+", separator, stem.strip(separator))
 
     return stem
+
+
+# }}}
+
+
+# {{{ stringify_table
+
+
+def stringify_table(table: Table) -> str:
+    """Stringify a rich table."""
+    import io
+
+    from rich.console import Console
+
+    file = io.StringIO()
+    console = Console(file=file)
+    console.print(table)
+
+    return str(file.getvalue())
 
 
 # }}}
