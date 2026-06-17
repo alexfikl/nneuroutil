@@ -59,7 +59,7 @@ def test_leaky_quadratic() -> None:
 
     mod = ComplexLeakyQuadratic()
     res = mod(x)
-    assert torch.allclose(res, x * x)
+    assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 
 
 def test_complex_tanh() -> None:
