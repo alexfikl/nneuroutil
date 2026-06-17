@@ -41,16 +41,25 @@ def test_quadratic() -> None:
 
 
 def test_leaky_quadratic() -> None:
-    from nneuroutil.torch_extras import LeakyQuadratic
+    from nneuroutil.torch_extras import ComplexLeakyQuadratic, LeakyQuadratic
 
+    n = 5
     alpha = 0.2
-    x = torch.randn(5, 5)
+    x = torch.randn(n, n)
 
     mod = LeakyQuadratic(alpha=alpha)
     res = mod(x)
     expected = alpha * x + (1.0 - alpha) * x * x
 
     assert torch.allclose(res, expected)
+
+    # test complex
+    x = torch.randn(n, 2 * n)
+    x[:, n:] = 0.0
+
+    mod = ComplexLeakyQuadratic()
+    res = mod(x)
+    assert torch.allclose(res, x * x)
 
 
 def test_complex_tanh() -> None:
