@@ -206,9 +206,9 @@ def leaky_quadratic_uniform(
     if abs(alpha - 1.0) < 1.0e-8:
         scale = 1.0
     else:
-        a = 2 * (1 - alpha) ** 2
+        a = 3 * (1 - alpha) ** 2
         b = alpha**2
-        scale = (-b + (b**2 + 8 * a) ** 0.5) / (2 * a)
+        scale = (-b + (b**2 + 4 * a) ** 0.5) / (2 * a)
 
     return nnx.initializers.variance_scaling(
         scale=scale,
@@ -239,9 +239,9 @@ def leaky_quadratic_normal(
     if abs(alpha - 1.0) < 1.0e-8:
         scale = 1.0
     else:
-        a = 2 * (1 - alpha) ** 2
+        a = 3 * (1 - alpha) ** 2
         b = alpha**2
-        scale = (-b + (b**2 + 8 * a) ** 0.5) / (2 * a)
+        scale = (-b + (b**2 + 4 * a) ** 0.5) / (2 * a)
 
     return nnx.initializers.variance_scaling(
         scale=scale,

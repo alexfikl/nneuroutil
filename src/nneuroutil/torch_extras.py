@@ -203,18 +203,18 @@ def kaiming_uniform_(
         bound = math.sqrt(3) / math.sqrt(math.sqrt(2) * fan)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
     elif nonlinearity == "leaky_quadratic":
-        # NOTE: if not given, we go back to a straight quadratic
+        # NOTE: if not given, use the default from LeakyQuadratic
         if param is None:
-            param = 1.0
+            param = 0.5
 
-        if abs(param) < 1.0e-8:
+        if abs(param - 1.0) < 1.0e-8:
             var_x = 1.0 / fan
         else:
-            a = param
-            b = (1 - a) ** 2
-            var_x = (-b + math.sqrt(b**2 + 8 * a**2)) / (4 * a**2 * fan)
+            b = param**2
+            a = 3 * (1 - param) ** 2
+            var_x = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a * fan)
 
-        bound = math.sqrt(3) * math.sqrt(var_x)
+        bound = math.sqrt(3 * var_x)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
     else:
         # NOTE: this is the default for kaiming_uniform_
@@ -249,16 +249,16 @@ def kaiming_normal_(
         std = 1.0 / math.sqrt(math.sqrt(2) * fan)
         return nn.init.normal_(x, 0.0, std, generator=generator)
     elif nonlinearity == "leaky_quadratic":
-        # NOTE: if not given, we go back to a straight quadratic
+        # NOTE: if not given, use the default from LeakyQuadratic
         if param is None:
-            param = 1.0
+            param = 0.5
 
-        if abs(param) < 1.0e-8:
+        if abs(param - 1.0) < 1.0e-8:
             var_x = 1.0 / fan
         else:
-            a = param
-            b = (1 - a) ** 2
-            var_x = (-b + math.sqrt(b**2 + 8 * a**2)) / (4 * a**2 * fan)
+            b = param**2
+            a = 3 * (1 - param) ** 2
+            var_x = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a * fan)
 
         return nn.init.normal_(x, 0.0, math.sqrt(var_x), generator=generator)
     else:
