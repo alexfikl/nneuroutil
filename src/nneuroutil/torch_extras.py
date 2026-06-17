@@ -72,9 +72,18 @@ class ComplexTanh(nn.Module):
 
 
 class Bias(nn.Module):
-    def __init__(self, size: int, *, dtype: Any = None) -> None:
+    def __init__(
+        self,
+        size: int,
+        *,
+        device: str | torch.device | None = None,
+        dtype: Any = None,
+    ) -> None:
         super().__init__()
-        self.bias = nn.Parameter(torch.zeros(size, dtype=dtype))
+        self.bias = nn.Parameter(torch.zeros(size, device=device, dtype=dtype))
+
+    def reset_parameters(self) -> None:
+        nn.init.zeros_(self.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
@@ -88,15 +97,22 @@ class ComplexLinear(nn.Module):
         out_features: int,
         *,
         bias: bool = False,
+        device: str | torch.device | None = None,
         dtype: Any | None = None,
-    ):
+    ) -> None:
         super().__init__()
 
         ftype = None if dtype is None else dtype.to_real()
-        self.weight = nn.Parameter(torch.empty(out_features, in_features, dtype=ftype))
+        self.weight = nn.Parameter(
+            torch.empty(out_features, in_features, device=device, dtype=ftype)
+        )
         if bias:
-            self.bias_re = nn.Parameter(torch.empty(out_features))
-            self.bias_im = nn.Parameter(torch.empty(out_features))
+            self.bias_re = nn.Parameter(
+                torch.empty(out_features, device=device, dtype=ftype)
+            )
+            self.bias_im = nn.Parameter(
+                torch.empty(out_features, device=device, dtype=ftype)
+            )
         else:
             self.bias_re = self.bias_im = None
 
@@ -108,6 +124,10 @@ class ComplexLinear(nn.Module):
     def reset_parameters(self) -> None:
         # kaiming uniform (same as nn.Linear default) as a safe fallback
         nn.init.kaiming_uniform_(self.weight, math.sqrt(5))
+        if self.bias_re is not None:
+            nn.init.zeros_(self.bias_re)
+        if self.bias_im is not None:
+            nn.init.zeros_(self.bias_im)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
