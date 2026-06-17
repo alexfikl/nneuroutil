@@ -140,6 +140,44 @@ class ComplexLinear(nn.Module):
         return torch.cat([result_re, result_im], dim=-1)
 
 
+class SymmetricLinear(nn.Module):
+    def __init__(
+        self,
+        features: int,
+        *,
+        bias: bool = False,
+        device: str | torch.device | None = None,
+        dtype: Any | None = None,
+    ) -> None:
+        super().__init__()
+
+        self.in_features = features
+        self.out_features = features
+
+        self._weight = nn.Parameter(
+            torch.empty(features, features, device=device, dtype=dtype)
+        )
+
+        if bias:
+            self.bias = nn.Parameter(torch.empty(features, device=device, dtype=dtype))
+        else:
+            self.bias = None
+
+    @property
+    def weight(self) -> torch.Tensor:
+        return self._weight.triu() + self._weight.triu().transpose(-1, -2)
+
+    def reset_parameters(self) -> None:
+        # NOTE: this is the same init as nn.Linear. Turns out that symmetrizing
+        # it doesn't change the row-wise variances, so the same init works here
+        nn.init.kaiming_uniform_(self._weight, math.sqrt(5))
+        if self.bias is not None:
+            nn.init.zeros_(self.zeros)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return nn.functional.linear(x, self.weight, self.bias)
+
+
 # }}}
 
 
