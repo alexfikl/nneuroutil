@@ -200,7 +200,7 @@ def kaiming_uniform_(
     fan = fan_in if mode == "fan_in" else fan_out
 
     if nonlinearity == "quadratic":
-        bound = math.sqrt(3) / math.sqrt(math.sqrt(2) * fan)
+        bound = math.sqrt(3) / math.sqrt(math.sqrt(3) * fan)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
     elif nonlinearity == "leaky_quadratic":
         # NOTE: if not given, use the default from LeakyQuadratic
@@ -246,7 +246,7 @@ def kaiming_normal_(
     fan = fan_in if mode == "fan_in" else fan_out
 
     if nonlinearity == "quadratic":
-        std = 1.0 / math.sqrt(math.sqrt(2) * fan)
+        std = 1.0 / math.sqrt(math.sqrt(3) * fan)
         return nn.init.normal_(x, 0.0, std, generator=generator)
     elif nonlinearity == "leaky_quadratic":
         # NOTE: if not given, use the default from LeakyQuadratic
