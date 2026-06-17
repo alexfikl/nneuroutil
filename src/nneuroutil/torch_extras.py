@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
@@ -38,7 +38,7 @@ class ComplexQuadratic(nn.Module):
 
 
 class LeakyQuadratic(nn.Module):
-    def __init__(self, alpha: float = 0.1) -> None:
+    def __init__(self, alpha: float = 0.5) -> None:
         super().__init__()
 
         self.alpha = alpha
@@ -49,7 +49,7 @@ class LeakyQuadratic(nn.Module):
 
 
 class ComplexLeakyQuadratic(nn.Module):
-    def __init__(self, alpha: float = 0.1) -> None:
+    def __init__(self, alpha: float = 0.5) -> None:
         super().__init__()
 
         self.alpha = alpha
@@ -351,6 +351,58 @@ class DeviceCheckMode(TorchDispatchMode):
                 )
 
         return func(*args, **(kwargs or {}))
+
+
+# }}}
+
+
+# {{{ gather_model_signal_statistics
+
+
+class LayerStatistics(NamedTuple):
+    mean: float
+    var: float
+    msq: float
+
+
+def gather_model_signal_statistics(
+    model: nn.Module,
+    shape: tuple[int, ...],
+    *,
+    dtype: Any = None,
+    device: str | torch.device | None = None,
+    batch: int = 4096,
+) -> dict[str, LayerStatistics]:
+    stats = {}
+
+    def hook(name: str) -> Callable[[nn.Module, torch.Tensor, torch.Tensor], None]:
+        def fn(module: nn.Module, inp: torch.Tensor, out: torch.Tensor) -> None:
+            o = out.detach()
+            stats[name] = LayerStatistics(
+                mean=torch.mean(o).item(),
+                var=torch.var(o, correction=1).item(),
+                msq=torch.mean(torch.pow(o, 2)).item(),
+            )
+
+        return fn
+
+    # register our hook for each layer
+    handles = []
+    for name, m in model.named_modules():
+        if not name or list(m.children()):
+            continue
+
+        handles.append(m.register_forward_hook(hook(name)))
+
+    # run model and some nice data
+    x = torch.randn(batch, *shape, device=device, dtype=dtype)
+    model(x)
+
+    # remove remove hooks from the layers
+    for h in handles:
+        h.remove()
+
+    return stats
 
 
 # }}}
