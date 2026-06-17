@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -161,15 +162,16 @@ def quadratic_uniform(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
-    # NOTE: some simple math to construct that scale=0.5 for our quadratic activation.
-    # Assuming a zero-mean Gaussian pre-activation, we have that
-    #   Var(x^2) = 2 Var(x)^2
-    # To maintain unit variance we'd need
-    #   2 Var(x)^2 = Var(x)     => Var(x) = 0.5
-    # That's it!
+    # NOTE just a small math derivation for that scale=1/sqrt(3).
+    # 1. We assume that we have a zero-mean Gaussian pre-activation.
+    # 2. Then, we have that
+    #   E[y^2] = E[x^4] = 3 Var[x]^2
+    # 3. We want to impose a unit second moment, so
+    #   E[y^2] = 3 Var[x]^2 = 1      =>  scale = Var[x] = 1 / sqrt(3)
+    # That's it! This matches what the Kaiming inits do for ReLU.
 
     return nnx.initializers.variance_scaling(
-        scale=0.5,
+        scale=1 / math.sqrt(3),
         mode="fan_in",
         distribution="uniform",
         in_axis=in_axis,
@@ -186,7 +188,7 @@ def quadratic_normal(
     dtype: Any = None,
 ) -> Initializer:
     return nnx.initializers.variance_scaling(
-        scale=0.5,
+        scale=1 / math.sqrt(3),
         mode="fan_in",
         distribution="truncated_normal",
         in_axis=in_axis,
@@ -203,12 +205,22 @@ def leaky_quadratic_uniform(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
+    # NOTE: leaky_quadratic has a nonzero mean for alpha != 1, so we use the
+    # second-moment convention (like He/Kaiming for ReLU) to keep the next
+    # layer's pre-activation at unit variance.
+    # 1. In the alpha = 1 case, we have a simple linear => scale = 1.0
+    # 2. Otherwise, with scale = Var(z) and y = alpha z + (1 - alpha) z^2,
+    #   E[y^2] = alpha^2 v + 3 (1 - alpha)^2 v^2
+    # 3. E[y^2] = 1 gives a quadratic in s = scale:
+    #   3 (1 - alpha)^2 s^2 + alpha^2 s - 1 = 0
+    # of which we take the positive root.
+
     if abs(alpha - 1.0) < 1.0e-8:
         scale = 1.0
     else:
         a = 3 * (1 - alpha) ** 2
         b = alpha**2
-        scale = (-b + (b**2 + 4 * a) ** 0.5) / (2 * a)
+        scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
 
     return nnx.initializers.variance_scaling(
         scale=scale,
@@ -228,20 +240,12 @@ def leaky_quadratic_normal(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
-    # NOTE: some simple math for this as well.
-    # 1. In the alpha = 1 case, we have a simple linear => scale = 1.0
-    # 2. For alpha in (0, 1), we have that
-    #   Var(x^2) = a^2 Var(x)^2 + 2 (1 - a)^2 Var(x)^4
-    # if we want to maintain unit variance again, we get a nice quadratic in scale
-    #   2 (1 - a)^2 s^2 + a^2 s - 1 = 0
-    # and pick the positive root.
-
     if abs(alpha - 1.0) < 1.0e-8:
         scale = 1.0
     else:
         a = 3 * (1 - alpha) ** 2
         b = alpha**2
-        scale = (-b + (b**2 + 4 * a) ** 0.5) / (2 * a)
+        scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
 
     return nnx.initializers.variance_scaling(
         scale=scale,
