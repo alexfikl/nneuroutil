@@ -52,7 +52,7 @@ funca_name = "LeakyQuadratic"
 # larger values seem to keep it stable for longer.
 n = 512
 depth = 10
-alpha = 0.85
+alpha = 0.8
 
 layer = nn.Linear(n, n, bias=False)
 default_model = make_mlp(
