@@ -30,6 +30,7 @@ def make_mlp(
     init_fn: Callable[[nn.Module], None],
     *,
     depth: int = 10,
+    alpha: float = 0.85,
 ) -> nn.Module:
     layers = []
     for _ in range(depth):
@@ -37,25 +38,33 @@ def make_mlp(
         init_fn(layer.weight)
         layers.append(layer)
 
-        layers.append(LeakyQuadratic(0.85))
+        layers.append(LeakyQuadratic(alpha))
 
     return nn.Sequential(*layers)
 
 
 # {{{ make testing MLPs
 
-n = 512
 layer_name = "Linear"
 funca_name = "LeakyQuadratic"
+
+# NOTE: alpha << 0.75 will explode for depth=10 because of the quadratic, but
+# larger values seem to keep it stable for longer.
+n = 512
+depth = 10
+alpha = 0.85
 
 layer = nn.Linear(n, n, bias=False)
 default_model = make_mlp(
     layer,
     lambda w: None,
+    depth=depth,
 )
 activated_model = make_mlp(
     layer,
-    lambda w: kaiming_uniform_(w, nonlinearity="leaky_quadratic", param=0.85),
+    lambda w: kaiming_uniform_(w, nonlinearity="leaky_quadratic", param=alpha),
+    depth=depth,
+    alpha=alpha,
 )
 
 # }}}
