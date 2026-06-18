@@ -202,6 +202,36 @@ def test_device_check_mode() -> None:
 # }}}
 
 
+# {{{ test_sliding_window_dataset
+
+
+def test_sliding_window_dataset() -> None:
+    from nneuroutil.torch_extras import SlidingWindowDataset
+
+    nreal, maxit, dim = 2, 5, 3
+    window_size = 3
+
+    x = torch.arange(nreal * maxit * dim, dtype=torch.float64).reshape(
+        nreal, maxit, dim
+    )
+    dataset = SlidingWindowDataset(x, window_size)
+
+    breakpoint()
+    assert len(dataset) == nreal * (maxit - window_size + 1)
+
+    # check first window of first realization
+    assert torch.allclose(dataset[0], x[0, 0:window_size, :])
+
+    # check first window of second realization
+    assert torch.allclose(dataset[3], x[1, 0:window_size, :])
+
+    # check last window
+    assert torch.allclose(dataset[-1], x[-1, maxit - window_size : maxit, :])
+
+
+# }}}
+
+
 if __name__ == "__main__":
     import sys
 

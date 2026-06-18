@@ -402,6 +402,11 @@ class SlidingWindowDataset(Dataset):
         return self.total_windows
 
     def __getitem__(self, index: int) -> torch.Tensor:
+        if not len(self) <= index < len(self):
+            raise IndexError(
+                f"index {index} is out of bounds for dataset of length {len(self)}"
+            )
+
         ridx = index // self.windows_per_realization
         n = index % self.windows_per_realization
 
