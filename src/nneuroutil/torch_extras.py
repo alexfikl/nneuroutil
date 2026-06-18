@@ -11,6 +11,7 @@ import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch import nn
 from torch.utils._python_dispatch import TorchDispatchMode  # noqa: PLC2701
+from torch.utils.data import Dataset
 
 from nneuroutil.helpers import module_logger
 
@@ -273,6 +274,32 @@ def kaiming_normal_(
             nonlinearity=nonlinearity,
             generator=generator,
         )
+
+
+# }}}
+
+
+# {{{ SlidingWindowDataset
+
+
+class SlidingWindowDataset(Dataset):
+    def __init__(self, x: torch.Tensor, window_size: int) -> None:
+        self.x = x
+        self.window_size = window_size
+
+        self.nrealizations, self.maxit, self.dim = x.shape
+        self.windows_per_realization = self.maxit - self.window_size + 1
+        self.total_windows = self.nrealizations * self.windows_per_realization
+
+    def __len__(self) -> int:
+        return self.total_windows
+
+    def __getitem__(self, index: int) -> torch.Tensor:
+        ridx = index // self.windows_per_realization
+        n = index % self.windows_per_realization
+
+        window = self.x[ridx, n : n + self.window_size, :]
+        return window
 
 
 # }}}
