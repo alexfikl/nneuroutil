@@ -22,26 +22,50 @@ log = module_logger(__name__)
 
 
 def complex_quadratic(x: torch.Tensor) -> torch.Tensor:
+    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
+
+    We assume that ``x[..., :d]`` is the real part and ``x[..., d:]`` is the
+    imaginary part and compute the standard complex square.
+    """
+    if x.shape[-1] % 2 != 0:
+        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
+
     x_re, x_im = torch.chunk(x, 2, dim=-1)
     return torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
 
 
 class Quadratic(nn.Module):
+    """A quadratic :math:`x^2` activation function."""
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
         """Define the computation performed at every call."""
         return x * x
 
 
 class ComplexQuadratic(nn.Module):
+    """An activation function that uses :func:`complex_quadratic`."""
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
         """Define the computation performed at every call."""
         return complex_quadratic(x)
 
 
-class LeakyQuadratic(nn.Module):
-    def __init__(self, alpha: float = 0.5) -> None:
-        super().__init__()
+class LinearQuadratic(nn.Module):
+    r"""A convex combination of a linear and a quadratic activation.
 
+    .. math::
+
+        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+    """
+
+    alpha: float
+    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+
+    def __init__(self, alpha: float = 0.5) -> None:
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
+
+        super().__init__()
         self.alpha = alpha
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -49,10 +73,23 @@ class LeakyQuadratic(nn.Module):
         return self.alpha * x + (1.0 - self.alpha) * x * x
 
 
-class ComplexLeakyQuadratic(nn.Module):
-    def __init__(self, alpha: float = 0.5) -> None:
-        super().__init__()
+class ComplexLinearQuadratic(nn.Module):
+    r"""A convex combination of a linear and a quadratic activation, where the
+    quadratic term uses :func:`complex_quadratic`.
 
+    .. math::
+
+        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+    """
+
+    alpha: float
+    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+
+    def __init__(self, alpha: float = 0.5) -> None:
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
+
+        super().__init__()
         self.alpha = alpha
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -61,6 +98,13 @@ class ComplexLeakyQuadratic(nn.Module):
 
 
 class ComplexTanh(nn.Module):
+    r"""A hyperbolic tangent for a complex vector of shape ``(d,)``.
+
+    This applies the hyperbolic tangent to the real and imaginary components
+    separately. Note that this is different than :math:`\tanh(z)` for a complex
+    :math:`z`.
+    """
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
         """Define the computation performed at every call."""
         return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
@@ -73,6 +117,13 @@ class ComplexTanh(nn.Module):
 
 
 class Bias(nn.Module):
+    """A bias-only layer: :math:`y = x + b`."""
+
+    size: int
+    """The size of the bias vector."""
+    bias: torch.Tensor
+    """The learnable bias of shape ``(size,)``. The values are initialized to zero."""
+
     def __init__(
         self,
         size: int,
@@ -81,6 +132,8 @@ class Bias(nn.Module):
         dtype: Any = None,
     ) -> None:
         super().__init__()
+
+        self.size = size
         self.bias = nn.Parameter(torch.zeros(size, device=device, dtype=dtype))
 
     def reset_parameters(self) -> None:
@@ -92,6 +145,34 @@ class Bias(nn.Module):
 
 
 class ComplexLinear(nn.Module):
+    """A linear layer applied to stacked complex variables.
+
+    We assume that the input vector is of shape ``(2 d,)`` representing a
+    stacked complex vector of shape ``(d,)``. This linear layer treats it as such
+    and computes
+
+    .. code:: python
+
+        y = torch.cat([x[..., :d] @ W.T + b_re, x[..., d:] @ W.T + b_im], dim=-1)
+    """
+
+    in_features: int
+    """Size of each input sample."""
+    out_features: int
+    """Size of each output sample."""
+    weight: torch.Tensor
+    """The learnable weights of the module of shape ``(out_features, in_features)``.
+    The values are initialized using :func:`kaiming_uniform_`.
+    """
+    bias_re: torch.Tensor
+    """The learnable bias of shape ``(out_features,)`` for the real part of the
+    input vector. The values are initialized to 0.
+    """
+    bias_im: torch.Tensor
+    """The learnable bias of shape ``(out_features,)`` for the imaginary part of the
+    input vector. The values are initialized to 0.
+    """
+
     def __init__(
         self,
         in_features: int,
@@ -142,6 +223,18 @@ class ComplexLinear(nn.Module):
 
 
 class SymmetricLinear(nn.Module):
+    """A symmetric linear layer."""
+
+    in_features: int
+    """Size of each input sample."""
+    out_features: int
+    """Size of each output sample."""
+
+    bias: torch.Tensor | None
+    """The learnable bias of shape ``(out_features,)``. The values are
+    initialized to 0.
+    """
+
     def __init__(
         self,
         features: int,
@@ -166,6 +259,9 @@ class SymmetricLinear(nn.Module):
 
     @property
     def weight(self) -> torch.Tensor:
+        """The learnable weights of the module of shape ``(out_features, in_features)``.
+        The values are initialized using :func:`kaiming_uniform_`.
+        """
         return self._weight.triu() + self._weight.triu().transpose(-1, -2)
 
     def reset_parameters(self) -> None:
@@ -176,6 +272,7 @@ class SymmetricLinear(nn.Module):
             nn.init.zeros_(self.zeros)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         return nn.functional.linear(x, self.weight, self.bias)
 
 
@@ -203,8 +300,8 @@ def kaiming_uniform_(
     if nonlinearity == "quadratic":
         bound = math.sqrt(3) / math.sqrt(math.sqrt(3) * fan)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
-    elif nonlinearity == "leaky_quadratic":
-        # NOTE: if not given, use the default from LeakyQuadratic
+    elif nonlinearity == "linear_quadratic":
+        # NOTE: if not given, use the default from LinearQuadratic
         if param is None:
             param = 0.5
 
@@ -249,8 +346,8 @@ def kaiming_normal_(
     if nonlinearity == "quadratic":
         std = 1.0 / math.sqrt(math.sqrt(3) * fan)
         return nn.init.normal_(x, 0.0, std, generator=generator)
-    elif nonlinearity == "leaky_quadratic":
-        # NOTE: if not given, use the default from LeakyQuadratic
+    elif nonlinearity == "linear_quadratic":
+        # NOTE: if not given, use the default from LinearQuadratic
         if param is None:
             param = 0.5
 
@@ -283,6 +380,16 @@ def kaiming_normal_(
 
 
 class SlidingWindowDataset(Dataset):
+    """A sliding window dataset for tensors of shape ``(nrealizations, maxit, d)``.
+
+    This constructs sliding windows of the shape ``(L, d)`` for each realization.
+    """
+
+    x: torch.Tensor
+    """The tensor for which to compute sliding windows."""
+    window_size: int
+    """The size of each window."""
+
     def __init__(self, x: torch.Tensor, window_size: int) -> None:
         self.x = x
         self.window_size = window_size
@@ -387,9 +494,14 @@ class DeviceCheckMode(TorchDispatchMode):
 
 
 class LayerStatistics(NamedTuple):
+    """Simple statistics for a layer output."""
+
     mean: float
+    """The mean value of the output over all dimensions."""
     var: float
+    """The (unbiased) variance of the output over all dimensions."""
     msq: float
+    """The second-moment :math:`E[y^2]` of the output over all dimensions."""
 
 
 def gather_model_signal_statistics(
@@ -400,6 +512,13 @@ def gather_model_signal_statistics(
     device: str | torch.device | None = None,
     batch: int = 4096,
 ) -> dict[str, LayerStatistics]:
+    r"""Gather statistics over the whole *model* starting from a randomly
+    distributed input in :math:`\mathcal{N}(0, 1)`.
+
+    :returns: a dictionary with statistics for each module in the *model*. The
+        names of the modules are expected to be unique, see
+        :meth:`torch.nn.Module.named_modules`.
+    """
     stats = {}
 
     def hook(name: str) -> Callable[[nn.Module, torch.Tensor, torch.Tensor], None]:

@@ -22,7 +22,7 @@ from nneuroutil.typing import Array1D, DataclassInstanceT
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from rich.table import Table
+    import rich.table
 
 # {{{ environment
 
@@ -304,7 +304,7 @@ def slugify(stem: str, separator: str = "_") -> str:
 # {{{ stringify_table
 
 
-def stringify_table(table: Table) -> str:
+def stringify_table(table: rich.table.Table) -> str:
     """Stringify a rich table."""
     import io
 

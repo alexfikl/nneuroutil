@@ -40,14 +40,14 @@ def test_quadratic() -> None:
     assert torch.allclose(res, x * x)
 
 
-def test_leaky_quadratic() -> None:
-    from nneuroutil.torch_extras import ComplexLeakyQuadratic, LeakyQuadratic
+def test_linear_quadratic() -> None:
+    from nneuroutil.torch_extras import ComplexLinearQuadratic, LinearQuadratic
 
     n = 5
     alpha = 0.2
     x = torch.randn(n, n)
 
-    mod = LeakyQuadratic(alpha=alpha)
+    mod = LinearQuadratic(alpha=alpha)
     res = mod(x)
     expected = alpha * x + (1.0 - alpha) * x * x
 
@@ -57,7 +57,7 @@ def test_leaky_quadratic() -> None:
     x = torch.randn(n, 2 * n)
     x[:, n:] = 0.0
 
-    mod = ComplexLeakyQuadratic()
+    mod = ComplexLinearQuadratic()
     res = mod(x)
     assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 
@@ -134,7 +134,7 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 # {{{ test_init
 
 
-@pytest.mark.parametrize("nonlinearity", ["quadratic", "leaky_quadratic", "relu"])
+@pytest.mark.parametrize("nonlinearity", ["quadratic", "linear_quadratic", "relu"])
 @pytest.mark.parametrize("param", [None, 0.0, 0.2])
 @pytest.mark.parametrize("mode", ["fan_in", "fan_out"])
 def test_kaiming_init(

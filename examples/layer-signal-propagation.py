@@ -19,7 +19,7 @@ except ImportError:
     raise SystemExit(0) from None
 
 from nneuroutil.torch_extras import (
-    LeakyQuadratic,
+    LinearQuadratic,
     gather_model_signal_statistics,
     kaiming_uniform_,
 )
@@ -38,7 +38,7 @@ def make_mlp(
         init_fn(layer.weight)
         layers.append(layer)
 
-        layers.append(LeakyQuadratic(alpha))
+        layers.append(LinearQuadratic(alpha))
 
     return nn.Sequential(*layers)
 
@@ -46,7 +46,7 @@ def make_mlp(
 # {{{ make testing MLPs
 
 layer_name = "Linear"
-funca_name = "LeakyQuadratic"
+funca_name = "LinearQuadratic"
 
 # NOTE: alpha << 0.75 will explode for depth=10 because of the quadratic, but
 # larger values seem to keep it stable for longer.
@@ -62,7 +62,7 @@ default_model = make_mlp(
 )
 activated_model = make_mlp(
     layer,
-    lambda w: kaiming_uniform_(w, nonlinearity="leaky_quadratic", param=alpha),
+    lambda w: kaiming_uniform_(w, nonlinearity="linear_quadratic", param=alpha),
     depth=depth,
     alpha=alpha,
 )

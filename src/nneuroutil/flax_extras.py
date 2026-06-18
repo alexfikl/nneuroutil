@@ -278,7 +278,7 @@ def available_device_names() -> frozenset[str]:
 
 @contextmanager
 def jax_default_device(device: str) -> Iterator[None]:
-    """A context manager similar to :func:`jax.default_device`.
+    """A context manager similar to ``jax.default_device``.
 
     :arg device: a device name in the form ``platform[:id]``.
     """
