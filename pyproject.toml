@@ -44,7 +44,7 @@ urls.Repository = "https://github.com/alexfikl/nneuroutil"
 
 [dependency-groups]
 dev = [ "pyproject-fmt", "reuse", "typos", "uv" ]
-test = [ "pytest", "ruff", "scipy-stubs", "ty" ]
+test = [ "pytest", "pytest-github-actions-annotate-failures", "ruff", "scipy-stubs", "ty" ]
 docs = [ "sphinx>=6", "sphinx-book-theme" ]
 jax = [ "flax>=0.10", "jax>=0.7" ]
 torch = [ "pytorch>=2" ]

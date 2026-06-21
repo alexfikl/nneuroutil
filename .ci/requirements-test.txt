@@ -50,13 +50,13 @@ imagesize==2.0.0
     # via sphinx
 iniconfig==2.3.0
     # via pytest
-jax==0.10.1
+jax==0.10.2
     # via
     #   nneuroutil (pyproject.toml:jax)
     #   flax
     #   optax
     #   orbax-checkpoint
-jaxlib==0.10.1
+jaxlib==0.10.2
     # via
     #   jax
     #   optax
@@ -79,7 +79,7 @@ ml-dtypes==0.5.4
     #   jax
     #   jaxlib
     #   tensorstore
-msgpack==1.2.0
+msgpack==1.2.1
     # via
     #   flax
     #   orbax-checkpoint
@@ -101,13 +101,17 @@ numpy==2.4.6
     #   scipy
     #   tensorstore
     #   treescope
-numpy-typing-compat==20251206.2.4
+numpy-typing-compat==20251206.2.4 ; python_full_version < '3.12'
+    # via optype
+numpy-typing-compat==20260602.2.4 ; python_full_version >= '3.12'
     # via optype
 opt-einsum==3.4.0
     # via jax
 optax==0.2.8
     # via flax
-optype==0.17.1
+optype==0.17.1 ; python_full_version < '3.12'
+    # via scipy-stubs
+optype==0.18.0 ; python_full_version >= '3.12'
     # via scipy-stubs
 orbax-checkpoint==0.12.0
     # via flax
@@ -137,7 +141,11 @@ pygments==2.20.0
     #   sphinx
 pyparsing==3.3.2
     # via matplotlib
-pytest==9.1.0
+pytest==9.1.1
+    # via
+    #   nneuroutil (pyproject.toml:test)
+    #   pytest-github-actions-annotate-failures
+pytest-github-actions-annotate-failures==0.4.2
     # via nneuroutil (pyproject.toml:test)
 python-dateutil==2.9.0.post0
     # via matplotlib
@@ -153,16 +161,23 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.15.17
+ruff==0.15.18
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.1
     # via nneuroutil (pyproject.toml:visualization)
-scipy==1.17.1
+scipy==1.17.1 ; python_full_version < '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   jax
     #   jaxlib
-scipy-stubs==1.17.1.5
+scipy==1.18.0 ; python_full_version >= '3.12'
+    # via
+    #   nneuroutil (pyproject.toml)
+    #   jax
+    #   jaxlib
+scipy-stubs==1.17.1.5 ; python_full_version < '3.12'
+    # via nneuroutil (pyproject.toml:test)
+scipy-stubs==1.18.0.0 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:test)
 simplejson==4.1.1
     # via orbax-checkpoint
@@ -202,7 +217,7 @@ tensorstore==0.1.84
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.49
+ty==0.0.51
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.15.0
     # via

@@ -14,7 +14,9 @@ pygments==2.20.0
     # via rich
 rich==15.0.0
     # via nneuroutil (pyproject.toml)
-scipy==1.17.1
+scipy==1.17.1 ; python_full_version < '3.12'
+    # via nneuroutil (pyproject.toml)
+scipy==1.18.0 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml)
 typing-extensions==4.15.0
     # via nneuroutil (pyproject.toml)
