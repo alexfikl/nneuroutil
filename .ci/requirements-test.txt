@@ -85,7 +85,23 @@ msgpack==1.2.1
     #   orbax-checkpoint
 nest-asyncio==1.6.0 ; sys_platform == 'win32'
     # via orbax-checkpoint
-numpy==2.4.6
+numpy==2.4.6 ; python_full_version < '3.12'
+    # via
+    #   nneuroutil (pyproject.toml)
+    #   contourpy
+    #   flax
+    #   jax
+    #   jaxlib
+    #   matplotlib
+    #   ml-dtypes
+    #   numpy-typing-compat
+    #   optax
+    #   optype
+    #   orbax-checkpoint
+    #   scipy
+    #   tensorstore
+    #   treescope
+numpy==2.5.0 ; python_full_version >= '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   contourpy
@@ -103,7 +119,7 @@ numpy==2.4.6
     #   treescope
 numpy-typing-compat==20251206.2.4 ; python_full_version < '3.12'
     # via optype
-numpy-typing-compat==20260602.2.4 ; python_full_version >= '3.12'
+numpy-typing-compat==20260602.2.5 ; python_full_version >= '3.12'
     # via optype
 opt-einsum==3.4.0
     # via jax
