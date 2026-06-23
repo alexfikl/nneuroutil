@@ -41,13 +41,13 @@ def test_quadratic() -> None:
 
 
 def test_linear_quadratic() -> None:
-    from nneuroutil.torch_extras import ComplexLinearQuadratic, LinearQuadratic
+    from nneuroutil.torch_extras import BlendedQuadratic, ComplexBlendedQuadratic
 
     n = 5
     alpha = 0.2
     x = torch.randn(n, n)
 
-    mod = LinearQuadratic(alpha=alpha)
+    mod = BlendedQuadratic(alpha=alpha)
     res = mod(x)
     expected = alpha * x + (1.0 - alpha) * x * x
 
@@ -57,7 +57,7 @@ def test_linear_quadratic() -> None:
     x = torch.randn(n, 2 * n)
     x[:, n:] = 0.0
 
-    mod = ComplexLinearQuadratic()
+    mod = ComplexBlendedQuadratic()
     res = mod(x)
     assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 

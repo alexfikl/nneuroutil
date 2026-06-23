@@ -50,7 +50,7 @@ class ComplexQuadratic(nn.Module):
         return complex_quadratic(x)
 
 
-class LinearQuadratic(nn.Module):
+class BlendedQuadratic(nn.Module):
     r"""A convex combination of a linear and a quadratic activation.
 
     .. math::
@@ -73,7 +73,7 @@ class LinearQuadratic(nn.Module):
         return self.alpha * x + (1.0 - self.alpha) * x * x
 
 
-class ComplexLinearQuadratic(nn.Module):
+class ComplexBlendedQuadratic(nn.Module):
     r"""A convex combination of a linear and a quadratic activation, where the
     quadratic term uses :func:`complex_quadratic`.
 
@@ -300,8 +300,8 @@ def kaiming_uniform_(
     if nonlinearity == "quadratic":
         bound = math.sqrt(3) / math.sqrt(math.sqrt(3) * fan)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
-    elif nonlinearity == "linear_quadratic":
-        # NOTE: if not given, use the default from LinearQuadratic
+    elif nonlinearity == "blended_quadratic":
+        # NOTE: if not given, use the default from BlendedQuadratic
         if param is None:
             param = 0.5
 
@@ -346,8 +346,8 @@ def kaiming_normal_(
     if nonlinearity == "quadratic":
         std = 1.0 / math.sqrt(math.sqrt(3) * fan)
         return nn.init.normal_(x, 0.0, std, generator=generator)
-    elif nonlinearity == "linear_quadratic":
-        # NOTE: if not given, use the default from LinearQuadratic
+    elif nonlinearity == "blended_quadratic":
+        # NOTE: if not given, use the default from BlendedQuadratic
         if param is None:
             param = 0.5
 

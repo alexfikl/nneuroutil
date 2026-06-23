@@ -26,12 +26,12 @@ class Quadratic(nnx.Module):
         return quadratic(x)
 
 
-class LeakyQuadratic(nnx.Module):
+class BlendedQuadratic(nnx.Module):
     def __init__(self, alpha: float = 0.1) -> None:
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return leaky_quadratic(x, alpha=self.alpha)
+        return blended_quadratic(x, alpha=self.alpha)
 
 
 class ComplexQuadratic(nnx.Module):
@@ -39,12 +39,12 @@ class ComplexQuadratic(nnx.Module):
         return complex_quadratic(x)
 
 
-class ComplexLeakyQuadratic(nnx.Module):
+class ComplexBlendedQuadratic(nnx.Module):
     def __init__(self, alpha: float = 0.1) -> None:
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_leaky_quadratic(x, alpha=self.alpha)
+        return complex_blended_quadratic(x, alpha=self.alpha)
 
 
 class ComplexTanh(nnx.Module):
@@ -56,7 +56,7 @@ def quadratic(x: jax.Array) -> jax.Array:
     return x * x
 
 
-def leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+def blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
     return alpha * x + (1 - alpha) * x * x
 
 
@@ -65,7 +65,7 @@ def complex_quadratic(x: jax.Array) -> jax.Array:
     return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
 
 
-def complex_leaky_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+def complex_blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
     return alpha * x + (1 - alpha) * complex_quadratic(x)
 
 
@@ -198,14 +198,14 @@ def quadratic_normal(
     )
 
 
-def leaky_quadratic_uniform(
+def blended_quadratic_uniform(
     alpha: float = 1.0,
     in_axis: int | tuple[int, ...] = -2,
     out_axis: int | tuple[int, ...] = -1,
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
-    # NOTE: leaky_quadratic has a nonzero mean for alpha != 1, so we use the
+    # NOTE: blended_quadratic has a nonzero mean for alpha != 1, so we use the
     # second-moment convention (like He/Kaiming for ReLU) to keep the next
     # layer's pre-activation at unit variance.
     # 1. In the alpha = 1 case, we have a simple linear => scale = 1.0
@@ -233,7 +233,7 @@ def leaky_quadratic_uniform(
     )
 
 
-def leaky_quadratic_normal(
+def blended_quadratic_normal(
     alpha: float = 1.0,
     in_axis: int | tuple[int, ...] = -2,
     out_axis: int | tuple[int, ...] = -1,

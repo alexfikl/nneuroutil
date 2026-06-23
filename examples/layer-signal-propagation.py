@@ -19,7 +19,7 @@ except ImportError:
     raise SystemExit(0) from None
 
 from nneuroutil.torch_extras import (
-    LinearQuadratic,
+    BlendedQuadratic,
     gather_model_signal_statistics,
     kaiming_uniform_,
 )
@@ -38,7 +38,7 @@ def make_mlp(
         init_fn(layer.weight)
         layers.append(layer)
 
-        layers.append(LinearQuadratic(alpha))
+        layers.append(BlendedQuadratic(alpha))
 
     return nn.Sequential(*layers)
 
@@ -46,7 +46,7 @@ def make_mlp(
 # {{{ make testing MLPs
 
 layer_name = "Linear"
-funca_name = "LinearQuadratic"
+funca_name = "BlendedQuadratic"
 
 # NOTE: alpha << 0.75 will explode for depth=10 because of the quadratic, but
 # larger values seem to keep it stable for longer.

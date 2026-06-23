@@ -36,15 +36,15 @@ def test_quadratic() -> None:
     assert jnp.allclose(res_func, x * x)
 
 
-def test_leaky_quadratic() -> None:
-    from nneuroutil.flax_extras import LeakyQuadratic, leaky_quadratic
+def test_blended_quadratic() -> None:
+    from nneuroutil.flax_extras import BlendedQuadratic, blended_quadratic
 
     alpha = 0.2
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
 
-    mod = LeakyQuadratic(alpha=alpha)
+    mod = BlendedQuadratic(alpha=alpha)
     res_mod = mod(x)
-    res_func = leaky_quadratic(x, alpha=alpha)
+    res_func = blended_quadratic(x, alpha=alpha)
     expected = alpha * x + (1.0 - alpha) * x * x
 
     assert jnp.allclose(res_mod, expected)
@@ -129,8 +129,8 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 @pytest.mark.parametrize("alpha", [1.0, 0.5])
 def test_kaiming_init(alpha: float) -> None:
     from nneuroutil.flax_extras import (
-        leaky_quadratic_normal,
-        leaky_quadratic_uniform,
+        blended_quadratic_normal,
+        blended_quadratic_uniform,
         quadratic_normal,
         quadratic_uniform,
     )
@@ -149,16 +149,16 @@ def test_kaiming_init(alpha: float) -> None:
     assert res_qn.shape == shape
     assert not jnp.allclose(res_qn, 0.0)
 
-    # 2. leaky_quadratic_uniform / leaky_quadratic_normal
-    init_lqu = leaky_quadratic_uniform(alpha=alpha)
-    res_lqu = init_lqu(key, shape)
-    assert res_lqu.shape == shape
-    assert not jnp.allclose(res_lqu, 0.0)
+    # 2. blended_quadratic_uniform / blended_quadratic_normal
+    init_bqu = blended_quadratic_uniform(alpha=alpha)
+    res_bqu = init_bqu(key, shape)
+    assert res_bqu.shape == shape
+    assert not jnp.allclose(res_bqu, 0.0)
 
-    init_lqn = leaky_quadratic_normal(alpha=alpha)
-    res_lqn = init_lqn(key, shape)
-    assert res_lqn.shape == shape
-    assert not jnp.allclose(res_lqn, 0.0)
+    init_bqn = blended_quadratic_normal(alpha=alpha)
+    res_bqn = init_bqn(key, shape)
+    assert res_bqn.shape == shape
+    assert not jnp.allclose(res_bqn, 0.0)
 
 
 # }}}
