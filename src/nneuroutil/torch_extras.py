@@ -424,6 +424,12 @@ class SlidingWindowDataset(Dataset):
             (self.maxit - self.window_size) / (nwindows - 1) if nwindows > 1 else 0.0
         )
 
+        if nwindows > 1 and self.window_step > self.window_size - 1:
+            raise ValueError(
+                "'nwindows' is too large for 'window_size': consecutive windows "
+                "do not overlap (min overlap is 1)"
+            )
+
     def __len__(self) -> int:
         return self.total_windows
 

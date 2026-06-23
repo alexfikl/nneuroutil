@@ -243,7 +243,7 @@ def test_sliding_window_dataset_nwindows() -> None:
 
     nruns, maxit, dim = 2, 10, 3
     window_size = 3
-    nwindows = 4
+    nwindows = 5
 
     x = torch.arange(nruns * maxit * dim, dtype=torch.float64)
     x = x.reshape(nruns, maxit, dim)
@@ -267,6 +267,28 @@ def test_sliding_window_dataset_nwindows() -> None:
             (win,) = dataset[r * nwindows + i]
             start = round(i * step)
             assert torch.allclose(win, x[r, start : start + window_size, :])
+
+
+# }}}
+
+
+# {{{ test_sliding_window_dataset_overlap
+
+
+def test_sliding_window_dataset_overlap() -> None:
+    from nneuroutil.torch_extras import SlidingWindowDataset
+
+    nruns, maxit, dim = 2, 10, 3
+    x = torch.arange(nruns * maxit * dim, dtype=torch.float64)
+    x = x.reshape(nruns, maxit, dim)
+
+    # window_size=3, nwindows=4 -> step = 7/3 > 2 -> consecutive windows
+    # do not overlap by at least 1
+    with pytest.raises(ValueError, match="overlap"):
+        SlidingWindowDataset(x, window_size=3, nwindows=4)
+
+    # borderline: step == window_size - 1 -> overlap exactly 1 (allowed)
+    SlidingWindowDataset(x, window_size=4, nwindows=3)
 
 
 # }}}
