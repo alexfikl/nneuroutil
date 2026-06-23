@@ -393,7 +393,10 @@ class SlidingWindowDataset(Dataset):
     """The number of windows per realization."""
 
     def __init__(
-        self, *xs: torch.Tensor, window_size: int, nwindows: int | None = None,
+        self,
+        *xs: torch.Tensor,
+        window_size: int,
+        nwindows: int | None = None,
     ) -> None:
         if not xs:
             raise ValueError(f"{type(self).__name__}: no tensors are provided")
@@ -424,17 +427,22 @@ class SlidingWindowDataset(Dataset):
     def __len__(self) -> int:
         return self.total_windows
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, ...]:
+    def window(self, index: int) -> slice:
         if not -len(self) <= index < len(self):
             raise IndexError(
                 f"index {index} is out of bounds for dataset of length {len(self)}"
             )
 
-        ridx = index // self.nwindows
         i = index % self.nwindows
         n = round(i * self.window_step)
 
-        return tuple(x[ridx, n : n + self.window_size, :] for x in self.xs)
+        return slice(n, n + self.window_size)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, ...]:
+        ridx = index // self.nwindows
+        window = self.window(index)
+
+        return tuple(x[ridx, window, :] for x in self.xs)
 
 
 # }}}
