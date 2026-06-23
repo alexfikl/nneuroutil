@@ -385,23 +385,33 @@ class SlidingWindowDataset(Dataset):
     This constructs sliding windows of the shape ``(L, d)`` for each realization.
     """
 
-    x: torch.Tensor
-    """The tensor for which to compute sliding windows."""
+    xs: tuple[torch.Tensor, ...]
+    """The tensors for which to compute sliding windows."""
     window_size: int
     """The size of each window."""
 
-    def __init__(self, x: torch.Tensor, window_size: int) -> None:
-        self.x = x
+    def __init__(self, *xs: torch.Tensor, window_size: int) -> None:
+        if not xs:
+            raise ValueError(f"{type(self).__name__}: no tensors are provided")
+
+        shape = xs[0].shape
+        if not len(shape) == 3:
+            raise ValueError(f"tensors must be 3d: {shape}")
+
+        if not all(shape == x.shape for x in xs[1:]):
+            raise ValueError("tensors must have the same shape")
+
+        self.xs = xs
         self.window_size = window_size
 
-        self.nrealizations, self.maxit, self.dim = x.shape
+        self.nrealizations, self.maxit, self.dim = shape
         self.windows_per_realization = self.maxit - self.window_size + 1
         self.total_windows = self.nrealizations * self.windows_per_realization
 
     def __len__(self) -> int:
         return self.total_windows
 
-    def __getitem__(self, index: int) -> torch.Tensor:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, ...]:
         if not -len(self) <= index < len(self):
             raise IndexError(
                 f"index {index} is out of bounds for dataset of length {len(self)}"
@@ -410,8 +420,7 @@ class SlidingWindowDataset(Dataset):
         ridx = index // self.windows_per_realization
         n = index % self.windows_per_realization
 
-        window = self.x[ridx, n : n + self.window_size, :]
-        return window
+        return tuple(x[ridx, n : n + self.window_size, :] for x in self.xs)
 
 
 # }}}

@@ -214,7 +214,7 @@ def test_sliding_window_dataset() -> None:
     x = torch.arange(nreal * maxit * dim, dtype=torch.float64).reshape(
         nreal, maxit, dim
     )
-    dataset = SlidingWindowDataset(x, window_size)
+    dataset = SlidingWindowDataset(x, window_size=window_size)
 
     breakpoint()
     assert len(dataset) == nreal * (maxit - window_size + 1)
