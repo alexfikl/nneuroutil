@@ -57,7 +57,7 @@ def test_linear_quadratic() -> None:
     x = torch.randn(n, 2 * n)
     x[:, n:] = 0.0
 
-    mod = ComplexBlendedQuadratic()
+    mod = ComplexBlendedQuadratic(alpha=alpha)
     res = mod(x)
     assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 
@@ -134,7 +134,7 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 # {{{ test_init
 
 
-@pytest.mark.parametrize("nonlinearity", ["quadratic", "linear_quadratic", "relu"])
+@pytest.mark.parametrize("nonlinearity", ["quadratic", "blended_quadratic", "relu"])
 @pytest.mark.parametrize("param", [None, 0.0, 0.2])
 @pytest.mark.parametrize("mode", ["fan_in", "fan_out"])
 def test_kaiming_init(
@@ -208,25 +208,65 @@ def test_device_check_mode() -> None:
 def test_sliding_window_dataset() -> None:
     from nneuroutil.torch_extras import SlidingWindowDataset
 
-    nreal, maxit, dim = 2, 5, 3
+    nruns, maxit, dim = 2, 5, 3
     window_size = 3
+    nwindows = maxit - window_size + 1
 
-    x = torch.arange(nreal * maxit * dim, dtype=torch.float64).reshape(
-        nreal, maxit, dim
-    )
+    x = torch.arange(nruns * maxit * dim, dtype=torch.float64)
+    x = x.reshape(nruns, maxit, dim)
+
     dataset = SlidingWindowDataset(x, window_size=window_size)
 
-    breakpoint()
-    assert len(dataset) == nreal * (maxit - window_size + 1)
+    assert len(dataset) == nruns * nwindows
 
-    # check first window of first realization
-    assert torch.allclose(dataset[0], x[0, 0:window_size, :])
+    # first window of first realization starts at 0
+    (win,) = dataset[0]
+    assert torch.allclose(win, x[0, 0:window_size, :])
 
-    # check first window of second realization
-    assert torch.allclose(dataset[3], x[1, 0:window_size, :])
+    # first window of second realization
+    (win,) = dataset[nwindows]
+    assert torch.allclose(win, x[1, 0:window_size, :])
 
-    # check last window
-    assert torch.allclose(dataset[-1], x[-1, maxit - window_size : maxit, :])
+    # last window ends at maxit
+    (win,) = dataset[-1]
+    assert torch.allclose(win, x[-1, maxit - window_size : maxit, :])
+
+
+# }}}
+
+
+# {{{ test_sliding_window_dataset_nwindows
+
+
+def test_sliding_window_dataset_nwindows() -> None:
+    from nneuroutil.torch_extras import SlidingWindowDataset
+
+    nruns, maxit, dim = 2, 10, 3
+    window_size = 3
+    nwindows = 4
+
+    x = torch.arange(nruns * maxit * dim, dtype=torch.float64)
+    x = x.reshape(nruns, maxit, dim)
+    dataset = SlidingWindowDataset(x, window_size=window_size, nwindows=nwindows)
+
+    assert len(dataset) == nruns * nwindows
+
+    for r in range(nruns):
+        # first window always starts at 0
+        (first,) = dataset[r * nwindows]
+        assert torch.allclose(first, x[r, 0:window_size, :])
+
+        # last window always ends at maxit
+        (last,) = dataset[r * nwindows + nwindows - 1]
+        assert torch.allclose(last, x[r, maxit - window_size : maxit, :])
+
+    # spot-check intermediate windows use round() spacing
+    step = (maxit - window_size) / (nwindows - 1)
+    for r in range(nruns):
+        for i in range(nwindows):
+            (win,) = dataset[r * nwindows + i]
+            start = round(i * step)
+            assert torch.allclose(win, x[r, start : start + window_size, :])
 
 
 # }}}

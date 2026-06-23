@@ -389,8 +389,12 @@ class SlidingWindowDataset(Dataset):
     """The tensors for which to compute sliding windows."""
     window_size: int
     """The size of each window."""
+    nwindows: int
+    """The number of windows per realization."""
 
-    def __init__(self, *xs: torch.Tensor, window_size: int) -> None:
+    def __init__(
+        self, *xs: torch.Tensor, window_size: int, nwindows: int | None = None,
+    ) -> None:
         if not xs:
             raise ValueError(f"{type(self).__name__}: no tensors are provided")
 
@@ -403,10 +407,19 @@ class SlidingWindowDataset(Dataset):
 
         self.xs = xs
         self.window_size = window_size
-
         self.nrealizations, self.maxit, self.dim = shape
-        self.windows_per_realization = self.maxit - self.window_size + 1
-        self.total_windows = self.nrealizations * self.windows_per_realization
+
+        if nwindows is None:
+            nwindows = self.maxit - self.window_size + 1
+
+        if nwindows < 1:
+            raise ValueError(f"'nwindows' must be >= 1: got {nwindows}")
+
+        self.nwindows = nwindows
+        self.total_windows = self.nrealizations * self.nwindows
+        self.window_step = (
+            (self.maxit - self.window_size) / (nwindows - 1) if nwindows > 1 else 0.0
+        )
 
     def __len__(self) -> int:
         return self.total_windows
@@ -417,8 +430,9 @@ class SlidingWindowDataset(Dataset):
                 f"index {index} is out of bounds for dataset of length {len(self)}"
             )
 
-        ridx = index // self.windows_per_realization
-        n = index % self.windows_per_realization
+        ridx = index // self.nwindows
+        i = index % self.nwindows
+        n = round(i * self.window_step)
 
         return tuple(x[ridx, n : n + self.window_size, :] for x in self.xs)
 
