@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from nneuroutil.helpers import module_logger
-from nneuroutil.scores import dice_score
+from nneuroutil.scores import dice_score, jaccard_index
 from nneuroutil.visualization import set_plotting_defaults
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -37,11 +37,11 @@ def test_dice_score(xp: Any) -> None:
     # zeros
     x = xp.zeros((3, 8))
     y = xp.zeros((3, 8))
-    assert float(xp.abs(dice_score(x, y) - 1.0)) < 1.0e-15
+    assert float(xp.abs(dice_score(x, y, eps=eps) - 1.0)) < 1.0e-15
 
     # equal
     x = xp.ones((4, 16))
-    assert float(xp.abs(dice_score(x, x) - 1.0)) < 1.0e-15
+    assert float(xp.abs(dice_score(x, x, eps=eps) - 1.0)) < 1.0e-15
 
     # mismatch
     x = xp.asarray(rng.standard_normal((4, 16)))
@@ -68,8 +68,61 @@ def test_dice_score_partial_zeros(xp: Any) -> None:
     x = xp.asarray([[1.0, -1.0, 2.0, -2.0], [0.0, 0.0, 0.0, 0.0]])
     y = xp.asarray([[0.5, -0.5, 1.0, -1.0], [0.0, 0.0, 0.0, 0.0]])
 
-    result = dice_score(x, y, axis=1)
+    result = dice_score(x, y, eps=1.0e-6, axis=1)
     assert float(xp.abs(result[0] - 2.0)) < 1.0e-5
+    assert float(xp.abs(result[1] - 1.0)) < 1.0e-15
+
+
+# }}}
+
+
+# {{{ test_jaccard_index
+
+
+def test_jaccard_index(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    x = xp.asarray(rng.standard_normal((4, 16)))
+    y = xp.asarray(rng.standard_normal((4, 16)))
+
+    eps = 1.0e-6
+    x_n_y = xp.sum(x * y)
+    x_u_y = xp.sum(x) + xp.sum(y) - x_n_y
+    result = jaccard_index(x, y, eps=eps)
+    expected = (x_n_y + eps) / (x_u_y + eps)
+    assert float(xp.abs(result - expected)) < 1.0e-15
+
+    # zeros
+    x = xp.zeros((3, 8))
+    y = xp.zeros((3, 8))
+    assert float(xp.abs(jaccard_index(x, y, eps=eps) - 1.0)) < 1.0e-15
+
+    # equal
+    x = xp.ones((4, 16))
+    assert float(xp.abs(jaccard_index(x, x, eps=eps) - 1.0)) < 1.0e-15
+
+
+def test_jaccard_index_axis(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    x = xp.asarray(rng.standard_normal((4, 16)))
+    y = xp.asarray(rng.standard_normal((4, 16)))
+
+    eps = 1.0e-6
+    result = jaccard_index(x, y, eps=eps, axis=1)
+    assert result.shape == (4,)
+
+    x_n_y = xp.sum(x[0] * y[0])
+    x_u_y = xp.sum(x[0]) + xp.sum(y[0]) - x_n_y
+    expected_0 = (x_n_y + eps) / (x_u_y + eps)
+    assert float(xp.abs(result[0] - expected_0)) < 1.0e-15
+
+
+def test_jaccard_index_partial_zeros(xp: Any) -> None:
+    x = xp.asarray([[1.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
+    y = xp.asarray([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+
+    eps = 1.0e-6
+    result = jaccard_index(x, y, eps=eps, axis=1)
+    assert float(xp.abs(result[0] - 0.5)) < 10.0 * eps
     assert float(xp.abs(result[1] - 1.0)) < 1.0e-15
 
 

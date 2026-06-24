@@ -47,7 +47,63 @@ def dice_score(
     x_plus_y = xp.sum(x, axis=axis) + xp.sum(y, axis=axis)
     x_plus_y = xp.where(x_plus_y == 0, x_n_y, x_plus_y)
 
-    return (2.0 * x_times_y + eps) / (x_plus_y + eps)
+    return (2.0 * x_n_y + eps) / (x_plus_y + eps)
+
+
+# }}}
+
+
+# {{{ f1_score
+
+
+def f1_score(
+    x: ArrayND,
+    y: ArrayND,
+    *,
+    eps: float = 0.0,
+    axis: int | tuple[int, ...] | None = None,
+    xp: Any = None,
+) -> ArrayND:
+    """Equivalent to the Dice Score."""
+    return dice_score(x, y, eps=eps, axis=axis, xp=xp)
+
+
+# }}}
+
+
+# {{{ jaccard
+
+
+def jaccard_index(
+    x: ArrayND,
+    y: ArrayND,
+    *,
+    eps: float = 0.0,
+    axis: int | tuple[int, ...] | None = None,
+    xp: Any = None,
+):
+    r"""Compute the Jaccard Index for *x* and *y*.
+
+    .. math::
+
+        S(x, y) = 2 \frac{\sum_i x_i y_i}{\sum_i x_i + \sum_i y_i - \sum_i x_i y_i}
+
+    where the summation is done along the *axis* axes. This is a "soft" Jaccard
+    index by default. The arrays must be converted to an appropriate boolean
+    array by the caller.
+
+    The Jaccard index (named after Paul Jaccard) is also sometimes known as the
+    Intersection over Union score, critical success index, the Tanimoto Index, or
+    the Tanimoto coefficient.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x, y)
+
+    # NOTE: n is intersection and u is union :)
+    x_n_y = xp.sum(x * y, axis=axis)
+    x_u_y = xp.sum(x, axis=axis) + xp.sum(y, axis=axis) - x_n_y
+
+    return (x_n_y + eps) / (x_u_y + eps)
 
 
 # }}}
