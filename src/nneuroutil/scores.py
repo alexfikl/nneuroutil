@@ -112,6 +112,58 @@ def jaccard_index(
 # }}}
 
 
+# {{{ tversky_index
+
+
+def tversky_index(
+    x: ArrayND,
+    y: ArrayND,
+    *,
+    alpha: float = 0.5,
+    beta: float = 0.5,
+    eps: float = 0.0,
+    axis: int | tuple[int, ...] | None = None,
+    xp: Any = None,
+) -> ArrayND:
+    r"""Compute the Tversky Index for *x* and *y*.
+
+    .. math::
+
+        S(x, y) = \frac{\sum_i x_i y_i}
+            {\sum_i x_i y_i + \alpha \sum_i x_i (1 - y_i) + \beta \sum_i (1 - x_i) y_i}
+
+    where the summation is done along the *axis* axes. This is a "soft" Tversky
+    index by default, defined for all :math:`x_i, y_i in [0, 1]`. The arrays
+    must be converted to an appropriate boolean array by the caller.
+
+    This score is a generalization of the :func:`dice_score` and the
+    :func:`jaccard_index`. If we take
+
+    * ``alpha = beta = 0.5``, we get the Dice Score.
+    * ``alpha = beta = 1.0``, we get the Jaccard Index.
+    * ``alpha < beta``, we penalize false negatives more,
+    * ``alpha > beta``, we penalize false positives more.
+
+    :arg alpha: weight on false positives.
+    :arg beta: weight on false negatives.
+    """
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(x, y)
+
+    if x.shape != y.shape:
+        raise ValueError(f"shape mismatch: {x.shape} vs {y.shape}")
+
+    x_n_y = xp.sum(x * y, axis=axis)
+    x_m_y = xp.sum(x * (1 - y), axis=axis)
+    y_m_x = xp.sum((1 - x) * y, axis=axis)
+
+    return (x_n_y + eps) / (x_n_y + alpha * x_m_y + beta * y_m_x + eps)
+
+
+# }}}
+
+
 # {{{ volumetric_similarity
 
 
