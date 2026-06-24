@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cache
 from typing import TYPE_CHECKING, Any
 
 import array_api_compat
@@ -54,6 +55,7 @@ def on_ci() -> bool:
     )
 
 
+@cache
 def enable_test_plotting() -> bool:
     """Check if plotting is enabled.
 
@@ -61,7 +63,13 @@ def enable_test_plotting() -> bool:
     variable. The name can change, so use this helper function instead, if possible.
     """
 
-    return get_environ_boolean("NNEUROUTIL_ENABLE_TEST_PLOTTING")
+    from nneuroutil.visualization import set_plotting_defaults
+
+    enabled = get_environ_boolean("NNEUROUTIL_ENABLE_TEST_PLOTTING")
+    if enabled:
+        set_plotting_defaults()
+
+    return enabled
 
 
 # }}}

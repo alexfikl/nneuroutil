@@ -11,13 +11,11 @@ import numpy as np
 import pytest
 
 from nneuroutil.helpers import module_logger, spectrum_error
-from nneuroutil.visualization import set_plotting_defaults
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
 log = module_logger(__name__)
-set_plotting_defaults()
 
 # {{{ test_dmd_classic
 
