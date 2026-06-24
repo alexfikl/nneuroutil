@@ -86,7 +86,7 @@ def jaccard_index(
 
     .. math::
 
-        S(x, y) = 2 \frac{\sum_i x_i y_i}{\sum_i x_i + \sum_i y_i - \sum_i x_i y_i}
+        S(x, y) = \frac{\sum_i x_i y_i}{\sum_i x_i + \sum_i y_i - \sum_i x_i y_i}
 
     where the summation is done along the *axis* axes. This is a "soft" Jaccard
     index by default. The arrays must be converted to an appropriate boolean
@@ -195,7 +195,7 @@ def volumetric_similarity(
     vx = xp.sum(x, axis=axis)
     vy = xp.sum(y, axis=axis)
 
-    return 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
+    return 1.0 - (xp.abs(vx - vy) + eps) / (vx + vy + eps)
 
 
 # }}}
