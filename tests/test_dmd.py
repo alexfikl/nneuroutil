@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pathlib
+from typing import Any
 
 import array_api_compat
 import numpy as np
@@ -21,27 +22,11 @@ set_plotting_defaults()
 # {{{ test_dmd_classic
 
 
-@pytest.mark.parametrize("backend", ["numpy", "jax", "torch"])
 @pytest.mark.parametrize("tls", [True, False])
-def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
+def test_dmd_classic_linear(xp: Any, tls: bool) -> None:  # noqa: FBT001
     rng = np.random.default_rng(seed=42)
     ndim = 8
     nsnapshots = 64
-
-    # set up backend
-    if backend == "jax":
-        jax = pytest.importorskip("jax")
-
-        from nneuroutil.flax_extras import set_jax_config
-
-        set_jax_config()
-        xp = jax.numpy
-    elif backend == "torch":
-        xp = pytest.importorskip("torch")
-    elif backend == "numpy":
-        xp = np
-    else:
-        raise ValueError(f"unknown backend: {backend!r}")
 
     from nneuroutil.dmd import build_dmd, total_least_squares
 
@@ -54,7 +39,6 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     X = xp.stack(xs)
 
     # build DMD approximation
-    xp = array_api_compat.array_namespace(A)
     X1 = X[:-1]
     X2 = X[1:]
     if tls:
@@ -62,14 +46,14 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     dmd = build_dmd(X1, X2, xp=xp)
 
     # ensure the implementation can be compiled
-    if backend == "jax":
+    if array_api_compat.is_jax_namespace(xp):
         import jax
 
-        _ = jax.jit(build_dmd, static_argnames=("rank", "xp"))(X[:-1], X[1:], xp=xp)
-    elif backend == "torch":
+        _ = jax.jit(build_dmd, static_argnames=("rank", "xp"))(X1, X2, xp=xp)
+    elif array_api_compat.is_torch_namespace(xp):
         import torch  # ty: ignore[unresolved-import,unused-ignore-comment]
 
-        _ = torch.compile(build_dmd)(X[:-1], X[1:], xp=xp)
+        _ = torch.compile(build_dmd)(X1, X2, xp=xp)
 
     # check DMD approximation on a random state
     x = xp.asarray(rng.standard_normal(ndim))
@@ -79,7 +63,7 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     error = float(xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref))
     log.info(
         "[%s] DMD classic relative error: %.3e (rank=%d)",
-        backend,
+        xp.__name__,
         error,
         dmd.reduced_size,
     )
@@ -88,7 +72,7 @@ def test_dmd_classic_linear(backend: str, tls: bool) -> None:  # noqa: FBT001
     # check eigenvalues
     lambdas, _ = dmd.eigendecomposition()
     assert xp.all(xp.abs(lambdas) < 1.0 + 1.0e-10)
-    log.info("[%s] Largest eigenvalue: %.3e", backend, xp.max(xp.abs(lambdas)))
+    log.info("[%s] Largest eigenvalue: %.3e", xp.__name__, xp.max(xp.abs(lambdas)))
 
 
 # }}}

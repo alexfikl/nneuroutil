@@ -34,7 +34,7 @@ class DMD:
     """Spatial modes as an array of shape :math:`(r, d)`."""
 
     @property
-    def dtype(self) -> np.dtype:
+    def dtype(self) -> np.dtype[Any]:
         """The :class:`~numpy.dtype` of this operator."""
         return self.Ahat.dtype
 
