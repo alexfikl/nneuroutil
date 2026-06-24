@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -277,7 +277,7 @@ def available_device_names() -> frozenset[str]:
 
 
 @contextmanager
-def jax_default_device(device: str) -> Iterator[None]:
+def jax_default_device(device: str) -> Generator[None]:
     """A context manager similar to ``jax.default_device``.
 
     :arg device: a device name in the form ``platform[:id]``.

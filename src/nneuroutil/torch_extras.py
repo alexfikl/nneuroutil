@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
@@ -481,6 +482,32 @@ def available_device_names() -> frozenset[str]:
         d.type if d.index is None else f"{d.type}:{d.index}"
         for d in available_devices()
     ])
+
+
+@contextmanager
+def torch_default_device(
+    device: str | torch.device | None = None,
+) -> Generator[torch.device]:
+    """Context manager to set the default device.
+
+    Newer versions of ``pytorch`` can use ``torch.device`` for this.
+    """
+    prev_device = torch.get_default_device()
+    torch.set_default_device(device)
+
+    try:
+        yield torch.get_default_device()
+    finally:
+        torch.set_default_device(prev_device)
+
+
+def get_default_device() -> torch.device:
+    """Get the default device used on tensor creation.
+
+    This creates a dummy tensor and returns its device. It should be equivalent
+    to `torch.get_default_device()`, but that does not seem to work across versions.
+    """
+    return torch.zeros(1).device
 
 
 # }}}
