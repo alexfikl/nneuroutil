@@ -144,7 +144,7 @@ def test_volumetric_similarity(xp: Any) -> None:
     vx = xp.sum(x)
     vy = xp.sum(y)
     result = volumetric_similarity(x, y, eps=eps)
-    expected = 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
+    expected = 1.0 - (xp.abs(vx - vy) + eps) / (vx + vy + eps)
     assert float(xp.abs(result - expected)) < 1.0e-15
 
     # zeros: vx = vy = 0 → result = 1 - eps/eps = 0
@@ -175,7 +175,7 @@ def test_volumetric_similarity_axis(xp: Any) -> None:
 
     vx = xp.sum(x[0])
     vy = xp.sum(y[0])
-    expected_0 = 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
+    expected_0 = 1.0 - (xp.abs(vx - vy) + eps) / (vx + vy + eps)
     assert float(xp.abs(result[0] - expected_0)) < 1.0e-15
 
 
