@@ -493,10 +493,13 @@ def torch_default_device(
     Newer versions of ``pytorch`` can use ``torch.device`` for this.
     """
     prev_device = torch.get_default_device()
+
     torch.set_default_device(device)
+    new_device = torch.get_default_device()
+    assert new_device == get_default_device()
 
     try:
-        yield torch.get_default_device()
+        yield new_device
     finally:
         torch.set_default_device(prev_device)
 
