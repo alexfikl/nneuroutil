@@ -81,7 +81,7 @@ def jaccard_index(
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-):
+) -> ArrayND:
     r"""Compute the Jaccard Index for *x* and *y*.
 
     .. math::
@@ -99,11 +99,51 @@ def jaccard_index(
     if xp is None:
         xp = array_api_compat.array_namespace(x, y)
 
+    if x.shape != y.shape:
+        raise ValueError(f"shape mismatch: {x.shape} vs {y.shape}")
+
     # NOTE: n is intersection and u is union :)
     x_n_y = xp.sum(x * y, axis=axis)
     x_u_y = xp.sum(x, axis=axis) + xp.sum(y, axis=axis) - x_n_y
 
     return (x_n_y + eps) / (x_u_y + eps)
+
+
+# }}}
+
+
+# {{{ volumetric_similarity
+
+
+def volumetric_similarity(
+    x: ArrayND,
+    y: ArrayND,
+    *,
+    eps: float = 0.0,
+    axis: int | tuple[int, ...] | None = None,
+    xp: Any = None,
+) -> ArrayND:
+    r"""Compute the Volumetric Similarity between *x* and *y*.
+
+    .. math::
+
+        S(x, y) =
+            1 - \frac{\left|\sum_i x_i - \sum_i y_i\right|}{\sum_i x_i + \sum_i y_i},
+
+    where the summation is done along the *axis* axes. This is a "soft" volumetric
+    similarity by default. The arrays must be converted to an appropriate boolean
+    array by the caller.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x, y)
+
+    if x.shape != y.shape:
+        raise ValueError(f"shape mismatch: {x.shape} vs {y.shape}")
+
+    vx = xp.sum(x, axis=axis)
+    vy = xp.sum(y, axis=axis)
+
+    return 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
 
 
 # }}}

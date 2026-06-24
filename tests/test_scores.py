@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from nneuroutil.helpers import module_logger
-from nneuroutil.scores import dice_score, jaccard_index
+from nneuroutil.scores import dice_score, jaccard_index, volumetric_similarity
 from nneuroutil.visualization import set_plotting_defaults
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -124,6 +124,66 @@ def test_jaccard_index_partial_zeros(xp: Any) -> None:
     result = jaccard_index(x, y, eps=eps, axis=1)
     assert float(xp.abs(result[0] - 0.5)) < 10.0 * eps
     assert float(xp.abs(result[1] - 1.0)) < 1.0e-15
+
+
+# }}}
+
+
+# {{{ test_volumetric_similarity
+
+
+def test_volumetric_similarity(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    x = xp.asarray(rng.standard_normal((4, 16)))
+    y = xp.asarray(rng.standard_normal((4, 16)))
+
+    eps = 1.0e-6
+    vx = xp.sum(x)
+    vy = xp.sum(y)
+    result = volumetric_similarity(x, y, eps=eps)
+    expected = 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
+    assert float(xp.abs(result - expected)) < 1.0e-15
+
+    # zeros: vx = vy = 0 → result = 1 - eps/eps = 0
+    x = xp.zeros((3, 8))
+    y = xp.zeros((3, 8))
+    assert float(xp.abs(volumetric_similarity(x, y, eps=eps))) < 1.0e-15
+
+    # equal ones
+    x = xp.ones((4, 16))
+    expected = 1.0 - eps / (2.0 * xp.sum(x) + eps)
+    assert float(xp.abs(volumetric_similarity(x, x, eps=eps) - expected)) < 1.0e-15
+
+    # mismatch
+    x = xp.asarray(rng.standard_normal((4, 16)))
+    y = xp.asarray(rng.standard_normal((4, 8)))
+    with pytest.raises(ValueError, match="shape mismatch"):
+        volumetric_similarity(x, y)
+
+
+def test_volumetric_similarity_axis(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    x = xp.asarray(rng.standard_normal((4, 16)))
+    y = xp.asarray(rng.standard_normal((4, 16)))
+
+    eps = 1.0e-6
+    result = volumetric_similarity(x, y, eps=eps, axis=1)
+    assert result.shape == (4,)
+
+    vx = xp.sum(x[0])
+    vy = xp.sum(y[0])
+    expected_0 = 1.0 - xp.abs(vx - vy + eps) / (vx + vy + eps)
+    assert float(xp.abs(result[0] - expected_0)) < 1.0e-15
+
+
+def test_volumetric_similarity_partial_zeros(xp: Any) -> None:
+    x = xp.asarray([[3.0, 1.0], [0.0, 0.0]])
+    y = xp.asarray([[1.0, 1.0], [0.0, 0.0]])
+
+    eps = 1.0e-6
+    result = volumetric_similarity(x, y, eps=eps, axis=1)
+    assert float(xp.abs(result[0] - 2.0 / 3.0)) < 10.0 * eps
+    assert float(xp.abs(result[1])) < 1.0e-15
 
 
 # }}}
