@@ -42,7 +42,7 @@ fonttools==4.63.0
     # via matplotlib
 fsspec==2026.6.0
     # via etils
-humanize==4.15.0
+humanize==4.16.0
     # via orbax-checkpoint
 idna==3.18
     # via requests
@@ -129,14 +129,14 @@ optype==0.17.1 ; python_full_version < '3.12'
     # via scipy-stubs
 optype==0.18.0 ; python_full_version >= '3.12'
     # via scipy-stubs
-orbax-checkpoint==0.12.0
+orbax-checkpoint==0.12.1
     # via flax
 packaging==26.2
     # via
     #   matplotlib
     #   pytest
     #   sphinx
-pillow==12.2.0
+pillow==12.3.0
     # via matplotlib
 pluggy==1.6.0
     # via pytest
@@ -177,7 +177,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.15.19
+ruff==0.15.20
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -233,9 +233,9 @@ tensorstore==0.1.84
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.53
+ty==0.0.56
     # via nneuroutil (pyproject.toml:test)
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   nneuroutil (pyproject.toml)
     #   beautifulsoup4
