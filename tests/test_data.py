@@ -70,10 +70,6 @@ def test_sliced_data_loader_shuffle(xp: Any) -> None:
     batches = list(loader)
     assert len(batches) == 3
 
-    perm = list(loader.indices)
-    assert sorted(perm) == [0, 1, 2, 3, 4, 5]
-    assert perm != [0, 1, 2, 3, 4, 5]
-
     # all elements appear exactly once across batches
     combined = []
     for (bx,) in batches:

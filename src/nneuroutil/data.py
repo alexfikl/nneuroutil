@@ -54,20 +54,9 @@ class SlicedDataLoader:
         if rng is None:
             rng = np.random.default_rng()
 
-        xp = array_api_compat.array_namespace(dataset)
-
         num_samples = len(dataset)
         if drop_last:
             num_samples = (num_samples // batch_size) * batch_size
-
-        if shuffle:
-            indices = xp.asarray(
-                rng.permutation(num_samples),
-                dtype=xp.int32,
-                device=dataset.device,
-            )
-        else:
-            indices = xp.arange(num_samples, dtype=xp.int32, device=dataset.device)
 
         self.ds = ds
         self.batch_size = batch_size
@@ -75,7 +64,6 @@ class SlicedDataLoader:
         self.drop_last = drop_last
         self.num_samples = num_samples
 
-        self.indices = indices
         self.device = dataset.device
         self.rng = rng
 
@@ -83,8 +71,19 @@ class SlicedDataLoader:
         return (self.num_samples + self.batch_size - 1) // self.batch_size
 
     def __iter__(self) -> Iterator[tuple[ArrayND, ...]]:
+        xp = array_api_compat.array_namespace(*self.ds)
+
+        if self.shuffle:
+            indices = xp.asarray(
+                self.rng.permutation(self.num_samples),
+                dtype=xp.int32,
+                device=self.device,
+            )
+        else:
+            indices = xp.arange(self.num_samples, dtype=xp.int32, device=self.device)
+
         for start in range(0, self.num_samples, self.batch_size):
-            sl = self.indices[start : start + self.batch_size]
+            sl = indices[start : start + self.batch_size]
             yield tuple(d[sl] for d in self.ds)
 
 
