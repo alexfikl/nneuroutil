@@ -108,7 +108,10 @@ class ComplexTanh(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
         """Define the computation performed at every call."""
-        return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
+        if x.is_complex():
+            return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
+        else:
+            return torch.complex(torch.tanh(x), torch.zeros_like(x))
 
 
 # }}}
