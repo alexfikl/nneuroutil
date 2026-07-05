@@ -22,11 +22,20 @@ log = module_logger(__name__)
 
 
 class Quadratic(nnx.Module):
+    """A quadratic :math:`x^2` activation function."""
+
     def __call__(self, x: jax.Array) -> jax.Array:
         return quadratic(x)
 
 
 class BlendedQuadratic(nnx.Module):
+    r"""A convex combination of a linear and a quadratic activation.
+
+    .. math::
+
+        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+    """
+
     def __init__(self, alpha: float = 0.1) -> None:
         self.alpha = alpha
 
@@ -35,11 +44,21 @@ class BlendedQuadratic(nnx.Module):
 
 
 class ComplexQuadratic(nnx.Module):
+    """An activation function that uses :func:`complex_quadratic`."""
+
     def __call__(self, x: jax.Array) -> jax.Array:
         return complex_quadratic(x)
 
 
 class ComplexBlendedQuadratic(nnx.Module):
+    r"""A convex combination of a linear and a quadratic activation, where the
+    quadratic term uses :func:`complex_quadratic`.
+
+    .. math::
+
+        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+    """
+
     def __init__(self, alpha: float = 0.1) -> None:
         self.alpha = alpha
 
@@ -48,28 +67,40 @@ class ComplexBlendedQuadratic(nnx.Module):
 
 
 class ComplexTanh(nnx.Module):
+    r"""A hyperbolic tangent for a complex vector of shape ``(d,)``.
+
+    This applies the hyperbolic tangent to the real and imaginary components
+    separately. Note that this is different than :math:`\tanh(z)` for a complex
+    :math:`z`.
+    """
+
     def __call__(self, x: jax.Array) -> jax.Array:
         return complex_tanh(x)
 
 
 def quadratic(x: jax.Array) -> jax.Array:
+    """The quadratic activation :math:`x^2`."""
     return x * x
 
 
 def blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+    r"""The blended quadratic activation :math:`\alpha x + (1 - \alpha) x^2`."""
     return alpha * x + (1 - alpha) * x * x
 
 
 def complex_quadratic(x: jax.Array) -> jax.Array:
+    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square."""
     x_re, x_im = jnp.split(x, 2, axis=-1)
     return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
 
 
 def complex_blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+    r"""Blended quadratic for complex-valued inputs."""
     return alpha * x + (1 - alpha) * complex_quadratic(x)
 
 
 def complex_tanh(x: jax.Array) -> jax.Array:
+    """Hyperbolic tangent applied separately to real and imaginary parts."""
     return jnp.tanh(x.real) + 1j * jnp.tanh(x.imag)
 
 
@@ -80,6 +111,11 @@ def complex_tanh(x: jax.Array) -> jax.Array:
 
 
 class Bias(nnx.Module):
+    """A bias-only layer: :math:`y = x + b`."""
+
+    bias: nnx.Param
+    """The learnable bias of shape ``(size,)``."""
+
     def __init__(
         self,
         size: int,
@@ -94,22 +130,52 @@ class Bias(nnx.Module):
         if rngs is None:
             rngs = nnx.Rngs(0)
 
+        self.size = size
         self.bias = nnx.Param(init(rngs.params(), (size,), dtype))
 
     def __call__(self, x: jax.Array) -> jax.Array:
+        """Applies a translation to the inputs along the last dimension."""
         return x + self.bias  # ty: ignore[unsupported-operator]
 
 
 class Residual(nnx.Module):
+    """A basic residual layer around a given module."""
+
+    model: nnx.Module
+    """The wrapped model."""
+
     def __init__(self, m: nnx.Module) -> None:
         super().__init__()
         self.module = m
 
     def __call__(self, x: jax.Array) -> jax.Array:
+        """Applies a residual to the :attr:`model`."""
         return self.module(x) + x
 
 
 class ComplexLinear(nnx.Module):
+    """A linear layer applied to stacked complex variables.
+
+    We assume that the input vector is of shape ``(2 d,)`` representing a
+    stacked complex vector of shape ``(d,)``.
+    """
+
+    in_features: int
+    """Size of each input sample."""
+    out_features: int
+    """Size of each output sample."""
+
+    kernel: nnx.Param
+    """The learnable weights of the module of shape ``(out_features, in_features)``."""
+    bias_re: nnx.Param | None
+    """The learnable bias of shape ``(out_features,)`` for the real part of the
+    input vector.
+    """
+    bias_im: nnx.Param | None
+    """The learnable bias of shape ``(out_features,)`` for the imaginary part of the
+    input vector.
+    """
+
     def __init__(
         self,
         in_features: int,
@@ -147,6 +213,9 @@ class ComplexLinear(nnx.Module):
             self.bias_re = self.bias_im = None
 
     def __call__(self, x: jax.Array) -> jax.Array:
+        """Applies a complex linear transformation to the inputs along the last
+        dimension.
+        """
         # x: [batch, 2 * in_features]
         x_re, x_im = jnp.split(x, 2, axis=-1)
 
@@ -173,6 +242,8 @@ def quadratic_uniform(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
+    """A uniform init that preserves variance through :func:`quadratic`."""
+
     # NOTE just a small math derivation for that scale=1/sqrt(3).
     # 1. We assume that we have a zero-mean Gaussian pre-activation.
     # 2. Then, we have that
@@ -198,6 +269,7 @@ def quadratic_normal(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
+    """A normal init that preserves variance through :func:`quadratic`."""
     return nnx.initializers.variance_scaling(
         scale=1 / math.sqrt(3),
         mode="fan_in",
@@ -216,6 +288,8 @@ def blended_quadratic_uniform(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
+    """A uniform init that preserves variance through :func:`blended_quadratic`."""
+
     # NOTE: blended_quadratic has a nonzero mean for alpha != 1, so we use the
     # second-moment convention (like He/Kaiming for ReLU) to keep the next
     # layer's pre-activation at unit variance.
@@ -251,6 +325,7 @@ def blended_quadratic_normal(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
+    """A normal init that preserves variance through :func:`blended_quadratic`."""
     if abs(alpha - 1.0) < 1.0e-8:
         scale = 1.0
     else:

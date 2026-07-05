@@ -156,6 +156,7 @@ class Residual(nn.Module):
         self.model = m
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
         return self.model(x) + x
 
 
