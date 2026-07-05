@@ -100,6 +100,15 @@ class Bias(nnx.Module):
         return x + self.bias  # ty: ignore[unsupported-operator]
 
 
+class Residual(nnx.Module):
+    def __init__(self, m: nnx.Module) -> None:
+        super().__init__()
+        self.module = m
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return self.module(x) + x
+
+
 class ComplexLinear(nnx.Module):
     def __init__(
         self,
@@ -112,6 +121,8 @@ class ComplexLinear(nnx.Module):
         bias_init: Initializer | None = None,
         rngs: nnx.Rngs | None = None,
     ) -> None:
+        super().__init__()
+
         if rngs is None:
             rngs = nnx.Rngs(0)
 
