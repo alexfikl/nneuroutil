@@ -145,6 +145,20 @@ class Bias(nn.Module):
         return x + self.bias
 
 
+class Residual(nn.Module):
+    """A basic residual layer around a given *model*."""
+
+    model: nn.Module
+    """The wrapped model."""
+
+    def __init__(self, m: nn.Module) -> None:
+        super().__init__()
+        self.model = m
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x) + x
+
+
 class ComplexLinear(nn.Module):
     """A linear layer applied to stacked complex variables.
 
