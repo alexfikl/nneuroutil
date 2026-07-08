@@ -224,6 +224,84 @@ def test_sliding_window_dataset_overlap(xp: Any) -> None:
 # }}}
 
 
+# {{{ test_random_split
+
+
+def test_random_split_partitions(xp: Any) -> None:
+    from nneuroutil.data import random_split
+
+    rng = np.random.default_rng(seed=42)
+    x = xp.arange(10)
+
+    # integer partitions of different sizes
+    splits = random_split([x], [3, 7], rng=rng)
+    assert len(splits) == 2
+    assert [s[0].shape[0] for s in splits] == [3, 7]
+    assert array_equal(xp.sort(xp.concat([s[0] for s in splits])), x)
+
+    splits = random_split([x], [2, 3, 5], rng=rng)
+    assert [s[0].shape[0] for s in splits] == [2, 3, 5]
+    assert array_equal(xp.sort(xp.concat([s[0] for s in splits])), x)
+
+    # an empty split (size 0) is allowed
+    splits = random_split([x], [0, 10], rng=rng)
+    assert [s[0].shape[0] for s in splits] == [0, 10]
+    assert array_equal(xp.sort(xp.concat([s[0] for s in splits])), x)
+
+    # fractions: the floor remainder is distributed round-robin.
+    # n=11, [0.5, 0.5] -> floor([5, 5]) -> remainder 1 -> [6, 5]
+    y = xp.arange(11)
+    splits = random_split([y], [0.5, 0.5], rng=rng)
+    assert [s[0].shape[0] for s in splits] == [6, 5]
+    assert array_equal(xp.sort(xp.concat([s[0] for s in splits])), y)
+
+
+def test_random_split_multi_array(xp: Any) -> None:
+    from nneuroutil.data import random_split
+
+    rng = np.random.default_rng(seed=42)
+    x = xp.arange(10)
+    y = x * 10
+
+    splits = random_split([x, y], [6, 4], rng=rng)
+    assert len(splits) == 2
+    assert [s[0].shape[0] for s in splits] == [6, 4]
+
+    # parallel arrays stay aligned under the same permutation
+    for sx, sy in splits:
+        assert sx.shape[0] == sy.shape[0]
+        assert array_equal(sy, sx * 10)
+
+    # each array is partitioned disjointly and completely
+    for j, original in enumerate((x, y)):
+        assert array_equal(xp.sort(xp.concat([s[j] for s in splits])), original)
+
+
+def test_random_split_errors(xp: Any) -> None:
+    from nneuroutil.data import random_split
+
+    x = xp.arange(10)
+
+    # integer lengths do not add up to the dataset size
+    with pytest.raises(ValueError, match="do not add up to dataset size"):
+        random_split([x], [3, 4])
+
+    # fractions must sum to 1
+    with pytest.raises(ValueError, match="must sum to 1"):
+        random_split([x], [0.3, 0.3])
+
+    # fractions must lie in [0, 1] (sum is 1, but an element is out of range)
+    with pytest.raises(ValueError, match=r"not in \[0, 1\]"):
+        random_split([x], [1.5, -0.5])
+
+    # parallel arrays must share the leading dimension
+    with pytest.raises(ValueError, match="same leading dimension"):
+        random_split([x, xp.arange(12)], [5, 5])
+
+
+# }}}
+
+
 if __name__ == "__main__":
     import sys
 
