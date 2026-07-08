@@ -88,3 +88,81 @@ class SlicedDataLoader:
 
 
 # }}}
+
+
+# {{{ SlidingWindowDataset
+
+
+class SlidingWindowDataset:
+    """A sliding window dataset for tensors of shape ``(nrealizations, maxit, d)``.
+
+    This constructs sliding windows of the shape ``(L, d)`` for each realization.
+    """
+
+    xs: tuple[ArrayND, ...]
+    """The tensors for which to compute sliding windows."""
+    window_size: int
+    """The size of each window."""
+    nwindows: int
+    """The number of windows per realization."""
+
+    def __init__(
+        self,
+        *xs: ArrayND,
+        window_size: int,
+        nwindows: int | None = None,
+    ) -> None:
+        if not xs:
+            raise ValueError(f"{type(self).__name__}: no tensors are provided")
+
+        shape = xs[0].shape
+        if not len(shape) == 3:
+            raise ValueError(f"tensors must be 3d: {shape}")
+
+        if not all(shape == x.shape for x in xs[1:]):
+            raise ValueError("tensors must have the same shape")
+
+        self.xs = xs
+        self.window_size = window_size
+        self.nrealizations, self.maxit, self.dim = shape
+
+        if nwindows is None:
+            nwindows = self.maxit - self.window_size + 1
+
+        if nwindows < 1:
+            raise ValueError(f"'nwindows' must be >= 1: got {nwindows}")
+
+        self.nwindows = nwindows
+        self.total_windows = self.nrealizations * self.nwindows
+        self.window_step = (
+            (self.maxit - self.window_size) / (nwindows - 1) if nwindows > 1 else 0.0
+        )
+
+        if self.window_step > self.window_size - 1:
+            raise ValueError(
+                "'nwindows' is too large for 'window_size': consecutive windows "
+                "do not overlap (min overlap is 1)"
+            )
+
+    def __len__(self) -> int:
+        return self.total_windows
+
+    def window(self, index: int) -> slice:
+        if not -len(self) <= index < len(self):
+            raise IndexError(
+                f"index {index} is out of bounds for dataset of length {len(self)}"
+            )
+
+        i = index % self.nwindows
+        n = round(i * self.window_step)
+
+        return slice(n, n + self.window_size)
+
+    def __getitem__(self, index: int) -> tuple[ArrayND, ...]:
+        ridx = index // self.nwindows
+        window = self.window(index)
+
+        return tuple(x[ridx, window, :] for x in self.xs)
+
+
+# }}}

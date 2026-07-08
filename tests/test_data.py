@@ -129,6 +129,101 @@ def test_sliced_data_loader_no_dataset() -> None:
 # }}}
 
 
+# {{{ test_sliding_window_dataset
+
+
+def test_sliding_window_dataset(xp: Any) -> None:
+    from nneuroutil.data import SlidingWindowDataset
+
+    nruns, maxit, dim = 2, 5, 3
+    window_size = 3
+    nwindows = maxit - window_size + 1
+
+    x = xp.reshape(
+        xp.arange(nruns * maxit * dim, dtype=xp.float64), (nruns, maxit, dim)
+    )
+
+    dataset = SlidingWindowDataset(x, window_size=window_size)
+
+    assert len(dataset) == nruns * nwindows
+
+    # first window of first realization starts at 0
+    (win,) = dataset[0]
+    assert array_equal(win, x[0, 0:window_size, :])
+
+    # first window of second realization
+    (win,) = dataset[nwindows]
+    assert array_equal(win, x[1, 0:window_size, :])
+
+    # last window ends at maxit
+    (win,) = dataset[-1]
+    assert array_equal(win, x[-1, maxit - window_size : maxit, :])
+
+
+# }}}
+
+
+# {{{ test_sliding_window_dataset_nwindows
+
+
+def test_sliding_window_dataset_nwindows(xp: Any) -> None:
+    from nneuroutil.data import SlidingWindowDataset
+
+    nruns, maxit, dim = 2, 10, 3
+    window_size = 3
+    nwindows = 5
+
+    x = xp.reshape(
+        xp.arange(nruns * maxit * dim, dtype=xp.float64), (nruns, maxit, dim)
+    )
+    dataset = SlidingWindowDataset(x, window_size=window_size, nwindows=nwindows)
+
+    assert len(dataset) == nruns * nwindows
+
+    for r in range(nruns):
+        # first window always starts at 0
+        (first,) = dataset[r * nwindows]
+        assert array_equal(first, x[r, 0:window_size, :])
+
+        # last window always ends at maxit
+        (last,) = dataset[r * nwindows + nwindows - 1]
+        assert array_equal(last, x[r, maxit - window_size : maxit, :])
+
+    # spot-check intermediate windows use round() spacing
+    step = (maxit - window_size) / (nwindows - 1)
+    for r in range(nruns):
+        for i in range(nwindows):
+            (win,) = dataset[r * nwindows + i]
+            start = round(i * step)
+            assert array_equal(win, x[r, start : start + window_size, :])
+
+
+# }}}
+
+
+# {{{ test_sliding_window_dataset_overlap
+
+
+def test_sliding_window_dataset_overlap(xp: Any) -> None:
+    from nneuroutil.data import SlidingWindowDataset
+
+    nruns, maxit, dim = 2, 10, 3
+    x = xp.reshape(
+        xp.arange(nruns * maxit * dim, dtype=xp.float64), (nruns, maxit, dim)
+    )
+
+    # window_size=3, nwindows=4 -> step = 7/3 > 2 -> consecutive windows
+    # do not overlap by at least 1
+    with pytest.raises(ValueError, match="overlap"):
+        SlidingWindowDataset(x, window_size=3, nwindows=4)
+
+    # borderline: step == window_size - 1 -> overlap exactly 1 (allowed)
+    SlidingWindowDataset(x, window_size=4, nwindows=3)
+
+
+# }}}
+
+
 if __name__ == "__main__":
     import sys
 
