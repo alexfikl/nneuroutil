@@ -126,6 +126,7 @@ class Array(Protocol[ShapeT_co, DTypeT]):  # noqa: PLR0904
     # Not part of the Array API
     def __len__(self) -> int: ...
     def __iter__(self) -> Any: ...
+    def __array__(self) -> np.ndarray[Any, Any]: ...  # noqa: PLW3201
 
 
 Array0D = TypeAliasType(
