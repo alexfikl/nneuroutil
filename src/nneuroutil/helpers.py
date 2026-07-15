@@ -458,7 +458,7 @@ def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
         return dtype  # ty: ignore[invalid-return-type]
 
     try:
-        return _REAL_TO_COMPLEX_DTYPE[dtype]
+        return _REAL_TO_COMPLEX_DTYPE[dtype]  # ty: ignore[invalid-return-type]
     except KeyError:
         raise TypeError(f"no complex counterpart for dtype {dtype!r}") from None
 

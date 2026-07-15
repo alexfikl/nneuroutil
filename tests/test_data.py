@@ -73,7 +73,7 @@ def test_sliced_data_loader_shuffle(xp: Any) -> None:
     # all elements appear exactly once across batches
     combined = []
     for (bx,) in batches:
-        combined.extend(list(bx.ravel()))
+        combined.extend(list(xp.reshape(bx, (-1,))))
     assert sorted(combined) == list(range(12))
 
 

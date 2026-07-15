@@ -135,7 +135,7 @@ class Bias(nnx.Module):
 
     def __call__(self, x: jax.Array) -> jax.Array:
         """Applies a translation to the inputs along the last dimension."""
-        return x + self.bias  # ty: ignore[unsupported-operator]
+        return x + self.bias
 
 
 class Residual(nnx.Module):

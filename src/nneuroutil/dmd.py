@@ -90,7 +90,7 @@ class DMD:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
-    def __call__(self, x: Array1D) -> Array1D:
+    def __call__(self, x: ArrayND) -> ArrayND:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
@@ -120,7 +120,7 @@ def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
     Lambda = lambdas[None, :] ** n
 
     # apply the operator
-    return (Lambda * b[None, :]) @ Phi.conj().T
+    return (Lambda * b[None, :]) @ xp.conj(Phi).T
 
 
 # }}}

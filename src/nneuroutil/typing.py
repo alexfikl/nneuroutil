@@ -7,7 +7,8 @@ import os
 from dataclasses import Field
 from typing import Any, ClassVar, Protocol, TypeAlias
 
-from typing_extensions import TypeVar
+import numpy as np
+from typing_extensions import TypeAliasType, TypeVar
 
 T = TypeVar("T")
 """An unbound invariant generic type variable."""
@@ -15,24 +16,106 @@ T = TypeVar("T")
 PathLike: TypeAlias = os.PathLike[str] | str
 """A union of types supported as paths."""
 
-ShapeT = TypeVar("ShapeT", bound=tuple[int, ...], default=tuple[Any, ...])
-"""An invariant type alias for ``tuple[int, ...]``."""
-
 # FIXME: maybe https://github.com/data-apis/array-api-typing will work some day.
 # Now, it seems pretty empty, so not sure it's worth doing more than this..
 
-Array0D: TypeAlias = Any
-"""An 0-dimensional array."""
-Array1D: TypeAlias = Any
-"""An 1-dimensional array."""
-Array2D: TypeAlias = Any
-"""A 2-dimensional array."""
-Array3D: TypeAlias = Any
-"""A 3-dimensional array."""
-Array4D: TypeAlias = Any
-"""A 4-dimensional array."""
-ArrayND: TypeAlias = Any
-"""An n-dimensional array."""
+ShapeT_co = TypeVar(
+    "ShapeT_co", bound=tuple[int, ...], default=tuple[Any, ...], covariant=True
+)
+"""A covariant type variable for array shapes (``tuple[int, ...]``)."""
+DTypeT = TypeVar("DTypeT", bound=np.dtype[Any], default=Any)
+"""An invariant type alias for ``np.dtype``."""
+ScalarTypeT = TypeVar("ScalarTypeT", bound=np.generic, default=Any)
+"""An invariant type alias for :mod:`numpy` scalars."""
+
+
+class Array(Protocol[ShapeT_co, DTypeT]):  # noqa: PLR0904
+    """A minimal protocol compatible with the Array API."""
+
+    @property
+    def shape(self) -> ShapeT_co: ...
+    @property
+    def ndim(self) -> int: ...
+    @property
+    def size(self) -> int: ...
+    @property
+    def dtype(self) -> Any: ...
+    @property
+    def device(self) -> Any: ...
+
+    def __array_namespace__(self, *, api_version: Any = None) -> Any: ...  # noqa: PLW3201
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Any: ...
+    def __getitem__(self, key: Any, /) -> Any: ...
+    def __setitem__(self, key: Any, value: Any, /) -> None: ...
+    def __abs__(self) -> Any: ...
+    def __pos__(self) -> Any: ...
+    def __neg__(self) -> Any: ...
+    def __invert__(self) -> Any: ...
+    def __add__(self, other: Any, /) -> Any: ...
+    def __sub__(self, other: Any, /) -> Any: ...
+    def __mul__(self, other: Any, /) -> Any: ...
+    def __truediv__(self, other: Any, /) -> Any: ...
+    def __floordiv__(self, other: Any, /) -> Any: ...
+    def __mod__(self, other: Any, /) -> Any: ...
+    def __pow__(self, other: Any, /) -> Any: ...
+    def __matmul__(self, other: Any, /) -> Any: ...
+    def __and__(self, other: Any, /) -> Any: ...
+    def __or__(self, other: Any, /) -> Any: ...
+    def __xor__(self, other: Any, /) -> Any: ...
+    def __lshift__(self, other: Any, /) -> Any: ...
+    def __rshift__(self, other: Any, /) -> Any: ...
+    def __radd__(self, other: Any, /) -> Any: ...
+    def __rsub__(self, other: Any, /) -> Any: ...
+    def __rmul__(self, other: Any, /) -> Any: ...
+    def __rtruediv__(self, other: Any, /) -> Any: ...
+    def __rfloordiv__(self, other: Any, /) -> Any: ...
+    def __rmod__(self, other: Any, /) -> Any: ...
+    def __rpow__(self, other: Any, /) -> Any: ...
+    def __rmatmul__(self, other: Any, /) -> Any: ...
+    def __rand__(self, other: Any, /) -> Any: ...
+    def __ror__(self, other: Any, /) -> Any: ...
+    def __rxor__(self, other: Any, /) -> Any: ...
+    def __rlshift__(self, other: Any, /) -> Any: ...
+    def __rrshift__(self, other: Any, /) -> Any: ...
+
+
+Array0D = TypeAliasType(
+    "Array0D",
+    Array[tuple[()], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for a 0-dimensional array."""
+Array1D = TypeAliasType(
+    "Array1D",
+    Array[tuple[int], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for a 1-dimensional array."""
+Array2D = TypeAliasType(
+    "Array2D",
+    Array[tuple[int, int], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for a 2-dimensional array."""
+Array3D = TypeAliasType(
+    "Array3D",
+    Array[tuple[int, int, int], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for a 3-dimensional array."""
+Array4D = TypeAliasType(
+    "Array4D",
+    Array[tuple[int, int, int, int], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for a 4-dimensional array."""
+ArrayND = TypeAliasType(
+    "ArrayND",
+    Array[tuple[int, ...], np.dtype[ScalarTypeT]],
+    type_params=(ScalarTypeT,),
+)
+"""A type alias for an n-dimensional array."""
 
 DTypeLike: TypeAlias = Any
 """A :class:`numpy.dtype` like object."""
