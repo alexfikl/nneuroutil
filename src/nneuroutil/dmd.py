@@ -21,16 +21,16 @@ log = module_logger(__name__)
 @register_dataclass
 @dataclass(frozen=True)
 class DMD:
-    Ahat: Array2D
+    Ahat: Array2D[np.inexact[Any]]
     """Reduced-order model operator of shape :math:`(r, r)` with rank
     :attr:`reduced_size`.
     """
 
-    U: Array2D
+    U: Array2D[np.inexact[Any]]
     """Temporal modes as an array of shape :math:`(n - 1, r)`."""
-    S: Array1D
+    S: Array1D[np.floating[Any]]
     """Singular values as an array of shape :math:`(r,)`."""
-    Vh: Array2D
+    Vh: Array2D[np.inexact[Any]]
     """Spatial modes as an array of shape :math:`(r, d)`."""
 
     @property
@@ -58,44 +58,50 @@ class DMD:
         """The size of the full model."""
         return self.Vh.shape[1]
 
-    def eigendecomposition(self) -> tuple[Array1D, Array2D]:
+    def eigendecomposition(
+        self,
+    ) -> tuple[Array1D[np.inexact[Any]], Array2D[np.inexact[Any]]]:
         """Compute the eigendecomposition of :attr:`Ahat`."""
         xp = array_api_compat.array_namespace(self.Ahat)
 
         eigs, eigenvectors = xp.linalg.eig(self.Ahat)
         return eigs, eigenvectors
 
-    def encode(self, x: ArrayND) -> ArrayND:
+    def encode(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
         """Project the full state *x* to the reduced coordinates."""
         assert x.shape[0] == self.full_size
 
         xp = array_api_compat.array_namespace(x, self.Vh)
         return xp.einsum("ij,j...->i...", self.Vh, x)
 
-    def evolve(self, x: ArrayND) -> ArrayND:
+    def evolve(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
         """Evolve the reduced-order model."""
         assert x.shape[0] == self.reduced_size
 
         xp = array_api_compat.array_namespace(x, self.Ahat)
         return xp.einsum("ij,j...->i...", self.Ahat, x)
 
-    def decode(self, x: ArrayND) -> ArrayND:
+    def decode(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
         """Reconstruct the full state from the reduced state *x*."""
         assert x.shape[0] == self.reduced_size
 
         xp = array_api_compat.array_namespace(x, self.Vh)
         return xp.einsum("ij,i...->j...", xp.conj(self.Vh), x)
 
-    def __matmul__(self, x: ArrayND) -> ArrayND:
+    def __matmul__(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
-    def __call__(self, x: ArrayND) -> ArrayND:
+    def __call__(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
 
-def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
+def reconstruct(
+    dmd: DMD,
+    x0: Array1D[np.inexact[Any]],
+    steps: int,
+) -> Array2D[np.inexact[Any]]:
     """
     :arg x0: initial condition for the system. If this is the size of the
         reduced system, we assume that it represents the amplitudes of the DMD
@@ -130,13 +136,13 @@ def reconstruct(dmd: DMD, x0: Array1D, steps: int) -> Array2D:
 
 
 def total_least_squares(
-    X: Array2D,
-    Y: Array2D,
+    X: Array2D[np.inexact[Any]],
+    Y: Array2D[np.inexact[Any]],
     *,
     rank: int | None = None,
     eps: float | None = None,
     xp: Any = None,
-) -> tuple[Array2D, Array2D]:
+) -> tuple[Array2D[np.inexact[Any]], Array2D[np.inexact[Any]]]:
     """Apply Total Least Squares de-biasing to the dataset.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
@@ -185,8 +191,8 @@ def total_least_squares(
 
 
 def build_dmd(
-    X: Array2D,
-    Y: Array2D,
+    X: Array2D[np.inexact[Any]],
+    Y: Array2D[np.inexact[Any]],
     *,
     rank: int | None = None,
     eps: float | None = None,

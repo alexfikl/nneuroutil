@@ -415,7 +415,12 @@ def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT
 # {{{ match_spectrum
 
 
-def spectrum_error(eig_a: Array1D, eig_b: Array1D, *, xp: Any | None = None) -> float:
+def spectrum_error(
+    eig_a: Array1D[np.inexact[Any]],
+    eig_b: Array1D[np.inexact[Any]],
+    *,
+    xp: Any | None = None,
+) -> float:
     if xp is None:
         xp = array_api_compat.array_namespace(eig_a, eig_b)
 

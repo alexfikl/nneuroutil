@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import array_api_compat
+import numpy as np
 
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import ArrayND
@@ -17,13 +18,13 @@ log = module_logger(__name__)
 
 
 def dice_score(
-    x: ArrayND,
-    y: ArrayND,
+    x: ArrayND[np.inexact[Any]],
+    y: ArrayND[np.inexact[Any]],
     *,
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-) -> ArrayND:
+) -> ArrayND[np.inexact[Any]]:
     r"""Compute the Dice Score for *x* and *y*.
 
     .. math::
@@ -57,13 +58,13 @@ def dice_score(
 
 
 def f1_score(
-    x: ArrayND,
-    y: ArrayND,
+    x: ArrayND[np.inexact[Any]],
+    y: ArrayND[np.inexact[Any]],
     *,
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-) -> ArrayND:
+) -> ArrayND[np.inexact[Any]]:
     """Equivalent to the Dice Score."""
     return dice_score(x, y, eps=eps, axis=axis, xp=xp)
 
@@ -75,13 +76,13 @@ def f1_score(
 
 
 def jaccard_index(
-    x: ArrayND,
-    y: ArrayND,
+    x: ArrayND[np.inexact[Any]],
+    y: ArrayND[np.inexact[Any]],
     *,
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-) -> ArrayND:
+) -> ArrayND[np.inexact[Any]]:
     r"""Compute the Jaccard Index for *x* and *y*.
 
     .. math::
@@ -116,15 +117,15 @@ def jaccard_index(
 
 
 def tversky_index(
-    x: ArrayND,
-    y: ArrayND,
+    x: ArrayND[np.inexact[Any]],
+    y: ArrayND[np.inexact[Any]],
     *,
     alpha: float = 0.5,
     beta: float = 0.5,
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-) -> ArrayND:
+) -> ArrayND[np.inexact[Any]]:
     r"""Compute the Tversky Index for *x* and *y*.
 
     .. math::
@@ -168,13 +169,13 @@ def tversky_index(
 
 
 def volumetric_similarity(
-    x: ArrayND,
-    y: ArrayND,
+    x: ArrayND[np.inexact[Any]],
+    y: ArrayND[np.inexact[Any]],
     *,
     eps: float = 0.0,
     axis: int | tuple[int, ...] | None = None,
     xp: Any = None,
-) -> ArrayND:
+) -> ArrayND[np.inexact[Any]]:
     r"""Compute the Volumetric Similarity between *x* and *y*.
 
     .. math::

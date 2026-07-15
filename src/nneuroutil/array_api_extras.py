@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import array_api_compat
+import numpy as np
 
 from nneuroutil.typing import ArrayND
 
@@ -13,8 +14,8 @@ from nneuroutil.typing import ArrayND
 
 
 def array_equal(
-    a: ArrayND,
-    b: ArrayND,
+    a: ArrayND[np.number[Any]],
+    b: ArrayND[np.number[Any]],
     *,
     equal_nan: bool = False,
     xp: Any = None,

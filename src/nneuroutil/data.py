@@ -19,7 +19,7 @@ from nneuroutil.typing import ArrayND
 class SlicedDataLoader:
     """A lightweight data loader for in-memory data."""
 
-    ds: tuple[ArrayND, ...]
+    ds: tuple[ArrayND[np.inexact[Any]], ...]
     """A tuple of arrays that should be loaded together in slices of *batch_size*."""
 
     size: int
@@ -36,7 +36,7 @@ class SlicedDataLoader:
 
     def __init__(
         self,
-        *ds: ArrayND,
+        *ds: ArrayND[np.inexact[Any]],
         batch_size: int = 1,
         shuffle: bool = True,
         drop_last: bool = False,
@@ -78,7 +78,7 @@ class SlicedDataLoader:
     def __len__(self) -> int:
         return (self.num_samples + self.batch_size - 1) // self.batch_size
 
-    def __iter__(self) -> Iterator[tuple[ArrayND, ...]]:
+    def __iter__(self) -> Iterator[tuple[ArrayND[np.inexact[Any]], ...]]:
         if self.shuffle:
             indices = self.xp.asarray(
                 self.rng.permutation(self.num_samples),
@@ -107,7 +107,7 @@ class SlidingWindowDataset:
     This constructs sliding windows of the shape ``(L, d)`` for each realization.
     """
 
-    xs: tuple[ArrayND, ...]
+    xs: tuple[ArrayND[np.inexact[Any]], ...]
     """The tensors for which to compute sliding windows."""
     window_size: int
     """The size of each window."""
@@ -116,7 +116,7 @@ class SlidingWindowDataset:
 
     def __init__(
         self,
-        *xs: ArrayND,
+        *xs: ArrayND[np.inexact[Any]],
         window_size: int,
         nwindows: int | None = None,
     ) -> None:
@@ -166,7 +166,7 @@ class SlidingWindowDataset:
 
         return slice(n, n + self.window_size)
 
-    def __getitem__(self, index: int) -> tuple[ArrayND, ...]:
+    def __getitem__(self, index: int) -> tuple[ArrayND[np.inexact[Any]], ...]:
         ridx = index // self.nwindows
         window = self.window(index)
 
@@ -184,12 +184,12 @@ def is_int_sequence(x: Sequence[Any]) -> TypeIs[Sequence[int]]:
 
 
 def random_split(
-    xs: Sequence[ArrayND],
+    xs: Sequence[ArrayND[np.inexact[Any]]],
     splits: Sequence[int] | Sequence[float],
     *,
     rng: np.random.Generator | None = None,
     xp: Any = None,
-) -> tuple[tuple[ArrayND, ...], ...]:
+) -> tuple[tuple[ArrayND[np.inexact[Any]], ...], ...]:
     """Randomly split a sequence of arrays with the same leading dimension.
 
     The split can be given as a sequence of integers that sum up to the size of
