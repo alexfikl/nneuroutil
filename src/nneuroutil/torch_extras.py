@@ -21,17 +21,28 @@ log = module_logger(__name__)
 # {{{ activation functions
 
 
-def complex_quadratic(x: torch.Tensor) -> torch.Tensor:
+def complex_quadratic(x: torch.Tensor, *, interleave: bool = False) -> torch.Tensor:
     """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
 
-    We assume that ``x[..., :d]`` is the real part and ``x[..., d:]`` is the
-    imaginary part and compute the standard complex square.
+    The storage of the array depends on *interleave*. If *True*, we assume that
+    the array is stored as ``[x[0].real, x[0].imag, ..., x[n].real,
+    x[n].imag]``. Otherwise, we assume that it is stacked as ``[x[0].real, ...,
+    x[n].real, x[0].imag, ..., x[n].imag]```.
     """
     if x.shape[-1] % 2 != 0:
         raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
 
-    x_re, x_im = torch.chunk(x, 2, dim=-1)
-    return torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
+    if interleave:
+        x = x.reshape(*x.shape[:-1], -1, 2)
+        x_re, x_im = x[..., 0], x[..., 1]
+
+        result = torch.stack([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
+        result = result.reshape(*x_re.shape[:-1], -1)
+    else:
+        x_re, x_im = torch.chunk(x, 2, dim=-1)
+        result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
+
+    return result
 
 
 class Quadratic(nn.Module):
@@ -45,9 +56,16 @@ class Quadratic(nn.Module):
 class ComplexQuadratic(nn.Module):
     """An activation function that uses :func:`complex_quadratic`."""
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+    interleave: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleave: bool = False) -> None:
+        super().__init__()
+        self.interleave = interleave
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return complex_quadratic(x)
+        return complex_quadratic(x, interleave=self.interleave)
 
 
 class BlendedQuadratic(nn.Module):
@@ -84,17 +102,21 @@ class ComplexBlendedQuadratic(nn.Module):
 
     alpha: float
     """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+    interleave: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
 
-    def __init__(self, alpha: float = 0.5) -> None:
+    def __init__(self, alpha: float = 0.5, *, interleave: bool = False) -> None:
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
 
         super().__init__()
         self.alpha = alpha
+        self.interleave = interleave
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return self.alpha * x + (1.0 - self.alpha) * complex_quadratic(x)
+        x2 = complex_quadratic(x, interleave=self.interleave)
+        return self.alpha * x + (1.0 - self.alpha) * x2
 
 
 class ComplexTanh(nn.Module):
