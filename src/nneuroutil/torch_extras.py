@@ -212,12 +212,15 @@ class ComplexLinear(nn.Module):
     """The learnable bias of shape ``(out_features,)`` for the imaginary part of the
     input vector. The values are initialized to 0.
     """
+    interleave: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
 
     def __init__(
         self,
         in_features: int,
         out_features: int,
         *,
+        interleave: bool = False,
         bias: bool = False,
         device: str | torch.device | None = None,
         dtype: Any | None = None,
@@ -240,6 +243,7 @@ class ComplexLinear(nn.Module):
 
         self.in_features = in_features
         self.out_features = out_features
+        self.interleave = interleave
 
         self.reset_parameters()
 
@@ -254,12 +258,23 @@ class ComplexLinear(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
         # x: [batch, 2 * in_features]
-        x_re, x_im = x.chunk(2, dim=-1)
+        if self.interleave:
+            d = self.in_features
+            x = x.reshape(*x.shape[:-1], d, 2)
+            re_in, im_in = x[..., 0], x[..., 1]
 
-        result_re = nn.functional.linear(x_re, self.weight, self.bias_re)
-        result_im = nn.functional.linear(x_im, self.weight, self.bias_im)
+            result_re = nn.functional.linear(re_in, self.weight, self.bias_re)
+            result_im = nn.functional.linear(im_in, self.weight, self.bias_im)
 
-        return torch.cat([result_re, result_im], dim=-1)
+            result = torch.stack([result_re, result_im], dim=-1)
+            return result.reshape(*result_re.shape[:-1], 2 * self.out_features)
+        else:
+            x_re, x_im = x.chunk(2, dim=-1)
+
+            result_re = nn.functional.linear(x_re, self.weight, self.bias_re)
+            result_im = nn.functional.linear(x_im, self.weight, self.bias_im)
+
+            return torch.cat([result_re, result_im], dim=-1)
 
 
 class SymmetricLinear(nn.Module):

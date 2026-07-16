@@ -160,6 +160,41 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
     assert mod_custom_dtype.weight.dtype == torch.float32
 
 
+@pytest.mark.parametrize("bias", [True, False])
+def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
+    from nneuroutil.torch_extras import ComplexLinear
+
+    in_features = 4
+    out_features = 6
+    batch_size = 3
+
+    z = torch.complex(
+        torch.randn(batch_size, in_features), torch.randn(batch_size, in_features)
+    )
+
+    # input: [batch, 2 * in_features] with interleaved storage
+    x = torch.view_as_real(z).reshape(batch_size, 2 * in_features)
+    mod = ComplexLinear(in_features, out_features, interleave=True, bias=bias)
+
+    res = mod(x)
+    assert res.shape == (batch_size, 2 * out_features)
+
+    expected_re = torch.nn.functional.linear(z.real, mod.weight, mod.bias_re)
+    expected_im = torch.nn.functional.linear(z.imag, mod.weight, mod.bias_im)
+    expected = torch.stack([expected_re, expected_im], dim=-1).reshape(
+        batch_size, 2 * out_features
+    )
+    assert torch.allclose(res, expected)
+
+    # check consistency with the stacked layout
+    mod.interleave = False
+    x = torch.cat([z.real, z.imag], dim=-1)
+
+    res = mod(x)
+    expected = torch.cat([expected_re, expected_im], dim=-1)
+    assert torch.allclose(res, expected)
+
+
 # }}}
 
 
