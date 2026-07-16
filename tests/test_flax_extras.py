@@ -68,6 +68,45 @@ def test_complex_tanh() -> None:
     assert jnp.allclose(res_func, expected)
 
 
+def test_complex_quadratic_interleave() -> None:
+    from nneuroutil.flax_extras import ComplexQuadratic, complex_quadratic
+
+    n = 5
+    key_re, key_im = jax.random.split(jax.random.PRNGKey(0))
+    z_re = jax.random.normal(key_re, (3, n))
+    z_im = jax.random.normal(key_im, (3, n))
+    z2_re = z_re * z_re - z_im * z_im
+    z2_im = 2.0 * z_re * z_im
+
+    # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
+    x = jnp.empty((3, 2 * n))
+    x = x.at[:, ::2].set(z_re).at[:, 1::2].set(z_im)
+    res = complex_quadratic(x, interleaved=True)
+    expected = jnp.empty((3, 2 * n))
+    expected = expected.at[:, ::2].set(z2_re).at[:, 1::2].set(z2_im)
+    assert res.shape == x.shape
+    assert jnp.allclose(res, expected)
+
+    # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
+    x = jnp.concatenate([z_re, z_im], axis=-1)
+    res = complex_quadratic(x, interleaved=False)
+    expected = jnp.concatenate([z2_re, z2_im], axis=-1)
+    assert jnp.allclose(res, expected)
+
+    # test module
+    x = jnp.empty((3, 2 * n))
+    x = x.at[:, ::2].set(z_re).at[:, 1::2].set(z_im)
+    mod = ComplexQuadratic(interleaved=True)
+    res = mod(x)
+    expected = jnp.empty((3, 2 * n))
+    expected = expected.at[:, ::2].set(z2_re).at[:, 1::2].set(z2_im)
+    assert jnp.allclose(res, expected)
+
+    # test odd dimension raises
+    with pytest.raises(ValueError, match="must be even"):
+        complex_quadratic(jnp.empty((3, 2 * n + 1)), interleaved=True)
+
+
 # }}}
 
 
@@ -118,6 +157,51 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
         rngs=nnx.Rngs(0),
     )
     assert mod_custom_dtype.kernel.value.dtype == jnp.float32
+
+
+@pytest.mark.parametrize("bias", [True, False])
+def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
+    from nneuroutil.flax_extras import ComplexLinear
+
+    in_features = 4
+    out_features = 6
+    batch_size = 3
+
+    key_re, key_im, key_rngs = jax.random.split(jax.random.PRNGKey(0), 3)
+    z_re = jax.random.normal(key_re, (batch_size, in_features))
+    z_im = jax.random.normal(key_im, (batch_size, in_features))
+
+    rngs = nnx.Rngs(params=key_rngs)
+
+    # interleaved input: [batch, 2 * in_features]
+    x = jnp.empty((batch_size, 2 * in_features))
+    x = x.at[:, ::2].set(z_re).at[:, 1::2].set(z_im)
+    mod = ComplexLinear(
+        in_features, out_features, interleaved=True, use_bias=bias, rngs=rngs
+    )
+
+    res = mod(x)
+    assert res.shape == (batch_size, 2 * out_features)
+
+    expected_re = z_re @ mod.kernel.value
+    expected_im = z_im @ mod.kernel.value
+    if bias:
+        assert mod.bias_re is not None
+        assert mod.bias_im is not None
+        expected_re += mod.bias_re.value
+        expected_im += mod.bias_im.value
+
+    expected = jnp.empty((batch_size, 2 * out_features))
+    expected = expected.at[:, ::2].set(expected_re).at[:, 1::2].set(expected_im)
+    assert jnp.allclose(res, expected)
+
+    # check consistency with the stacked layout
+    mod.interleaved = False
+    x = jnp.concatenate([z_re, z_im], axis=-1)
+
+    res = mod(x)
+    expected = jnp.concatenate([expected_re, expected_im], axis=-1)
+    assert jnp.allclose(res, expected)
 
 
 # }}}

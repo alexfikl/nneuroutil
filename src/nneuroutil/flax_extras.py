@@ -13,6 +13,7 @@ import jax.numpy as jnp
 from flax import nnx
 from flax.typing import Initializer
 
+from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import module_logger, to_real
 
 log = module_logger(__name__)
@@ -46,8 +47,14 @@ class BlendedQuadratic(nnx.Module):
 class ComplexQuadratic(nnx.Module):
     """An activation function that uses :func:`complex_quadratic`."""
 
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
+
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_quadratic(x)
+        return complex_quadratic(x, interleaved=self.interleaved)
 
 
 class ComplexBlendedQuadratic(nnx.Module):
@@ -59,11 +66,18 @@ class ComplexBlendedQuadratic(nnx.Module):
         f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
     """
 
-    def __init__(self, alpha: float = 0.1) -> None:
+    alpha: float
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, alpha: float = 0.1, *, interleaved: bool = False) -> None:
         self.alpha = alpha
+        self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_blended_quadratic(x, alpha=self.alpha)
+        return complex_blended_quadratic(
+            x, alpha=self.alpha, interleaved=self.interleaved
+        )
 
 
 class ComplexTanh(nnx.Module):
@@ -88,15 +102,32 @@ def blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
     return alpha * x + (1 - alpha) * x * x
 
 
-def complex_quadratic(x: jax.Array) -> jax.Array:
-    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square."""
+def complex_quadratic(x: jax.Array, *, interleaved: bool = False) -> jax.Array:
+    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
+
+    The storage of the array depends on *interleaved*. If *True*, we assume that
+    the array is stored as ``[x[0].real, x[0].imag, ..., x[n].real,
+    x[n].imag]``. Otherwise, we assume that it is stacked as ``[x[0].real, ...,
+    x[n].real, x[0].imag, ..., x[n].imag]``.
+    """
+    if x.shape[-1] % 2 != 0:
+        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
+
+    if interleaved:
+        x_re, x_im = deinterleave(x)
+        result_re = x_re * x_re - x_im * x_im
+        result_im = 2.0 * x_re * x_im
+        return interleave(result_re, result_im)
+
     x_re, x_im = jnp.split(x, 2, axis=-1)
     return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
 
 
-def complex_blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
+def complex_blended_quadratic(
+    x: jax.Array, *, alpha: float = 0.1, interleaved: bool = False
+) -> jax.Array:
     r"""Blended quadratic for complex-valued inputs."""
-    return alpha * x + (1 - alpha) * complex_quadratic(x)
+    return alpha * x + (1 - alpha) * complex_quadratic(x, interleaved=interleaved)
 
 
 def complex_tanh(x: jax.Array) -> jax.Array:
@@ -175,6 +206,8 @@ class ComplexLinear(nnx.Module):
     """The learnable bias of shape ``(out_features,)`` for the imaginary part of the
     input vector.
     """
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
 
     def __init__(
         self,
@@ -182,6 +215,7 @@ class ComplexLinear(nnx.Module):
         out_features: int,
         *,
         use_bias: bool = False,
+        interleaved: bool = False,
         dtype: Any | None = None,
         kernel_init: Initializer | None = None,
         bias_init: Initializer | None = None,
@@ -202,6 +236,7 @@ class ComplexLinear(nnx.Module):
 
         self.in_features = in_features
         self.out_features = out_features
+        self.interleaved = interleaved
         self.kernel = nnx.Param(
             kernel_init(rngs.params(), (in_features, out_features), ftype)
         )
@@ -217,7 +252,10 @@ class ComplexLinear(nnx.Module):
         dimension.
         """
         # x: [batch, 2 * in_features]
-        x_re, x_im = jnp.split(x, 2, axis=-1)
+        if self.interleaved:
+            x_re, x_im = deinterleave(x)
+        else:
+            x_re, x_im = jnp.split(x, 2, axis=-1)
 
         result_re = x_re @ self.kernel.value
         if self.bias_re is not None:
@@ -226,6 +264,9 @@ class ComplexLinear(nnx.Module):
         result_im = x_im @ self.kernel.value
         if self.bias_im is not None:
             result_im = result_im + self.bias_im.value  # noqa: PLR6104
+
+        if self.interleaved:
+            return interleave(result_re, result_im)
 
         return jnp.concatenate([result_re, result_im], axis=-1)
 
