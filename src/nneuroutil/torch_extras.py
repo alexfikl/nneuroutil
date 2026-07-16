@@ -13,6 +13,7 @@ import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch import nn
 from torch.utils._python_dispatch import TorchDispatchMode  # noqa: PLC2701
 
+from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import module_logger
 
 log = module_logger(__name__)
@@ -21,10 +22,10 @@ log = module_logger(__name__)
 # {{{ activation functions
 
 
-def complex_quadratic(x: torch.Tensor, *, interleave: bool = False) -> torch.Tensor:
+def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
     """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
 
-    The storage of the array depends on *interleave*. If *True*, we assume that
+    The storage of the array depends on *interleaved*. If *True*, we assume that
     the array is stored as ``[x[0].real, x[0].imag, ..., x[n].real,
     x[n].imag]``. Otherwise, we assume that it is stacked as ``[x[0].real, ...,
     x[n].real, x[0].imag, ..., x[n].imag]```.
@@ -32,12 +33,9 @@ def complex_quadratic(x: torch.Tensor, *, interleave: bool = False) -> torch.Ten
     if x.shape[-1] % 2 != 0:
         raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
 
-    if interleave:
-        x = x.reshape(*x.shape[:-1], -1, 2)
-        x_re, x_im = x[..., 0], x[..., 1]
-
-        result = torch.stack([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
-        result = result.reshape(*x_re.shape[:-1], -1)
+    if interleaved:
+        x_re, x_im = deinterleave(x, axis=-1, xp=torch)
+        result = interleave(x_re * x_re - x_im * x_im, 2 * x_re * x_im)
     else:
         x_re, x_im = torch.chunk(x, 2, dim=-1)
         result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
@@ -56,16 +54,16 @@ class Quadratic(nn.Module):
 class ComplexQuadratic(nn.Module):
     """An activation function that uses :func:`complex_quadratic`."""
 
-    interleave: bool
+    interleaved: bool
     """If *True*, assume that the tensors have interleaved real and complex parts."""
 
-    def __init__(self, *, interleave: bool = False) -> None:
+    def __init__(self, *, interleaved: bool = False) -> None:
         super().__init__()
-        self.interleave = interleave
+        self.interleaved = interleaved
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return complex_quadratic(x, interleave=self.interleave)
+        return complex_quadratic(x, interleaved=self.interleaved)
 
 
 class BlendedQuadratic(nn.Module):
@@ -102,20 +100,20 @@ class ComplexBlendedQuadratic(nn.Module):
 
     alpha: float
     """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
-    interleave: bool
+    interleaved: bool
     """If *True*, assume that the tensors have interleaved real and complex parts."""
 
-    def __init__(self, alpha: float = 0.5, *, interleave: bool = False) -> None:
+    def __init__(self, alpha: float = 0.5, *, interleaved: bool = False) -> None:
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
 
         super().__init__()
         self.alpha = alpha
-        self.interleave = interleave
+        self.interleaved = interleaved
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        x2 = complex_quadratic(x, interleave=self.interleave)
+        x2 = complex_quadratic(x, interleaved=self.interleaved)
         return self.alpha * x + (1.0 - self.alpha) * x2
 
 
@@ -212,7 +210,7 @@ class ComplexLinear(nn.Module):
     """The learnable bias of shape ``(out_features,)`` for the imaginary part of the
     input vector. The values are initialized to 0.
     """
-    interleave: bool
+    interleaved: bool
     """If *True*, assume that the tensors have interleaved real and complex parts."""
 
     def __init__(
@@ -220,7 +218,7 @@ class ComplexLinear(nn.Module):
         in_features: int,
         out_features: int,
         *,
-        interleave: bool = False,
+        interleaved: bool = False,
         bias: bool = False,
         device: str | torch.device | None = None,
         dtype: Any | None = None,
@@ -243,7 +241,7 @@ class ComplexLinear(nn.Module):
 
         self.in_features = in_features
         self.out_features = out_features
-        self.interleave = interleave
+        self.interleaved = interleaved
 
         self.reset_parameters()
 
@@ -258,16 +256,13 @@ class ComplexLinear(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
         # x: [batch, 2 * in_features]
-        if self.interleave:
-            d = self.in_features
-            x = x.reshape(*x.shape[:-1], d, 2)
-            re_in, im_in = x[..., 0], x[..., 1]
+        if self.interleaved:
+            re_in, im_in = deinterleave(x)
 
             result_re = nn.functional.linear(re_in, self.weight, self.bias_re)
             result_im = nn.functional.linear(im_in, self.weight, self.bias_im)
 
-            result = torch.stack([result_re, result_im], dim=-1)
-            return result.reshape(*result_re.shape[:-1], 2 * self.out_features)
+            return interleave(result_re, result_im)
         else:
             x_re, x_im = x.chunk(2, dim=-1)
 

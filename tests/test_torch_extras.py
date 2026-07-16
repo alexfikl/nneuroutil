@@ -49,27 +49,27 @@ def test_complex_quadratic_interleave() -> None:
 
     # test interleaved storage: [re[0], im[0], ..., re[n], im[n]]
     x = torch.view_as_real(z).reshape(3, 2 * n)
-    res = complex_quadratic(x, interleave=True)
+    res = complex_quadratic(x, interleaved=True)
     expected = torch.view_as_real(z2).reshape(3, 2 * n)
     assert res.shape == x.shape
     assert torch.allclose(res, expected)
 
     # test stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
     x = torch.cat([z.real, z.imag], dim=-1)
-    res = complex_quadratic(x, interleave=False)
+    res = complex_quadratic(x, interleaved=False)
     expected = torch.cat([z2.real, z2.imag], dim=-1)
     assert torch.allclose(res, expected)
 
     # test module
     x = torch.view_as_real(z).reshape(3, 2 * n)
-    mod = ComplexQuadratic(interleave=True)
+    mod = ComplexQuadratic(interleaved=True)
     res = mod(x)
     expected = torch.view_as_real(z2).reshape(3, 2 * n)
     assert torch.allclose(res, expected)
 
     # test odd dimension raises
     with pytest.raises(ValueError, match="must be even"):
-        complex_quadratic(torch.randn(3, 2 * n + 1), interleave=True)
+        complex_quadratic(torch.randn(3, 2 * n + 1), interleaved=True)
 
 
 def test_linear_quadratic() -> None:
@@ -174,7 +174,7 @@ def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
 
     # input: [batch, 2 * in_features] with interleaved storage
     x = torch.view_as_real(z).reshape(batch_size, 2 * in_features)
-    mod = ComplexLinear(in_features, out_features, interleave=True, bias=bias)
+    mod = ComplexLinear(in_features, out_features, interleaved=True, bias=bias)
 
     res = mod(x)
     assert res.shape == (batch_size, 2 * out_features)
@@ -187,7 +187,7 @@ def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
     assert torch.allclose(res, expected)
 
     # check consistency with the stacked layout
-    mod.interleave = False
+    mod.interleaved = False
     x = torch.cat([z.real, z.imag], dim=-1)
 
     res = mod(x)
