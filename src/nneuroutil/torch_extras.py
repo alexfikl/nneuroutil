@@ -13,7 +13,6 @@ import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch import nn
 from torch.utils._python_dispatch import TorchDispatchMode  # noqa: PLC2701
 
-from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import module_logger
 
 log = module_logger(__name__)
@@ -34,8 +33,8 @@ def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Te
         raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
 
     if interleaved:
-        x_re, x_im = deinterleave(x, axis=-1, xp=torch)
-        result = interleave(x_re * x_re - x_im * x_im, 2 * x_re * x_im)
+        z = torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
+        result = torch.view_as_real(z * z).reshape(*x.shape)
     else:
         x_re, x_im = torch.chunk(x, 2, dim=-1)
         result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
@@ -257,12 +256,12 @@ class ComplexLinear(nn.Module):
         """Define the computation performed at every call."""
         # x: [batch, 2 * in_features]
         if self.interleaved:
-            re_in, im_in = deinterleave(x)
-
-            result_re = nn.functional.linear(re_in, self.weight, self.bias_re)
-            result_im = nn.functional.linear(im_in, self.weight, self.bias_im)
-
-            return interleave(result_re, result_im)
+            z = torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
+            bias = None
+            if self.bias_re is not None:
+                bias = torch.complex(self.bias_re, self.bias_im)
+            result = nn.functional.linear(z, self.weight.to(z.dtype), bias)
+            return torch.view_as_real(result).reshape(*x.shape[:-1], -1)
         else:
             x_re, x_im = x.chunk(2, dim=-1)
 
