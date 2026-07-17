@@ -207,6 +207,8 @@ autodoc_default_options = {
     "show-inheritance": None,
 }
 
+autodoc_mock_imports = ["torch", "flax", "jax"]
+
 # }}}
 
 # {{{ links
