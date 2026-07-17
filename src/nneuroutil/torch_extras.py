@@ -23,6 +23,14 @@ log = module_logger(__name__)
 # {{{ activation functions
 
 
+def view_as_complex(x: torch.Tensor) -> torch.Tensor:
+    return torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
+
+
+def view_as_real(x: torch.Tensor) -> torch.Tensor:
+    return torch.view_as_real(x).reshape(*x.shape[:-1], -1)
+
+
 def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
     """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
 
@@ -35,7 +43,7 @@ def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Te
         raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
 
     if interleaved:
-        z = torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
+        z = view_as_complex(x)
         result = torch.view_as_real(z * z).reshape(*x.shape)
     else:
         x_re, x_im = torch.chunk(x, 2, dim=-1)
@@ -132,6 +140,94 @@ class ComplexTanh(nn.Module):
             return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
         else:
             return torch.complex(torch.tanh(x), torch.zeros_like(x))
+
+
+class modReLU(nn.Module):  # ruff:ignore[invalid-class-name]
+    r"""A modified ReLU activation function for complex numbers.
+
+    .. math::
+
+        f(z; b) = \operatorname{ReLU}(|z| + b) \operatorname{sgn}(z)
+    """
+
+    bias: float
+    """A non-learnable hyperparameter."""
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, bias: float = 0.0, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.bias = bias
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            z = view_as_complex(x)
+            result = torch.relu(torch.abs(z) + self.bias) * torch.sgn(z)
+            return view_as_real(result)
+        else:
+            z = torch.complex(*torch.chunk(x, 2, dim=-1))
+            result = torch.relu(torch.abs(z) + self.bias) * torch.sgn(z)
+            return torch.cat([result.real, result.imag], dim=-1)
+
+
+class ComplexCardioid(nn.Module):
+    r"""A complex cardioid activation function.
+
+    .. math::
+
+        f(z) = \frac{1}{2} (1 + \cos (\theta(z))) z
+    """
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            z = view_as_complex(x)
+            result = 0.5 * (1 + torch.cos(torch.angle(z))) * z
+            return view_as_real(result)
+        else:
+            z = torch.complex(*torch.chunk(x, 2, dim=-1))
+            result = 0.5 * (1 + torch.cos(torch.angle(z))) * z
+            return torch.cat([result.real, result.imag], dim=-1)
+
+
+class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
+    r"""A complex ReLU function that maintains the first quadrant.
+
+    .. math::
+
+        f(z) =
+        \begin{cases}
+        z, & \quad \Re(z) > 0, \Im(z) > 0, \\
+        0, & \quad \text{otherwise}.
+        \end{cases}
+    """
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            z = view_as_complex(x)
+            result = z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
+            return view_as_real(result)
+        else:
+            z = torch.complex(*torch.chunk(x, 2, dim=-1))
+            result = z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
+            return torch.cat([result.real, result.imag], dim=-1)
 
 
 # }}}
@@ -258,12 +354,14 @@ class ComplexLinear(nn.Module):
         """Define the computation performed at every call."""
         # x: [batch, 2 * in_features]
         if self.interleaved:
-            z = torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
+            z = view_as_complex(x)
+
             bias = None
             if self.bias_re is not None:
                 bias = torch.complex(self.bias_re, self.bias_im)
+
             result = nn.functional.linear(z, self.weight.to(z.dtype), bias)
-            return torch.view_as_real(result).reshape(*x.shape[:-1], -1)
+            return view_as_real(result)
         else:
             x_re, x_im = x.chunk(2, dim=-1)
 
