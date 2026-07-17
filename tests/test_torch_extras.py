@@ -151,6 +151,69 @@ def test_modrelu_known_values() -> None:
     assert torch.allclose(res, torch.tensor([0.0, 3.0]))
 
 
+@pytest.mark.parametrize("bias", [-2.0, 0.0, 1.0])
+@pytest.mark.parametrize("alpha", [0.1, 0.5])
+def test_leaky_modrelu(bias: float, alpha: float) -> None:
+    from nneuroutil.torch_extras import LeakyModReLU
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    r = torch.abs(z)
+    expected = torch.where(r + bias >= 0.0, r + bias, alpha * r) * torch.sgn(z)
+
+    # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = LeakyModReLU(bias=bias, alpha=alpha, interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = LeakyModReLU(bias=bias, alpha=alpha, interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_leaky_modrelu_known_values() -> None:
+    from nneuroutil.torch_extras import LeakyModReLU
+
+    # with bias = 0: |z| >= 0 always, so we are always in the positive branch and
+    # LeakyModReLU(z) = |z| * sgn(z) = z, independent of alpha
+    z = torch.tensor([1.0 + 1.0j, -2.0 + 0.5j, 0.0 + 3.0j])
+    xi = torch.view_as_real(z).reshape(6)
+    res = LeakyModReLU(bias=0.0, alpha=0.1, interleaved=True)(xi)
+    assert torch.allclose(res, xi)
+
+    # negative branch: with |z| = 0.5 and bias = -1.0 we get |z| + b < 0, so the
+    # output is alpha * |z| * sgn(z) = alpha * z (phase preserved)
+    z = torch.tensor([0.3 + 0.4j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = LeakyModReLU(bias=-1.0, alpha=0.5, interleaved=True)(xi)
+    assert torch.allclose(res, torch.tensor([0.15, 0.2]))
+
+    # boundary: |z| + b == 0 falls in the positive (>=) branch, giving 0
+    z = torch.tensor([1.0 + 1.0j])  # |z| = sqrt(2)
+    xi = torch.view_as_real(z).reshape(2)
+    res = LeakyModReLU(bias=-(2.0**0.5), alpha=0.5, interleaved=True)(xi)
+    assert torch.allclose(res, torch.zeros(2))
+
+
+def test_leaky_modrelu_matches_modrelu() -> None:
+    # with alpha = 0, LeakyModReLU coincides with ModReLU
+    from nneuroutil.torch_extras import LeakyModReLU, ModReLU
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+    x = torch.cat([z.real, z.imag], dim=-1)
+
+    bias = -1.5
+    res_leaky = LeakyModReLU(bias=bias, alpha=0.0, interleaved=False)(x)
+    res_mod = ModReLU(bias=bias, interleaved=False)(x)
+    assert torch.allclose(res_leaky, res_mod)
+
+
 def test_complex_cardioid() -> None:
     from nneuroutil.torch_extras import ComplexCardioid
 
