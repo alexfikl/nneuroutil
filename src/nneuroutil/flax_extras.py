@@ -434,7 +434,7 @@ def jax_default_device(device: str) -> Generator[None]:
             f"cannot set device {device!r}: id out of bounds for {len(devices)} devices"
         )
 
-    prev_device = jax.config.jax_default_device  # ty: ignore[unresolved-attribute]
+    prev_device = jax.config.jax_default_device
     jax.config.update("jax_default_device", devices[dev_id])
     try:
         yield
