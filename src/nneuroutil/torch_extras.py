@@ -206,7 +206,7 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
 
         f(z) =
         \begin{cases}
-        z, & \quad \Re(z) > 0, \Im(z) > 0, \\
+        z, & \quad \Re(z) \geq 0, \Im(z) \geq 0, \\
         0, & \quad \text{otherwise}.
         \end{cases}
     """

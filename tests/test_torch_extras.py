@@ -108,6 +108,126 @@ def test_complex_tanh() -> None:
     assert torch.allclose(res, expected)
 
 
+@pytest.mark.parametrize("bias", [0.0, 0.5, 2.0])
+def test_modrelu(bias: float) -> None:
+    from nneuroutil.torch_extras import modReLU
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    expected = torch.relu(torch.abs(z) + bias) * torch.sgn(z)
+
+    # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = modReLU(bias=bias, interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = modReLU(bias=bias, interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_modrelu_known_values() -> None:
+    from nneuroutil.torch_extras import modReLU
+
+    # z = 1 + 1j has |z| = sqrt(2); with bias = -sqrt(2) the magnitude vanishes
+    z = torch.tensor([1.0 + 1.0j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = modReLU(bias=-(2.0**0.5), interleaved=True)(xi)
+    assert torch.allclose(res, torch.zeros(2))
+
+    # with bias = 0, modReLU(z) = |z| * z / |z| = z (for |z| > 0)
+    res = modReLU(interleaved=True)(xi)
+    assert torch.allclose(res, xi)
+
+    # purely imaginary input is preserved (phase preserved) for bias = 0
+    z = torch.tensor([0.0 + 3.0j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = modReLU(interleaved=True)(xi)
+    assert torch.allclose(res, torch.tensor([0.0, 3.0]))
+
+
+def test_complex_cardioid() -> None:
+    from nneuroutil.torch_extras import ComplexCardioid
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    expected = 0.5 * (1 + torch.cos(torch.angle(z))) * z
+
+    # interleaved storage
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = ComplexCardioid(interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = ComplexCardioid(interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_complex_cardioid_known_values() -> None:
+    from nneuroutil.torch_extras import ComplexCardioid
+
+    # for real positive z (angle 0): factor = 0.5 * (1 + 1) = 1, so f(z) = z
+    z = torch.tensor([2.0 + 0.0j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = ComplexCardioid(interleaved=True)(xi)
+    assert torch.allclose(res, torch.tensor([2.0, 0.0]))
+
+    # for purely imaginary z (angle pi/2): factor = 0.5 * (1 + 0) = 0.5
+    z = torch.tensor([0.0 + 2.0j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = ComplexCardioid(interleaved=True)(xi)
+    assert torch.allclose(res, torch.tensor([0.0, 1.0]))
+
+
+def test_zrelu() -> None:
+    from nneuroutil.torch_extras import zReLU
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    mask = ((z.real >= 0.0) & (z.imag >= 0.0)).to(z.real.dtype)
+    expected = z * mask
+
+    # interleaved storage
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = zReLU(interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = zReLU(interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_zrelu_known_values() -> None:
+    from nneuroutil.torch_extras import zReLU
+
+    # interleaved input z = [1+1j, -1+1j, 1-1j, -1-1j]; only the first quadrant
+    # entry (1 + 1j) passes through, the rest are zeroed.
+    x = torch.tensor([1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0])
+    res = zReLU(interleaved=True)(x)
+    expected = torch.tensor([1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert torch.allclose(res, expected)
+
+    # boundary: values on the axes (Re = 0 or Im = 0) are kept by the >= test
+    x = torch.tensor([0.0, 5.0, 5.0, 0.0])
+    res = zReLU(interleaved=True)(x)
+    assert torch.allclose(res, x)
+
+
 # }}}
 
 
