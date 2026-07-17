@@ -142,7 +142,7 @@ class ComplexTanh(nn.Module):
             return torch.complex(torch.tanh(x), torch.zeros_like(x))
 
 
-class modReLU(nn.Module):  # ruff:ignore[invalid-class-name]
+class ModReLU(nn.Module):
     r"""A modified ReLU activation function for complex numbers.
 
     .. math::
@@ -163,13 +163,74 @@ class modReLU(nn.Module):  # ruff:ignore[invalid-class-name]
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
         if self.interleaved:
-            z = view_as_complex(x)
-            result = torch.relu(torch.abs(z) + self.bias) * torch.sgn(z)
-            return view_as_real(result)
+            return view_as_real(modrelu(view_as_complex(x), self.bias))
         else:
-            z = torch.complex(*torch.chunk(x, 2, dim=-1))
-            result = torch.relu(torch.abs(z) + self.bias) * torch.sgn(z)
+            result = modrelu(torch.complex(*torch.chunk(x, 2, dim=-1)), self.bias)
             return torch.cat([result.real, result.imag], dim=-1)
+
+
+def modrelu(z: torch.Tensor, b: float | torch.Tensor) -> torch.Tensor:
+    return torch.relu(torch.abs(z) + b) * torch.sgn(z)
+
+
+class LeakyModReLU(nn.Module):
+    r"""A modified LeakyReLU activation function for complex numbers.
+
+    .. math::
+
+        f(z; b) = \operatorname{sgn}(z) \times
+        \begin{cases}
+        |z| + b, & \quad |z| + b \ge 0, \\
+        \alpha * |z|, & \quad \text{otherwise}.
+        \end{cases}
+
+    Note that this is not the same as applying LeakyReLU to the :math:`|z| + b`
+    term as in the case of :class:`ModReLU`. Instead, if the shifted magnitude
+    becomes negative, we just add positive slope to it. This has the benefit of
+    maintaining the phase.
+    """
+
+    bias: float
+    """A non-learnable hyperparameter."""
+    alpha: float
+    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(
+        self,
+        bias: float = 0.0,
+        *,
+        alpha: float = 0.1,
+        interleaved: bool = False,
+    ) -> None:
+        super().__init__()
+        self.bias = bias
+        self.alpha = alpha
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            return view_as_real(
+                leaky_modrelu(view_as_complex(x), self.bias, alpha=self.alpha)
+            )
+        else:
+            result = leaky_modrelu(
+                torch.complex(*torch.chunk(x, 2, dim=-1)), self.bias, alpha=self.alpha
+            )
+            return torch.cat([result.real, result.imag], dim=-1)
+
+
+def leaky_modrelu(
+    z: torch.Tensor,
+    b: float | torch.Tensor,
+    *,
+    alpha: float = 0.1,
+) -> torch.Tensor:
+    r = torch.abs(z)
+    rb = r + b
+    return torch.where(rb >= 0.0, rb, alpha * r) * torch.sgn(z)
 
 
 class ComplexCardioid(nn.Module):
@@ -190,13 +251,14 @@ class ComplexCardioid(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
         if self.interleaved:
-            z = view_as_complex(x)
-            result = 0.5 * (1 + torch.cos(torch.angle(z))) * z
-            return view_as_real(result)
+            return view_as_real(ccardioid(view_as_complex(x)))
         else:
-            z = torch.complex(*torch.chunk(x, 2, dim=-1))
-            result = 0.5 * (1 + torch.cos(torch.angle(z))) * z
+            result = ccardioid(torch.complex(*torch.chunk(x, 2, dim=-1)))
             return torch.cat([result.real, result.imag], dim=-1)
+
+
+def ccardioid(z: torch.Tensor) -> torch.Tensor:
+    return 0.5 * (1 + torch.cos(torch.angle(z))) * z
 
 
 class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
@@ -221,13 +283,14 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
         if self.interleaved:
-            z = view_as_complex(x)
-            result = z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
-            return view_as_real(result)
+            return view_as_real(zrelu(view_as_complex(x)))
         else:
-            z = torch.complex(*torch.chunk(x, 2, dim=-1))
-            result = z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
+            result = zrelu(torch.complex(*torch.chunk(x, 2, dim=-1)))
             return torch.cat([result.real, result.imag], dim=-1)
+
+
+def zrelu(z: torch.Tensor) -> torch.Tensor:
+    return z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
 
 
 # }}}

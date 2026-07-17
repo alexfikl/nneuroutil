@@ -110,7 +110,7 @@ def test_complex_tanh() -> None:
 
 @pytest.mark.parametrize("bias", [0.0, 0.5, 2.0])
 def test_modrelu(bias: float) -> None:
-    from nneuroutil.torch_extras import modReLU
+    from nneuroutil.torch_extras import ModReLU
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -119,35 +119,35 @@ def test_modrelu(bias: float) -> None:
 
     # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
     x = torch.view_as_real(z).reshape(3, 2 * n)
-    res = modReLU(bias=bias, interleaved=True)(x)
+    res = ModReLU(bias=bias, interleaved=True)(x)
     expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
     assert res.shape == x.shape
     assert torch.allclose(res, expected_inter)
 
     # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
     x = torch.cat([z.real, z.imag], dim=-1)
-    res = modReLU(bias=bias, interleaved=False)(x)
+    res = ModReLU(bias=bias, interleaved=False)(x)
     expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
     assert torch.allclose(res, expected_stack)
 
 
 def test_modrelu_known_values() -> None:
-    from nneuroutil.torch_extras import modReLU
+    from nneuroutil.torch_extras import ModReLU
 
     # z = 1 + 1j has |z| = sqrt(2); with bias = -sqrt(2) the magnitude vanishes
     z = torch.tensor([1.0 + 1.0j])
     xi = torch.view_as_real(z).reshape(2)
-    res = modReLU(bias=-(2.0**0.5), interleaved=True)(xi)
+    res = ModReLU(bias=-(2.0**0.5), interleaved=True)(xi)
     assert torch.allclose(res, torch.zeros(2))
 
-    # with bias = 0, modReLU(z) = |z| * z / |z| = z (for |z| > 0)
-    res = modReLU(interleaved=True)(xi)
+    # with bias = 0, ModReLU(z) = |z| * z / |z| = z (for |z| > 0)
+    res = ModReLU(interleaved=True)(xi)
     assert torch.allclose(res, xi)
 
     # purely imaginary input is preserved (phase preserved) for bias = 0
     z = torch.tensor([0.0 + 3.0j])
     xi = torch.view_as_real(z).reshape(2)
-    res = modReLU(interleaved=True)(xi)
+    res = ModReLU(interleaved=True)(xi)
     assert torch.allclose(res, torch.tensor([0.0, 3.0]))
 
 
