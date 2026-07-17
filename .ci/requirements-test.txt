@@ -50,13 +50,23 @@ imagesize==2.0.0
     # via sphinx
 iniconfig==2.3.0
     # via pytest
-jax==0.10.2
+jax==0.10.2 ; python_full_version < '3.12'
     # via
     #   nneuroutil (pyproject.toml:jax)
     #   flax
     #   optax
     #   orbax-checkpoint
-jaxlib==0.10.2
+jax==0.11.0 ; python_full_version >= '3.12'
+    # via
+    #   nneuroutil (pyproject.toml:jax)
+    #   flax
+    #   optax
+    #   orbax-checkpoint
+jaxlib==0.10.2 ; python_full_version < '3.12'
+    # via
+    #   jax
+    #   optax
+jaxlib==0.11.0 ; python_full_version >= '3.12'
     # via
     #   jax
     #   optax
@@ -177,7 +187,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.15.21
+ruff==0.15.22
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -233,7 +243,7 @@ tensorstore==0.1.84
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.59
+ty==0.0.60
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
