@@ -26,6 +26,7 @@ SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
 path = [
+    ".readthedocs.yml",
     "docs/*.rst",
     "docs/justfile",
 ]
