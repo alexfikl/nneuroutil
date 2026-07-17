@@ -40,6 +40,11 @@ dependencies = [
     "scipy>=1.14",
     "typing-extensions>=4.10",
 ]
+# NOTE: this is just here because readthedocs does not know how to read dependency-groups
+optional-dependencies.docs = [
+    "sphinx>=6",
+    "sphinx-book-theme",
+]
 urls.Repository = "https://github.com/alexfikl/nneuroutil"
 
 [dependency-groups]
