@@ -123,7 +123,7 @@ def test_bias() -> None:
 
 
 @pytest.mark.parametrize("bias", [True, False])
-def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
+def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
     from nneuroutil.flax_extras import ComplexLinear
 
     in_features = 4
@@ -160,7 +160,7 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 
 
 @pytest.mark.parametrize("bias", [True, False])
-def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
+def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
     from nneuroutil.flax_extras import ComplexLinear
 
     in_features = 4

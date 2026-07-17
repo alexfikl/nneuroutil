@@ -15,7 +15,7 @@ from importlib import metadata
 m = metadata.metadata("nneuroutil")
 project = m["Name"]
 author = m["Author-email"]
-copyright = f"2026 {author}"  # noqa: A001
+copyright = f"2026 {author}"  # ruff:ignore[builtin-variable-shadowing]
 version = m["Version"]
 release = version
 url = "https://github.com/alexfikl/nneuroutil"

@@ -259,11 +259,11 @@ class ComplexLinear(nnx.Module):
 
         result_re = x_re @ self.kernel.value
         if self.bias_re is not None:
-            result_re = result_re + self.bias_re.value  # noqa: PLR6104
+            result_re = result_re + self.bias_re.value  # ruff:ignore[non-augmented-assignment]
 
         result_im = x_im @ self.kernel.value
         if self.bias_im is not None:
-            result_im = result_im + self.bias_im.value  # noqa: PLR6104
+            result_im = result_im + self.bias_im.value  # ruff:ignore[non-augmented-assignment]
 
         if self.interleaved:
             return interleave(result_re, result_im)

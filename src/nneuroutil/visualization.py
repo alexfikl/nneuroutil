@@ -72,7 +72,7 @@ def _check_usetex(*, s: bool) -> bool:
         if not shutil.which("dvipng"):
             return False
 
-        if not shutil.which("gs"):  # noqa: SIM103
+        if not shutil.which("gs"):  # ruff:ignore[needless-bool]
             return False
 
         return True

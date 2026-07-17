@@ -21,7 +21,7 @@ log = module_logger(__name__)
 
 
 @pytest.mark.parametrize("tls", [True, False])
-def test_dmd_classic_linear(xp: Any, tls: bool) -> None:  # noqa: FBT001
+def test_dmd_classic_linear(xp: Any, tls: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
     rng = np.random.default_rng(seed=42)
     ndim = 8
     nsnapshots = 64

@@ -29,7 +29,7 @@ ScalarTypeT = TypeVar("ScalarTypeT", bound=np.generic, default=Any)
 """An invariant type alias for :mod:`numpy` scalars."""
 
 
-class Array(Protocol[ShapeT_co, DTypeT]):  # noqa: PLR0904
+class Array(Protocol[ShapeT_co, DTypeT]):  # ruff:ignore[too-many-public-methods]
     """A minimal protocol compatible with the
     `Array API <https://data-apis.org/array-api/latest/API_specification/array_object.html>`__.
     """
@@ -126,7 +126,7 @@ class Array(Protocol[ShapeT_co, DTypeT]):  # noqa: PLR0904
     # Not part of the Array API
     def __len__(self) -> int: ...
     def __iter__(self) -> Any: ...
-    def __array__(self) -> np.ndarray[Any, Any]: ...  # noqa: PLW3201
+    def __array__(self) -> np.ndarray[Any, Any]: ...  # ruff:ignore[bad-dunder-method-name]
 
 
 Array0D = TypeAliasType(

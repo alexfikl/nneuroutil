@@ -125,7 +125,7 @@ def test_bias() -> None:
 
 
 @pytest.mark.parametrize("bias", [True, False])
-def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
+def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
     from nneuroutil.torch_extras import ComplexLinear
 
     in_features = 4
@@ -151,7 +151,7 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 
     # Let's also check with a custom dtype object that supports to_real()
     class MockDtype:
-        def to_real(self) -> torch.dtype:  # noqa: PLR6301
+        def to_real(self) -> torch.dtype:  # ruff:ignore[no-self-use]
             return torch.float32
 
     mod_custom_dtype = ComplexLinear(
@@ -161,7 +161,7 @@ def test_complex_linear(bias: bool) -> None:  # noqa: FBT001
 
 
 @pytest.mark.parametrize("bias", [True, False])
-def test_complex_linear_interleave(bias: bool) -> None:  # noqa: FBT001
+def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
     from nneuroutil.torch_extras import ComplexLinear
 
     in_features = 4
@@ -255,7 +255,7 @@ def test_device_check_mode() -> None:
         y = 2 * x
         assert y is not None
 
-    with pytest.raises(DeviceMismatchError):  # noqa: SIM117,PT012
+    with pytest.raises(DeviceMismatchError):  # ruff:ignore[multiple-with-statements, pytest-raises-with-multiple-statements]
         with DeviceCheckMode():
             # this should pass
             x = torch.linspace(0.0, 1.0, 32, device="cpu")

@@ -9,9 +9,11 @@ from contextlib import contextmanager
 from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
-import torch.utils._pytree as pytree  # noqa: PLC2701
+import torch.utils._pytree as pytree  # ruff:ignore[import-private-name]
 from torch import nn
-from torch.utils._python_dispatch import TorchDispatchMode  # noqa: PLC2701
+from torch.utils._python_dispatch import (  # ruff:ignore[import-private-name]
+    TorchDispatchMode,
+)
 
 from nneuroutil.helpers import module_logger
 
@@ -45,7 +47,7 @@ def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Te
 class Quadratic(nn.Module):
     """A quadratic :math:`x^2` activation function."""
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
         """Define the computation performed at every call."""
         return x * x
 
@@ -124,7 +126,7 @@ class ComplexTanh(nn.Module):
     :math:`z`.
     """
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: PLR6301
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
         """Define the computation performed at every call."""
         if x.is_complex():
             return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
@@ -513,7 +515,7 @@ class DeviceCheckMode(TorchDispatchMode):
 
         self.device = torch.device(device)
 
-    def __torch_dispatch__(  # noqa: PLW3201
+    def __torch_dispatch__(  # ruff:ignore[bad-dunder-method-name]
         self,
         func: Callable[..., R],
         types: tuple[type, ...],
