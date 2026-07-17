@@ -2,11 +2,15 @@
     :alt: Build Status
     :target: https://github.com/alexfikl/nneuroutil/actions/workflows/ci.yml
 
+.. |badge-rtd| image:: https://readthedocs.org/projects/nneuroutil/badge/?version=latest
+    :alt: Documentation
+    :target: https://nneuroutil.readthedocs.io/en/latest/?badge=latest
+
 .. |badge-mit| image:: https://img.shields.io/badge/License-MIT-blue.svg
     :alt: MIT license
     :target: https://spdx.org/licenses/MIT.html
 
-|badge-ci| |badge-mit|
+|badge-ci| |badge-rtd| |badge-mit|
 
 nneuroutil
 ==========
@@ -26,4 +30,5 @@ Links
 -----
 
 * `Code <https://github.com/alexfikl/nneuroutil>`__.
+* `Documentation <https://nneuroutil.readthedocs.io>`__.
 * License: MIT (see ``LICENSES/MIT.txt``).
