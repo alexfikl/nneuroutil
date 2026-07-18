@@ -493,6 +493,140 @@ class SymmetricLinear(nn.Module):
 
 # {{{ init
 
+NONLINEARITY_TYPE_NAME = {
+    BlendedQuadratic: "blended_quadratic",
+    ComplexBlendedQuadratic: "cblended_quadratic",
+    ComplexCardioid: "ccardioid",
+    ComplexQuadratic: "cquadratic",
+    ComplexTanh: "ctanh",
+    LeakyModReLU: "leaky_modrelu",
+    ModReLU: "modrelu",
+    Quadratic: "quadratic",
+    zReLU: "zrelu",
+}
+
+
+def bisect(
+    f: Callable[[float], float],
+    a: float,
+    b: float,
+    *,
+    atol: float = 1.0e-6,
+) -> float:
+    fa = f(a)
+    fb = f(b)
+    if fa * fb > 0:
+        raise ValueError(f"f(a) and f(b) must have opposite signs: {fa} and {fb}")
+
+    while 0.5 * (b - a) > atol:
+        m = (a + b) / 2.0
+        fm = f(m)
+        if fa * fm <= 0:
+            b = m
+            fb = fm
+        else:
+            a = m
+            fa = fm
+
+    return (a + b) / 2.0
+
+
+def complex_kaiming_uniform_(
+    x: torch.Tensor,
+    *,
+    nonlinearity: str = "modrelu",
+    param: float | None = None,
+    paramb: float | None = None,
+    mode: Literal["fan_in", "fan_out"] = "fan_in",
+    generator: torch.Generator | None = None,
+) -> torch.Tensor:
+    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(x)
+    fan = fan_in if mode == "fan_in" else fan_out
+
+    if nonlinearity == "cquadratic":
+        bound = math.sqrt(3) / math.sqrt(2 * fan)
+    elif nonlinearity == "cblended_quadratic":
+        # NOTE: if not given, use the default from BlendedQuadratic
+        if param is None:
+            param = 0.5
+
+        if abs(param - 1.0) < 1.0e-8:
+            var_x = 1.0 / fan
+        else:
+            b = param**2
+            a = 4 * (1 - param) ** 2
+            var_x = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a * fan)
+
+        bound = math.sqrt(3 * var_x)
+    elif nonlinearity == "modrelu":
+        if param is None:
+            param = 0.0
+
+        b = param
+        if b > math.sqrt(2):
+            raise ValueError(f"No solution exists for b>=sqrt(2): {b}")
+
+        if b >= 0:
+            var_w = 0.5 * (
+                math.sqrt(b**2 * math.pi / 2.0 + 4 - 2 * b**2)
+                - b * math.sqrt(math.pi / 2.0)
+            )
+        else:
+            # NOTE: these seems to be no exact solution for this case, so we just
+            # bisect it. Theoretically this doesn't happen a lot of times, so
+            # it should be fine to do a slower algorithm
+            result = bisect(
+                lambda s: (
+                    s * math.exp(-(b**2) / (2 * s))
+                    + b * math.sqrt(math.pi * s / 2) * math.erfc(-b / math.sqrt(2 * s))
+                    - 1
+                ),
+                1.0e-6,
+                max(100.0, b**2 + 10),
+            )
+            var_w = math.sqrt(result)
+
+        bound = math.sqrt(3) * var_w / math.sqrt(fan)
+    elif nonlinearity == "leaky_modrelu":
+        if param is None:
+            param = 0.0
+
+        if paramb is None:
+            paramb = 0.1
+
+        b = param
+        alpha = paramb
+
+        if b >= 0:
+            # NOTE: in this case, the leaky branch never actually triggers, so
+            # there is nothing extra to do compared to standard modReLU
+            var_w = 0.5 * (
+                math.sqrt(b**2 * math.pi / 2.0 + 4 - 2 * b**2)
+                - b * math.sqrt(math.pi / 2.0)
+            )
+        else:
+            result = bisect(
+                lambda s: (
+                    s * math.exp(-(b**2) / (2 * s))
+                    + b * math.sqrt(math.pi * s / 2) * math.erfc(-b / math.sqrt(2 * s))
+                    + alpha**2 * (s - (s + b**2 / 2) * math.exp(-(b**2) / (2 * s)))
+                    - 1
+                ),
+                1.0e-6,
+                max(100.0, b**2 + 10),
+            )
+            var_w = math.sqrt(result)
+
+        bound = math.sqrt(3) * var_w / math.sqrt(fan)
+    elif nonlinearity == "ccardioid":
+        bound = math.sqrt(3) / math.sqrt(0.375 * fan)
+    elif nonlinearity == "zrelu":
+        bound = math.sqrt(12) / math.sqrt(fan)
+    else:
+        raise ValueError(f"unknown nonlinearity: {nonlinearity!r}")
+
+    return nn.init.uniform_(x, -bound, bound, generator=generator)
+
 
 def kaiming_uniform_(
     x: torch.Tensor,
@@ -709,6 +843,18 @@ class LayerStatistics(NamedTuple):
     """The second-moment :math:`E[y^2]` of the output over all dimensions."""
 
 
+def rayleigh(
+    *shape: int,
+    sigma: float = 1.0,
+    device: str | torch.device | None = None,
+    dtype: Any = None,
+) -> torch.Tensor:
+    U = torch.rand(*shape, device=device, dtype=dtype)
+    torch.clamp_min_(U, 1.0e-12)
+
+    return sigma * torch.sqrt(-2.0 * torch.log(U))
+
+
 def gather_model_signal_statistics(
     model: nn.Module,
     shape: tuple[int, ...],
@@ -724,6 +870,9 @@ def gather_model_signal_statistics(
         names of the modules are expected to be unique, see
         :meth:`torch.nn.Module.named_modules`.
     """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+
     stats = {}
 
     def hook(name: str) -> Callable[[nn.Module, torch.Tensor, torch.Tensor], None]:
@@ -746,7 +895,14 @@ def gather_model_signal_statistics(
         handles.append(m.register_forward_hook(hook(name)))
 
     # run model and some nice data
-    x = torch.randn(batch, *shape, device=device, dtype=dtype)
+
+    if dtype.is_floating_point:
+        x = torch.randn(batch, *shape, device=device, dtype=dtype)
+    else:
+        r = rayleigh(batch, *shape, device=device, dtype=dtype.to_real())
+        theta = (2.0 * torch.rand_like(r) - 1.0) * math.pi
+        x = view_as_real(torch.polar(r, theta))
+
     model(x)
 
     # remove remove hooks from the layers
