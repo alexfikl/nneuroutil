@@ -24,20 +24,29 @@ log = module_logger(__name__)
 
 
 def view_as_complex(x: torch.Tensor) -> torch.Tensor:
+    """View a real tensor of shape ``(..., 2 d)`` with interleaved real and
+    imaginary parts as a complex tensor of shape ``(..., d)``.
+    """
     return torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
 
 
 def view_as_real(x: torch.Tensor) -> torch.Tensor:
+    """View a complex tensor of shape ``(..., d)`` as a real tensor of shape
+    ``(..., 2 d)`` with interleaved real and imaginary parts.
+    """
     return torch.view_as_real(x).reshape(*x.shape[:-1], -1)
 
 
 def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
-    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
+    r"""Treat *x* as a real tensor of shape ``(..., 2 d)`` storing a complex
+    tensor :math:`z` of shape ``(..., d)`` and compute its elementwise square
+    :math:`z^2`.
 
     The storage of the array depends on *interleaved*. If *True*, we assume that
-    the array is stored as ``[x[0].real, x[0].imag, ..., x[n].real,
-    x[n].imag]``. Otherwise, we assume that it is stacked as ``[x[0].real, ...,
-    x[n].real, x[0].imag, ..., x[n].imag]```.
+    the array is stored as ``[z[0].real, z[0].imag, ..., z[d - 1].real,
+    z[d - 1].imag]``. Otherwise, we assume that it is stacked as
+    ``[z[0].real, ..., z[d - 1].real, z[0].imag, ..., z[d - 1].imag]``. The
+    result uses the same storage as the input.
     """
     if x.shape[-1] % 2 != 0:
         raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
@@ -53,7 +62,11 @@ def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Te
 
 
 class Quadratic(nn.Module):
-    """A quadratic :math:`x^2` activation function."""
+    """A quadratic :math:`x^2` activation function.
+
+    Note that a quadratic activation is not "depth-stable", meaning in a deep
+    network it will eventually explode the variance of the inputs.
+    """
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
         """Define the computation performed at every call."""
@@ -61,10 +74,18 @@ class Quadratic(nn.Module):
 
 
 class ComplexQuadratic(nn.Module):
-    """An activation function that uses :func:`complex_quadratic`."""
+    r"""A quadratic activation :math:`f(z) = z^2` for complex values stored in
+    real tensors (see :func:`complex_quadratic`).
+
+    Note that a quadratic activation is not "depth-stable", meaning in a deep
+    network it will eventually explode the variance of the inputs.
+    """
 
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(self, *, interleaved: bool = False) -> None:
         super().__init__()
@@ -81,6 +102,11 @@ class BlendedQuadratic(nn.Module):
     .. math::
 
         f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+
+    Note that a quadratic activation is not "depth-stable", meaning in a deep
+    network it will eventually explode the variance of the inputs. For the
+    blended case, setting :math:`\alpha` close to 1 will delay the explosion,
+    allowing for deeper networks, but it does not solve the issue.
     """
 
     alpha: float
@@ -104,13 +130,21 @@ class ComplexBlendedQuadratic(nn.Module):
 
     .. math::
 
-        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+        f(z; \alpha) = \alpha z + (1 - \alpha) z^2.
+
+    Note that a quadratic activation is not "depth-stable", meaning in a deep
+    network it will eventually explode the variance of the inputs. For the
+    blended case, setting :math:`\alpha` close to 1 will delay the explosion,
+    allowing for deeper networks, but it does not solve the issue.
     """
 
     alpha: float
     """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(self, alpha: float = 0.5, *, interleaved: bool = False) -> None:
         if not 0.0 <= alpha <= 1.0:
@@ -127,11 +161,17 @@ class ComplexBlendedQuadratic(nn.Module):
 
 
 class ComplexTanh(nn.Module):
-    r"""A hyperbolic tangent for a complex vector of shape ``(d,)``.
+    r"""A split hyperbolic tangent for complex tensors.
 
-    This applies the hyperbolic tangent to the real and imaginary components
-    separately. Note that this is different than :math:`\tanh(z)` for a complex
-    :math:`z`.
+    .. math::
+
+        f(z) = \tanh(\Re z) + i \tanh(\Im z)
+
+    The hyperbolic tangent is applied to the real and imaginary components
+    separately, so this is different from the analytic :math:`\tanh(z)` for a
+    complex :math:`z`. Unlike the other activations in this module, the input
+    is expected to be a complex tensor; real inputs are promoted to complex
+    tensors with a zero imaginary part.
     """
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
@@ -143,17 +183,37 @@ class ComplexTanh(nn.Module):
 
 
 class ModReLU(nn.Module):
-    r"""A modified ReLU activation function for complex numbers.
+    r"""A modified ReLU activation function for complex networks from [Arjovsky2015]_.
 
     .. math::
 
-        f(z; b) = \operatorname{ReLU}(|z| + b) \operatorname{sgn}(z)
+        f(z; b) = \operatorname{ReLU}(|z| + b) \operatorname{sgn}(z),
+
+    where :math:`\operatorname{sgn}(z) = z / |z|` (taken to be zero at the
+    origin) preserves the phase of the input. For :math:`b < 0`, all inputs in
+    the disk :math:`|z| < -b` are zeroed out, analogously to the standard
+    :class:`~torch.nn.ReLU`. For :math:`b \ge 0`, the function reduces to
+    :math:`f(z) = z + b \operatorname{sgn}(z)`.
+
+    Note that for :math:`b < 0`, this activation function is not "depth-stable",
+    meaning that in a deep network it will eventually explode the variance. The
+    growth per layer is small (2% or so for :math:`b \sim -1`), but it compounds
+    with depth and can still cause problems. This is not an issue for
+    :math:`b \ge 0`.
+
+    .. [Arjovsky2015] M. Arjovsky, A. Shah, Y. Bengio,
+        *Unitary Evolution Recurrent Neural Networks*,
+        2015,
+        `URL <http://arxiv.org/abs/1511.06464v4>`__.
     """
 
     bias: float
-    """A non-learnable hyperparameter."""
+    """The bias :math:`b`. A non-learnable hyperparameter."""
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(self, bias: float = 0.0, *, interleaved: bool = False) -> None:
         super().__init__()
@@ -170,32 +230,46 @@ class ModReLU(nn.Module):
 
 
 def modrelu(z: torch.Tensor, b: float | torch.Tensor) -> torch.Tensor:
+    """Functional version of :class:`ModReLU` for a complex tensor *z*."""
     return torch.relu(torch.abs(z) + b) * torch.sgn(z)
 
 
 class LeakyModReLU(nn.Module):
-    r"""A modified LeakyReLU activation function for complex numbers.
+    r"""A leaky variant of the :class:`ModReLU` activation function.
 
     .. math::
 
-        f(z; b) = \operatorname{sgn}(z) \times
+        f(z; b, \alpha) = \operatorname{sgn}(z) \times
         \begin{cases}
         |z| + b, & \quad |z| + b \ge 0, \\
-        \alpha * |z|, & \quad \text{otherwise}.
+        \alpha |z|, & \quad \text{otherwise}.
         \end{cases}
 
-    Note that this is not the same as applying LeakyReLU to the :math:`|z| + b`
-    term as in the case of :class:`ModReLU`. Instead, if the shifted magnitude
-    becomes negative, we just add positive slope to it. This has the benefit of
-    maintaining the phase.
+    Note that this is not the same as applying a standard
+    :class:`~torch.nn.LeakyReLU` to the :math:`|z| + b` term of :class:`ModReLU`,
+    which would give the negative magnitude :math:`\alpha (|z| + b) < 0` and
+    thereby flip the phase by :math:`\pi`. Here the magnitude itself is scaled
+    by :math:`\alpha`, so the phase is always maintained. The trade-off is a
+    jump discontinuity of size :math:`\alpha |b|` at :math:`|z| = -b` when
+    :math:`b < 0`. For :math:`b \ge 0`, the leaky branch never triggers and the
+    function is identical to :class:`ModReLU`.
+
+    Note that for :math:`b < 0`, this activation function is not "depth-stable",
+    meaning that in a deep network it will eventually explode the variance. The
+    leak only enters the signal statistics at :math:`O(\alpha^2)`, so it does
+    not fix this instability. This is not an issue for :math:`b \ge 0`.
     """
 
     bias: float
-    """A non-learnable hyperparameter."""
+    """The bias :math:`b`. A non-learnable hyperparameter."""
     alpha: float
-    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+    r"""The leak slope :math:`\alpha`, with values in :math:`[0, 1]`. A
+    non-learnable hyperparameter."""
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(
         self,
@@ -228,21 +302,36 @@ def leaky_modrelu(
     *,
     alpha: float = 0.1,
 ) -> torch.Tensor:
+    """Functional version of :class:`LeakyModReLU` for a complex tensor *z*."""
     r = torch.abs(z)
     rb = r + b
     return torch.where(rb >= 0.0, rb, alpha * r) * torch.sgn(z)
 
 
 class ComplexCardioid(nn.Module):
-    r"""A complex cardioid activation function.
+    r"""A complex cardioid activation function from [Virtue2017]_.
 
     .. math::
 
-        f(z) = \frac{1}{2} (1 + \cos (\theta(z))) z
+        f(z) = \frac{1}{2} (1 + \cos \theta(z)) z,
+
+    where :math:`\theta(z) = \operatorname{arg} z` is the phase of the input.
+    The magnitude is attenuated based on the phase, while the phase itself is
+    preserved: inputs on the positive real axis are kept as is and inputs on
+    the negative real axis are zeroed out. For real inputs, this reduces to
+    the standard :class:`~torch.nn.ReLU`.
+
+    .. [Virtue2017] P. Virtue, S. X. Yu, M. Lustig,
+        *Better Than Real: Complex-Valued Neural Nets for MRI Fingerprinting*,
+        2017,
+        `URL <https://arxiv.org/abs/1707.00070>`__.
     """
 
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(self, *, interleaved: bool = False) -> None:
         super().__init__()
@@ -258,11 +347,12 @@ class ComplexCardioid(nn.Module):
 
 
 def ccardioid(z: torch.Tensor) -> torch.Tensor:
+    """Functional version of :class:`ComplexCardioid` for a complex tensor *z*."""
     return 0.5 * (1 + torch.cos(torch.angle(z))) * z
 
 
 class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
-    r"""A complex ReLU function that maintains the first quadrant.
+    r"""A complex ReLU function from [Guberman2016]_ that keeps the first quadrant.
 
     .. math::
 
@@ -271,10 +361,20 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
         z, & \quad \Re(z) \geq 0, \Im(z) \geq 0, \\
         0, & \quad \text{otherwise}.
         \end{cases}
+
+    Inputs with a phase outside of :math:`[0, \pi / 2]` are zeroed out.
+
+    .. [Guberman2016] N. Guberman,
+        *On Complex Valued Convolutional Neural Networks*,
+        2016,
+        `URL <https://arxiv.org/abs/1602.09046>`__.
     """
 
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(self, *, interleaved: bool = False) -> None:
         super().__init__()
@@ -290,6 +390,7 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
 
 
 def zrelu(z: torch.Tensor) -> torch.Tensor:
+    """Functional version of :class:`zReLU` for a complex tensor *z*."""
     return z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
 
 
@@ -371,7 +472,10 @@ class ComplexLinear(nn.Module):
     input vector. The values are initialized to 0.
     """
     interleaved: bool
-    """If *True*, assume that the tensors have interleaved real and complex parts."""
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
 
     def __init__(
         self,
