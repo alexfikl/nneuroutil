@@ -41,7 +41,7 @@ def test_quadratic() -> None:
 
 
 def test_complex_quadratic_interleave() -> None:
-    from nneuroutil.torch_extras import ComplexQuadratic, complex_quadratic
+    from nneuroutil.torch_extras import ComplexQuadratic, cquadratic
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -49,14 +49,14 @@ def test_complex_quadratic_interleave() -> None:
 
     # test interleaved storage: [re[0], im[0], ..., re[n], im[n]]
     x = torch.view_as_real(z).reshape(3, 2 * n)
-    res = complex_quadratic(x, interleaved=True)
+    res = cquadratic(x, interleaved=True)
     expected = torch.view_as_real(z2).reshape(3, 2 * n)
     assert res.shape == x.shape
     assert torch.allclose(res, expected)
 
     # test stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
     x = torch.cat([z.real, z.imag], dim=-1)
-    res = complex_quadratic(x, interleaved=False)
+    res = cquadratic(x, interleaved=False)
     expected = torch.cat([z2.real, z2.imag], dim=-1)
     assert torch.allclose(res, expected)
 
@@ -69,7 +69,7 @@ def test_complex_quadratic_interleave() -> None:
 
     # test odd dimension raises
     with pytest.raises(ValueError, match="must be even"):
-        complex_quadratic(torch.randn(3, 2 * n + 1), interleaved=True)
+        cquadratic(torch.randn(3, 2 * n + 1), interleaved=True)
 
 
 def test_linear_quadratic() -> None:

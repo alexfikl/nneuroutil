@@ -24,41 +24,19 @@ log = module_logger(__name__)
 
 
 def view_as_complex(x: torch.Tensor) -> torch.Tensor:
-    """View a real tensor of shape ``(..., 2 d)`` with interleaved real and
-    imaginary parts as a complex tensor of shape ``(..., d)``.
+    """View a real tensor of shape ``(..., 2d)`` as an interleaved complex tensor.
+
+    This is mostly :func:`torch.view_as_complex` with a reshape.
     """
     return torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
 
 
 def view_as_real(x: torch.Tensor) -> torch.Tensor:
-    """View a complex tensor of shape ``(..., d)`` as a real tensor of shape
-    ``(..., 2 d)`` with interleaved real and imaginary parts.
+    """View a complex tensor of shape ``(..., d)`` as an interleaved real tensor.
+
+    This is mostly :func:`torch.view_as_real` with a reshape.
     """
     return torch.view_as_real(x).reshape(*x.shape[:-1], -1)
-
-
-def complex_quadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
-    r"""Treat *x* as a real tensor of shape ``(..., 2 d)`` storing a complex
-    tensor :math:`z` of shape ``(..., d)`` and compute its elementwise square
-    :math:`z^2`.
-
-    The storage of the array depends on *interleaved*. If *True*, we assume that
-    the array is stored as ``[z[0].real, z[0].imag, ..., z[d - 1].real,
-    z[d - 1].imag]``. Otherwise, we assume that it is stacked as
-    ``[z[0].real, ..., z[d - 1].real, z[0].imag, ..., z[d - 1].imag]``. The
-    result uses the same storage as the input.
-    """
-    if x.shape[-1] % 2 != 0:
-        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
-
-    if interleaved:
-        z = view_as_complex(x)
-        result = torch.view_as_real(z * z).reshape(*x.shape)
-    else:
-        x_re, x_im = torch.chunk(x, 2, dim=-1)
-        result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
-
-    return result
 
 
 class Quadratic(nn.Module):
@@ -93,7 +71,30 @@ class ComplexQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return complex_quadratic(x, interleaved=self.interleaved)
+        return cquadratic(x, interleaved=self.interleaved)
+
+
+def cquadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
+    r"""Compute the complex square of a real vector *x*.
+
+    The storage of the array depends on *interleaved*. If *True*, we assume that
+    the array is stored as ``[z[0].real, z[0].imag, ..., z[d - 1].real,
+    z[d - 1].imag]``. Otherwise, we assume that it is stacked as
+    ``[z[0].real, ..., z[d - 1].real, z[0].imag, ..., z[d - 1].imag]``.
+
+    The result uses the same storage as the input.
+    """
+    if x.shape[-1] % 2 != 0:
+        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
+
+    if interleaved:
+        z = view_as_complex(x)
+        result = torch.view_as_real(z * z).reshape(*x.shape)
+    else:
+        x_re, x_im = torch.chunk(x, 2, dim=-1)
+        result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
+
+    return result
 
 
 class BlendedQuadratic(nn.Module):
@@ -156,8 +157,17 @@ class ComplexBlendedQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        x2 = complex_quadratic(x, interleaved=self.interleaved)
-        return self.alpha * x + (1.0 - self.alpha) * x2
+        return cblended_quadratic(x, interleaved=self.interleaved, alpha=self.alpha)
+
+
+def cblended_quadratic(
+    x: torch.Tensor,
+    *,
+    interleaved: bool = False,
+    alpha: float = 0.5,
+) -> torch.Tensor:
+    x2 = cquadratic(x, interleaved=interleaved)
+    return alpha * x + (1.0 - alpha) * x2
 
 
 class ComplexTanh(nn.Module):
