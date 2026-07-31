@@ -10,7 +10,7 @@ packaging==26.2
     #   wheel
 pathspec==1.1.1
     # via hatchling
-pip==26.1.2
+pip==26.2
     # via -r .ci/requirements-build.in
 pluggy==1.6.0
     # via hatchling

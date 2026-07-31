@@ -18,7 +18,7 @@ babel==2.18.0
     #   sphinx
 beautifulsoup4==4.15.0
     # via pydata-sphinx-theme
-certifi==2026.6.17
+certifi==2026.7.22
     # via requests
 charset-normalizer==3.4.9
     # via requests
@@ -36,11 +36,11 @@ docutils==0.22.4
     #   sphinx
 etils==1.14.0
     # via orbax-checkpoint
-flax==0.12.7
+flax==0.12.8
     # via nneuroutil (pyproject.toml:jax)
 fonttools==4.63.0
     # via matplotlib
-fsspec==2026.6.0
+fsspec==2026.7.0
     # via etils
 humanize==4.16.0
     # via orbax-checkpoint
@@ -71,14 +71,16 @@ jaxlib==0.11.0 ; python_full_version >= '3.12'
     #   jax
     #   optax
 jinja2==3.1.6
-    # via sphinx
+    # via
+    #   pydata-sphinx-theme
+    #   sphinx
 kiwisolver==1.5.0
     # via matplotlib
 markdown-it-py==4.2.0
     # via rich
 markupsafe==3.0.3
     # via jinja2
-matplotlib==3.11.0
+matplotlib==3.11.1
     # via
     #   nneuroutil (pyproject.toml:visualization)
     #   scienceplots
@@ -150,13 +152,13 @@ pillow==12.3.0
     # via matplotlib
 pluggy==1.6.0
     # via pytest
-prometheus-client==0.25.0
+prometheus-client==0.26.0
     # via orbax-checkpoint
 protobuf==7.35.1
     # via orbax-checkpoint
 psutil==7.2.2
     # via orbax-checkpoint
-pydata-sphinx-theme==0.16.1
+pydata-sphinx-theme==0.20.0
     # via sphinx-book-theme
 pygments==2.20.0
     # via
@@ -180,14 +182,16 @@ pyyaml==6.0.3
     #   flax
     #   orbax-checkpoint
 requests==2.34.2
-    # via sphinx
+    # via
+    #   pydata-sphinx-theme
+    #   sphinx
 rich==15.0.0
     # via
     #   nneuroutil (pyproject.toml)
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.15.22
+ruff==0.16.1
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -211,7 +215,7 @@ six==1.17.0
     # via python-dateutil
 snowballstemmer==3.1.1
     # via sphinx
-soupsieve==2.8.4
+soupsieve==2.9.1
     # via beautifulsoup4
 sphinx==9.0.4 ; python_full_version < '3.12'
     # via
@@ -223,7 +227,7 @@ sphinx==9.1.0 ; python_full_version >= '3.12'
     #   nneuroutil (pyproject.toml:docs)
     #   pydata-sphinx-theme
     #   sphinx-book-theme
-sphinx-book-theme==1.2.0
+sphinx-book-theme==1.4.0
     # via nneuroutil (pyproject.toml:docs)
 sphinxcontrib-applehelp==2.0.0
     # via sphinx
@@ -243,7 +247,7 @@ tensorstore==0.1.84
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.60
+ty==0.0.65
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
@@ -253,7 +257,6 @@ typing-extensions==4.16.0
     #   flax
     #   optype
     #   orbax-checkpoint
-    #   pydata-sphinx-theme
 urllib3==2.7.0
     # via requests
 uvloop==0.22.1 ; sys_platform != 'win32'
