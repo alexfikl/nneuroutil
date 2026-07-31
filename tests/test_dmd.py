@@ -115,8 +115,8 @@ def test_dmd_tls(sigma: float) -> None:
     eig_tls, _ = dmd_tls.eigendecomposition()
 
     eig_ref_index = np.argsort(-np.abs(eig_ref))
-    error_dmd = spectrum_error(eig_dmd, eig_ref[eig_ref_index[:rank]])
-    error_tls = spectrum_error(eig_tls, eig_ref[eig_ref_index[:rank]])
+    error_dmd = spectrum_error(eig_dmd, eig_ref[eig_ref_index[:rank]])  # ty: ignore[invalid-argument-type]
+    error_tls = spectrum_error(eig_tls, eig_ref[eig_ref_index[:rank]])  # ty: ignore[invalid-argument-type]
 
     log.info("Noise %.3f Error DMD %.5e TLS %.5e", sigma, error_dmd, error_tls)
     assert error_tls < error_dmd

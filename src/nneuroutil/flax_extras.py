@@ -117,10 +117,10 @@ def complex_quadratic(x: jax.Array, *, interleaved: bool = False) -> jax.Array:
         x_re, x_im = deinterleave(x)
         result_re = x_re * x_re - x_im * x_im
         result_im = 2.0 * x_re * x_im
-        return interleave(result_re, result_im)
-
-    x_re, x_im = jnp.split(x, 2, axis=-1)
-    return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
+        return interleave(result_re, result_im)  # ty: ignore[invalid-return-type]
+    else:
+        x_re, x_im = jnp.split(x, 2, axis=-1)
+        return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
 
 
 def complex_blended_quadratic(
@@ -266,9 +266,9 @@ class ComplexLinear(nnx.Module):
             result_im = result_im + self.bias_im.value  # ruff:ignore[non-augmented-assignment]
 
         if self.interleaved:
-            return interleave(result_re, result_im)
-
-        return jnp.concatenate([result_re, result_im], axis=-1)
+            return interleave(result_re, result_im)  # ty: ignore[invalid-return-type]
+        else:
+            return jnp.concatenate([result_re, result_im], axis=-1)
 
 
 # }}}

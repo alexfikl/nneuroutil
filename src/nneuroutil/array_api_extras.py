@@ -75,12 +75,12 @@ def interleave(
 
 
 def deinterleave(
-    z: ArrayND[np.number[Any]],
+    z: ArrayND[Any],
     /,
     *,
     axis: int = -1,
     xp: Any = None,
-) -> ArrayND[np.number[Any]]:
+) -> tuple[ArrayND[Any], ArrayND[Any]]:
     axis %= z.ndim
     n = z.shape[axis]
 
@@ -95,6 +95,7 @@ def deinterleave(
 
     idx0 = (slice(None),) * axis + (slice(None), 0)
     idx1 = (slice(None),) * axis + (slice(None), 1)
+
     return reshaped[idx0], reshaped[idx1]
 
 
