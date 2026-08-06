@@ -452,7 +452,7 @@ def to_real(dtype: Any) -> np.dtype[np.floating[Any]]:
         return dtype
 
     try:
-        return _COMPLEX_TO_REAL_DTYPE[dtype]
+        return _COMPLEX_TO_REAL_DTYPE[dtype]  # ty: ignore[invalid-argument-type]
     except KeyError:
         raise TypeError(f"no real counterpart for dtype {dtype!r}") from None
 
