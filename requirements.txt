@@ -10,17 +10,17 @@ numpy==2.4.6 ; python_full_version < '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   scipy
-numpy==2.5.1 ; python_full_version >= '3.12'
+numpy==2.5.2 ; python_full_version >= '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   scipy
-pygments==2.20.0
+pygments==2.21.0
     # via rich
 rich==15.0.0
     # via nneuroutil (pyproject.toml)
 scipy==1.17.1 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml)
-scipy==1.18.0 ; python_full_version >= '3.12'
+scipy==1.18.1 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml)
 typing-extensions==4.16.0
     # via nneuroutil (pyproject.toml)

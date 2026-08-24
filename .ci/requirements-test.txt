@@ -20,7 +20,7 @@ beautifulsoup4==4.15.0
     # via pydata-sphinx-theme
 certifi==2026.7.22
     # via requests
-charset-normalizer==3.4.9
+charset-normalizer==3.5.1
     # via requests
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
@@ -36,7 +36,9 @@ docutils==0.22.4
     #   sphinx
 etils==1.14.0
     # via orbax-checkpoint
-flax==0.12.8
+flax==0.12.8 ; python_full_version < '3.12'
+    # via nneuroutil (pyproject.toml:jax)
+flax==0.12.9 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:jax)
 fonttools==4.63.0
     # via matplotlib
@@ -44,7 +46,7 @@ fsspec==2026.7.0
     # via etils
 humanize==4.16.0
     # via orbax-checkpoint
-idna==3.18
+idna==3.19
     # via requests
 imagesize==2.0.0
     # via sphinx
@@ -56,7 +58,7 @@ jax==0.10.2 ; python_full_version < '3.12'
     #   flax
     #   optax
     #   orbax-checkpoint
-jax==0.11.0 ; python_full_version >= '3.12'
+jax==0.11.1 ; python_full_version >= '3.12'
     # via
     #   nneuroutil (pyproject.toml:jax)
     #   flax
@@ -66,7 +68,7 @@ jaxlib==0.10.2 ; python_full_version < '3.12'
     # via
     #   jax
     #   optax
-jaxlib==0.11.0 ; python_full_version >= '3.12'
+jaxlib==0.11.1 ; python_full_version >= '3.12'
     # via
     #   jax
     #   optax
@@ -86,7 +88,7 @@ matplotlib==3.11.1
     #   scienceplots
 mdurl==0.1.2
     # via markdown-it-py
-ml-dtypes==0.5.4
+ml-dtypes==0.6.0
     # via
     #   jax
     #   jaxlib
@@ -113,7 +115,7 @@ numpy==2.4.6 ; python_full_version < '3.12'
     #   scipy
     #   tensorstore
     #   treescope
-numpy==2.5.1 ; python_full_version >= '3.12'
+numpy==2.5.2 ; python_full_version >= '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   contourpy
@@ -141,7 +143,7 @@ optype==0.17.1 ; python_full_version < '3.12'
     # via scipy-stubs
 optype==0.18.0 ; python_full_version >= '3.12'
     # via scipy-stubs
-orbax-checkpoint==0.12.2
+orbax-checkpoint==0.12.4
     # via flax
 packaging==26.3
     # via
@@ -154,13 +156,13 @@ pluggy==1.6.0
     # via pytest
 prometheus-client==0.26.0
     # via orbax-checkpoint
-protobuf==7.35.1
+protobuf==7.36.0
     # via orbax-checkpoint
 psutil==7.2.2
     # via orbax-checkpoint
 pydata-sphinx-theme==0.20.0
     # via sphinx-book-theme
-pygments==2.20.0
+pygments==2.21.0
     # via
     #   accessible-pygments
     #   pydata-sphinx-theme
@@ -191,7 +193,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.16.1
+ruff==0.16.4
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -200,14 +202,14 @@ scipy==1.17.1 ; python_full_version < '3.12'
     #   nneuroutil (pyproject.toml)
     #   jax
     #   jaxlib
-scipy==1.18.0 ; python_full_version >= '3.12'
+scipy==1.18.1 ; python_full_version >= '3.12'
     # via
     #   nneuroutil (pyproject.toml)
     #   jax
     #   jaxlib
 scipy-stubs==1.17.1.5 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml:test)
-scipy-stubs==1.18.0.1 ; python_full_version >= '3.12'
+scipy-stubs==1.18.1.0 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:test)
 simplejson==4.1.1
     # via orbax-checkpoint
@@ -215,7 +217,7 @@ six==1.17.0
     # via python-dateutil
 snowballstemmer==3.1.1
     # via sphinx
-soupsieve==2.9.1
+soupsieve==2.9.2
     # via beautifulsoup4
 sphinx==9.0.4 ; python_full_version < '3.12'
     # via
@@ -247,7 +249,7 @@ tensorstore==0.1.85
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.69
+ty==0.0.74
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
