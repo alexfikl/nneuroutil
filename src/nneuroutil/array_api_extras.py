@@ -49,6 +49,13 @@ def interleave(
     axis: int = -1,
     xp: Any = None,
 ) -> ArrayND[np.number[Any]]:
+    """Interleave the elements of *x* and *y* along the given axis *axis*.
+
+    The two inputs must have the same shape. The result has the same shape as the
+    inputs, except along *axis*, where the size is doubled and the entries of
+    *x* and *y* alternate. For one-dimensional arrays, this is effectively just
+    ``(x[0], y[0], x[1], y[1], ...)``.
+    """
     if x.shape != y.shape:
         raise ValueError(
             f"interleave: x and y must have the same shape: {x.shape} and {y.shape}"
@@ -81,6 +88,11 @@ def deinterleave(
     axis: int = -1,
     xp: Any = None,
 ) -> tuple[ArrayND[Any], ArrayND[Any]]:
+    """Split the entries of *z* into two arrays along the given axis *axis*.
+
+    This is the inverse of :func:`interleave`: the size along *axis* must be
+    even, and the two outputs correspond to the even- and odd-indexed entries.
+    """
     axis %= z.ndim
     n = z.shape[axis]
 
@@ -114,6 +126,26 @@ def histogram(
     fallback: bool = False,
     xp: Any = None,
 ) -> tuple[Array1D[np.floating[Any]], Array1D[np.floating[Any]]]:
+    """Compute the histogram of *x*.
+
+    This implements a function similar to :func:`numpy.histogram` that works
+    with the Array API. In most cases, it will simply dispatch to the appropriate
+    backend. However, a fallback implementation based on the existing Array APIs
+    is available (but generally slower).
+
+    :arg x: input data, which must be a one-dimensional array.
+    :arg bins: number of bins into which to separate the given data. Note that
+        this can only be an integer, unlike in :func:`numpy.histogram`.
+    :arg range: a tuple ``(xmin, xmax)`` giving the lower and upper bounds of the
+        bins. If not provided, this will be ``(x.min(), x.max())``.
+    :arg density: if *True*, the result will be the probability density function
+        at each bin (normalized so that it integrates to 1). Otherwise, it is
+        simply the number of values in each bin.
+    :arg fallback: if *True*, a fallback implementation will be used instead of
+        the existing ones. This is meant mostly for testing.
+
+    :returns: a tuple of ``(counts, edges)`` similar to :func:`numpy.histogram`.
+    """
     if x.ndim != 1:
         raise ValueError(f"'x' input must be 1-dimensional: {x.shape}")
 

@@ -26,8 +26,14 @@ def otsu_threshold_from_image(
     nbins: int = 256,
     xp: Any = None,
 ) -> Array0D[np.floating[Any]]:
-    """
+    """Compute a threshold based on
+    `Otsu's Method <https://en.wikipedia.org/wiki/Otsu%27s_method>`__.
+
+    This threshold can be used to convert the image to a binary image. The
+    function computes the histogram and then uses :func:`otsu_threshold_from_histogram`.
+
     :arg img: an array of shape ``(n, m)`` representing a grayscale image.
+    :arg nbins: number of bins used to calculate the histogram from *img*.
     """
     if xp is None:
         xp = array_api_compat.array_namespace(img)
@@ -55,6 +61,15 @@ def otsu_threshold_from_histogram(
     *,
     xp: Any = None,
 ) -> Array0D[np.floating[Any]]:
+    """Compute a threshold based on
+    `Otsu's Method <https://en.wikipedia.org/wiki/Otsu%27s_method>`__.
+
+    :arg hist: an array of ``counts`` or a tuple of ``(counts, centers)``. For
+        more information, see :func:`numpy.histogram`, which returns
+        ``(counts, edges)`` in a compatible manner (edges can be averaged to
+        obtain the centers). If only counts are given, the centers are assumed to
+        be at integer locations ``(0, 1, ..., counts.size - 1)``.
+    """
     if not (array_api_compat.is_array_api_obj(hist) or isinstance(hist, tuple)):
         raise TypeError("'hist' must be an array or a ``(bins, centers)`` tuple")
 
