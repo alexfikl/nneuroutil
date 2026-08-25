@@ -8,7 +8,7 @@ from typing import Any
 import array_api_compat
 import numpy as np
 
-from nneuroutil.typing import ArrayND
+from nneuroutil.typing import Array1D, ArrayND
 
 # {{{ array_equal
 
@@ -97,6 +97,87 @@ def deinterleave(
     idx1 = (slice(None),) * axis + (slice(None), 1)
 
     return reshaped[idx0], reshaped[idx1]
+
+
+# }}}
+
+
+# {{{ histogram
+
+
+def histogram(
+    x: Array1D[np.floating[Any]],
+    bins: int,
+    *,
+    range: tuple[float, float] | None = None,  # ruff: ignore[builtin-argument-shadowing]
+    density: bool = False,
+    fallback: bool = False,
+    xp: Any = None,
+) -> tuple[Array1D[np.floating[Any]], Array1D[np.floating[Any]]]:
+    if x.ndim != 1:
+        raise ValueError(f"'x' input must be 1-dimensional: {x.shape}")
+
+    if bins <= 0:
+        raise ValueError(f"'bins' must be positive: {bins}")
+
+    if not fallback and array_api_compat.is_numpy_array(x):
+        return np.histogram(x, bins=bins, range=range, density=density)
+    elif not fallback and array_api_compat.is_jax_array(x):
+        import jax.numpy as jnp
+
+        return jnp.histogram(x, bins=bins, range=range, density=density)
+    elif not fallback and array_api_compat.is_torch_array(x):
+        import torch
+
+        # NOTE: torch.histogram does not work for integers, so we cast it
+        if not (x.is_floating_point() or x.is_complex()):
+            x = x.to(torch.get_default_dtype())
+
+        return torch.histogram(x, bins, range=range, density=density)
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+    else:
+        assert array_api_compat.array_namespace(x) is xp
+
+    # implement a fallback for other array libraries
+    if range is None:
+        xmin, xmax = xp.min(x), xp.max(x)
+
+        if not xp.isfinite(xmin) or not xp.isfinite(xmax):
+            raise ValueError(f"autodetected range [{xmin}, {xmax}] is not finite")
+
+        # expand the range for constant arrays, like numpy does
+        if xmin == xmax:
+            xmin -= 0.5
+            xmax += 0.5
+    else:
+        xmin, xmax = range
+
+    if xmin >= xmax:
+        raise ValueError(f"invalid range (xmin >= xmax): {range}")
+
+    # compute where each element in x falls using searchsorted
+    dtype = xp.result_type(x.dtype, xp.float64)
+    edges = xp.linspace(xmin, xmax, bins + 1, dtype=dtype)
+    idx = xp.searchsorted(edges, x, side="right") - 1
+
+    # clamp values at the last edge into the last bin, like numpy does
+    idx = xp.minimum(idx, xp.asarray(bins - 1, dtype=idx.dtype))
+
+    # drop any elements outside of the given range
+    mask = (x >= xmin) & (x <= xmax)  # ty: ignore[unsupported-operator]
+    idx = xp.where(mask, idx, xp.asarray(bins + 1, dtype=idx.dtype))
+
+    # count elements per bin
+    ids = xp.arange(bins, dtype=idx.dtype)
+    mask = idx[:, None] == ids[None, :]
+    counts = xp.sum(xp.astype(mask, idx.dtype), axis=0)
+
+    if density:
+        counts = counts / (xp.sum(counts) * (edges[1] - edges[0]))  # ruff: ignore[non-augmented-assignment]
+
+    return counts, edges
 
 
 # }}}
