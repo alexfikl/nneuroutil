@@ -230,6 +230,11 @@ intersphinx_mapping = {
 
 # fmt: off
 custom_type_links = {
+    # flax
+    "nnx.Module": ("flax", "flax.nnx.Module", "class"),
+    "nnx.Param": ("flax", "flax.nnx.Param", "class"),
+    # torch
+    "nn.Module": ("torch", "torch.nn.Module", "class"),
 }
 # fmt: on
 

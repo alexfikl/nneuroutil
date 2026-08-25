@@ -53,7 +53,7 @@ class Quadratic(nn.Module):
 
 class ComplexQuadratic(nn.Module):
     r"""A quadratic activation :math:`f(z) = z^2` for complex values stored in
-    real tensors (see :func:`complex_quadratic`).
+    real tensors (see :func:`cquadratic`).
 
     Note that a quadratic activation is not "depth-stable", meaning in a deep
     network it will eventually explode the variance of the inputs.
@@ -127,7 +127,7 @@ class BlendedQuadratic(nn.Module):
 
 class ComplexBlendedQuadratic(nn.Module):
     r"""A convex combination of a linear and a quadratic activation, where the
-    quadratic term uses :func:`complex_quadratic`.
+    quadratic term uses :func:`cquadratic`.
 
     .. math::
 

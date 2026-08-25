@@ -11,7 +11,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from flax.typing import Initializer
+from jax.nn.initializers import Initializer
 
 from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import module_logger, to_real
