@@ -199,12 +199,16 @@ def histogram(
 
     # drop any elements outside of the given range
     mask = (x >= xmin) & (x <= xmax)  # ty: ignore[unsupported-operator]
-    idx = xp.where(mask, idx, xp.asarray(bins + 1, dtype=idx.dtype))
+    idx = xp.where(mask, idx, xp.asarray(bins, dtype=idx.dtype))
 
-    # count elements per bin
-    ids = xp.arange(bins, dtype=idx.dtype)
-    mask = idx[:, None] == ids[None, :]
-    counts = xp.sum(xp.astype(mask, idx.dtype), axis=0)
+    # count elements per bin by sorting the bin indices and using searchsorted
+    # (O(n log n)) instead of building an O(n * bins) boolean matrix
+    sorted_idx = xp.sort(idx)
+    boundaries = xp.searchsorted(
+        sorted_idx, xp.arange(1, bins + 1, dtype=idx.dtype), side="left"
+    )
+    pad = xp.concatenate([xp.zeros((1,), dtype=boundaries.dtype), boundaries])
+    counts = xp.diff(pad)
 
     if density:
         counts = counts / (xp.sum(counts) * (edges[1] - edges[0]))  # ruff: ignore[non-augmented-assignment]
