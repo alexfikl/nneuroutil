@@ -167,8 +167,9 @@ def total_least_squares(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
         )
 
-    nsnapshots, dim = X.shape
-    if X.shape != Y.shape:
+    n, dx = X.shape
+    n, dy = Y.shape
+    if X.shape[0] != Y.shape[0]:
         raise ValueError(
             f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
         )
@@ -176,14 +177,14 @@ def total_least_squares(
     if xp is None:
         xp = array_api_compat.array_namespace(X, Y)
 
-    if rank is not None and not 0 < rank < dim:
-        raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
+    if rank is not None and not 0 < rank < min(dx, dy):
+        raise ValueError(f"'rank' must be in (0, {min(dx, dy)}): {rank}")
 
     if eps is not None and eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
     Z = xp.concat([X, Y], axis=1)
-    assert Z.shape == (nsnapshots, 2 * dim)
+    assert Z.shape == (n, dx + dy)
 
     U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
     S = xp.astype(S, X.dtype)
@@ -195,8 +196,8 @@ def total_least_squares(
         mask = xp.abs(S) > eps
         U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
-    X = U @ xp.diag(S) @ Vh[:, :dim]
-    Y = U @ xp.diag(S) @ Vh[:, dim:]
+    X = U @ xp.diag(S) @ Vh[:, :dx]
+    Y = U @ xp.diag(S) @ Vh[:, dx:]
 
     return X, Y
 
@@ -232,7 +233,6 @@ def build_dmd(
             f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
         )
 
-    _, dim = X.shape
     if Y is None:
         Y = X[:-1, :]
         X = X[1:, :]
@@ -242,13 +242,15 @@ def build_dmd(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
         )
 
-    if X.shape != Y.shape:
+    _, dx = X.shape
+    _, dy = Y.shape
+    if X.shape[0] != Y.shape[0]:
         raise ValueError(
             f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
         )
 
-    if rank is not None and not 0 < rank < dim:
-        raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
+    if rank is not None and not 0 < rank < min(dx, dy):
+        raise ValueError(f"'rank' must be in (0, {min(dx, dy)}): {rank}")
 
     if eps is not None and eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
@@ -319,7 +321,9 @@ def build_full_dmd(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
         )
 
-    if X.shape != Y.shape:
+    n, dx = X.shape
+    n, dy = Y.shape
+    if X.shape[0] != Y.shape[0]:
         raise ValueError(
             f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
         )
@@ -329,9 +333,8 @@ def build_full_dmd(
     else:
         assert array_api_compat.array_namespace(X, Y) is xp
 
-    nsnapshots, d = X.shape
     if eps is None:
-        eps = max(nsnapshots, d) * xp.finfo(X.dtype).eps
+        eps = max(n, dx, dy) * xp.finfo(X.dtype).eps
 
     if eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
@@ -355,8 +358,8 @@ def build_full_dmd(
         # matrices, we instead solve
         #   A^* = argmin |[X, \sqrt{\epsilon} I] A - [Y, O]|^2
 
-        I = xp.eye(d, d, dtype=X.dtype, device=X.device)  # ruff: ignore[ambiguous-variable-name]
-        O = xp.zeros((d, d), dtype=Y.dtype, device=Y.device)  # ruff: ignore[ambiguous-variable-name]
+        I = xp.eye(dx, dx, dtype=X.dtype, device=X.device)  # ruff: ignore[ambiguous-variable-name]
+        O = xp.zeros((dx, dy), dtype=Y.dtype, device=Y.device)  # ruff: ignore[ambiguous-variable-name]
 
         # FIXME: make eps relative as well? a bit expensive..
         X = xp.concat([X, eps**0.5 * I], axis=0)
@@ -374,6 +377,7 @@ def build_full_dmd(
 
 
 # {{{ build_full_extended_dmd
+
 
 def build_full_extended_dmd(
     observables: Sequence[Callable[[Array2D[ScalarTypeT]], Array2D[ScalarTypeT]]],
