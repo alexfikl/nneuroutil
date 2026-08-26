@@ -8,7 +8,11 @@ from typing import Any
 import array_api_compat
 import numpy as np
 
+from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array1D, ArrayND
+
+log = module_logger(__name__)
+
 
 # {{{ array_equal
 
@@ -168,11 +172,8 @@ def histogram(
 
             return torch.histogram(x, bins, range=range, density=density)
         else:
-            from warnings import warn
-
-            warn(
-                f"'torch.histogram' does not support {x.device}: using fallback.",
-                stacklevel=2,
+            log.debug(
+                "'torch.histogram' does not support %s: using fallback.", x.device
             )
 
     if xp is None:
@@ -203,11 +204,11 @@ def histogram(
     idx = xp.searchsorted(edges, x, side="right") - 1
 
     # clamp values at the last edge into the last bin, like numpy does
-    idx = xp.minimum(idx, xp.asarray(bins - 1, dtype=idx.dtype))
+    idx = xp.minimum(idx, xp.asarray(bins - 1, dtype=idx.dtype, device=x.device))
 
     # drop any elements outside of the given range
     mask = (x >= xmin) & (x <= xmax)  # ty: ignore[unsupported-operator]
-    idx = xp.where(mask, idx, xp.asarray(bins, dtype=idx.dtype))
+    idx = xp.where(mask, idx, xp.asarray(bins, dtype=idx.dtype, device=x.device))
 
     # count elements per bin by sorting the bin indices and using searchsorted
     # (O(n log n)) instead of building an O(n * bins) boolean matrix
