@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Any
+from typing import Any, Literal
 
 import array_api_compat
 import numpy as np
@@ -21,7 +21,7 @@ log = module_logger(__name__)
 
 
 @pytest.mark.parametrize("tls", [True, False])
-def test_dmd_classic_linear(xp: Any, tls: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
+def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
     rng = np.random.default_rng(seed=42)
     ndim = 8
     nsnapshots = 64
@@ -122,7 +122,113 @@ def test_dmd_tls(sigma: float) -> None:
     assert error_tls < error_dmd
 
 
-# {{{
+# {{{ test_build_full_dmd
+
+
+@pytest.mark.parametrize("use_complex", [False, True])
+def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
+    rng = np.random.default_rng(seed=42)
+    n, d = 16, 5
+    noise = 0.01
+
+    if use_complex:
+        X = rng.standard_normal((n, d)) + 1j * rng.standard_normal((n, d))
+    else:
+        X = rng.standard_normal((n, d))
+
+    A_true = rng.standard_normal((d, d))
+    Y = X @ A_true + noise * rng.standard_normal((n, d))
+
+    from nneuroutil.dmd import build_full_dmd
+
+    X = xp.asarray(X)
+    Y = xp.asarray(Y)
+
+    for eps in [1.0e-12, 0.1]:
+        A = build_full_dmd(X, Y, method="pinv", eps=eps, xp=xp)
+        A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
+
+        error = float(np.linalg.norm(np.asarray(A) - A_ref))
+        log.info(
+            "[%s] pinv error: %.3e (complex=%s eps=%.1e)",
+            xp.__name__,
+            error,
+            use_complex,
+            eps,
+        )
+        assert error < 1.0e-12
+
+
+@pytest.mark.parametrize("use_complex", [False, True])
+def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
+    rng = np.random.default_rng(seed=42)
+    n, d = 16, 5
+    noise = 0.01
+
+    if use_complex:
+        X = rng.standard_normal((n, d)) + 1j * rng.standard_normal((n, d))
+    else:
+        X = rng.standard_normal((n, d))
+
+    A_true = rng.standard_normal((d, d))
+    Y = X @ A_true + noise * rng.standard_normal((n, d))
+
+    from nneuroutil.dmd import build_full_dmd
+
+    X = xp.asarray(X)
+    Y = xp.asarray(Y)
+
+    for eps in [1.0e-12, 1.0e-4]:
+        A = build_full_dmd(X, Y, method="ridge", eps=eps, xp=xp)
+
+        X_ref = np.asarray(X)
+        Y_ref = np.asarray(Y)
+        X_aug = np.concatenate([X_ref, eps**0.5 * np.eye(d, dtype=X_ref.dtype)])
+        Y_aug = np.concatenate([Y_ref, np.zeros((d, d), dtype=Y_ref.dtype)])
+        A_ref = np.linalg.lstsq(X_aug, Y_aug, rcond=None)[0]
+
+        error = float(np.linalg.norm(np.asarray(A) - A_ref))
+        log.info(
+            "[%s] ridge error: %.3e (complex=%s eps=%.1e)",
+            xp.__name__,
+            error,
+            use_complex,
+            eps,
+        )
+        assert error < 1.0e-12
+
+
+@pytest.mark.parametrize("method", ["pinv", "ridge"])
+def test_build_full_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -> None:
+    rng = np.random.default_rng(seed=42)
+    nsnapshots, ndim = 16, 5
+
+    X = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
+    Y = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
+
+    from nneuroutil.dmd import build_full_dmd
+
+    A = build_full_dmd(X, Y, method=method, xp=xp)
+    A_ref = np.linalg.lstsq(np.asarray(X), np.asarray(Y), rcond=None)[0]
+
+    error = float(np.linalg.norm(np.asarray(A) - A_ref))
+    log.info("[%s] default eps error: %.3e (method=%s)", xp.__name__, error, method)
+    assert error < 1.0e-12
+
+
+def test_build_full_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_full_dmd
+
+    X = xp.asarray(np.random.default_rng(42).standard_normal((16, 5)))
+
+    with pytest.raises(ValueError, match="must be of shape"):
+        build_full_dmd(X[..., None], X, xp=xp)
+    with pytest.raises(ValueError, match="must be of shape"):
+        build_full_dmd(X, X[..., None], xp=xp)
+    with pytest.raises(ValueError, match="different shapes"):
+        build_full_dmd(X, X[:-1], xp=xp)
+    with pytest.raises(ValueError, match="unknown method"):
+        build_full_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
 
 
 # }}}
