@@ -137,7 +137,7 @@ def reconstruct(
 
 def total_least_squares(
     X: Array2D[ScalarTypeT],
-    Y: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
     *,
     rank: int | None = None,
     eps: float | None = None,
@@ -152,7 +152,20 @@ def total_least_squares(
         is a data-dependent slice and some frameworks (e.g. ``jax``) will not
         be able to compile it.
     """
-    _, dim = X.shape
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
+    if Y is None:
+        Y = X[:-1, :]
+        X = X[1:, :]
+
+    if Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
     nsnapshots, dim = X.shape
     if X.shape != Y.shape:
         raise ValueError(
@@ -164,6 +177,9 @@ def total_least_squares(
 
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
+
+    if eps is not None and eps < 0:
+        raise ValueError(f"'eps' must be positive: {eps}")
 
     Z = xp.concat([X, Y], axis=1)
     assert Z.shape == (nsnapshots, 2 * dim)
@@ -192,7 +208,7 @@ def total_least_squares(
 
 def build_dmd(
     X: Array2D[ScalarTypeT],
-    Y: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
     *,
     rank: int | None = None,
     eps: float | None = None,
@@ -210,10 +226,31 @@ def build_dmd(
         is a data-dependent slice and some frameworks (e.g. ``jax``) will not
         be able to compile it.
     """
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
     _, dim = X.shape
+    if Y is None:
+        Y = X[:-1, :]
+        X = X[1:, :]
+
+    if Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
+    if X.shape != Y.shape:
+        raise ValueError(
+            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
+        )
 
     if rank is not None and not 0 < rank < dim:
         raise ValueError(f"'rank' must be in (0, {dim}): {rank}")
+
+    if eps is not None and eps < 0:
+        raise ValueError(f"'eps' must be positive: {eps}")
 
     if xp is None:
         xp = array_api_compat.array_namespace(X)
@@ -244,9 +281,11 @@ def build_dmd(
 
 def build_full_dmd(
     X: Array2D[ScalarTypeT],
-    Y: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
     *,
-    method: Literal["pinv", "ridge"] = "pinv",
+    # NOTE: using 'ridge' as the default here because (1) it's differentiable
+    # and (2) seems to be recommended for Extended DMD. Might reconsider..
+    method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
 ) -> Array2D[ScalarTypeT]:
@@ -270,6 +309,10 @@ def build_full_dmd(
             f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
         )
 
+    if Y is None:
+        Y = X[:-1, :]
+        X = X[1:, :]
+
     if Y.ndim != 2:
         raise ValueError(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
@@ -288,6 +331,9 @@ def build_full_dmd(
     nsnapshots, d = X.shape
     if eps is None:
         eps = max(nsnapshots, d) * xp.finfo(X.dtype).eps
+
+    if eps < 0:
+        raise ValueError(f"'eps' must be positive: {eps}")
 
     if method == "pinv":
         # NOTE: this essentially does a least squares fit for `Y = X A`. We
