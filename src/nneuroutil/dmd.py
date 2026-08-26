@@ -385,6 +385,7 @@ def build_full_extended_dmd(
     Y: Array2D[ScalarTypeT] | None = None,
     *,
     method: Literal["pinv", "ridge"] = "ridge",
+    first_observable_is_state: bool = False,
     eps: float | None = None,
     xp: Any = None,
 ) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
@@ -454,7 +455,11 @@ def build_full_extended_dmd(
         Y_lift = lift(Y, xp=xp)
 
     A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
-    C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp)
+    if first_observable_is_state:
+        C = xp.zeros((X.shape[1], X_lift.shape[1]), dtype=X.dtype, device=X.device)
+        C = xp.fill_diagonal(C, 1.0)
+    else:
+        C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp)
 
     return A, C
 
