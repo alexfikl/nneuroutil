@@ -110,6 +110,7 @@ lint.isort.required-imports = [
 ]
 
 [tool.typos]
+default.extend-ignore-re = [ "(?Rm)^.*#\\s*spell:\\s*disable$" ]
 default.extend-words.inh = "inh"
 default.extend-words.ND = "ND"
 

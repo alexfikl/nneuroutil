@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import array_api_compat
 import numpy as np
 
 from nneuroutil.helpers import module_logger
-from nneuroutil.typing import Array1D, ArrayND
+from nneuroutil.typing import Array1D, ArrayND, ScalarTypeT
 
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike
@@ -63,6 +63,62 @@ def array_equal(
         return False
 
     return bool(xp.all(xp.equal(a, b)))
+
+
+# }}}
+
+
+# {{{ fill_diagonal
+
+
+def fill_diagonal(
+    x: ArrayND[ScalarTypeT],
+    value: Any,
+    *,
+    wrap: bool = False,
+    inplace: bool = True,
+    xp: Any = None,
+) -> ArrayND[ScalarTypeT]:
+    """Fill the main diagonal of the given array of any dimensionality.
+
+    For an array ``x`` with ``x.ndim >= 2``, the diagonal is the list of
+    values ``a[i, ..., i]`` with indices ``i`` all identical.
+
+    With ``inplace=True`` (the default) the array is modified in place and the
+    (same) array is returned. Otherwise, a copy with the modified diagonal is
+    returned and *x* is left untouched.
+
+    :arg wrap: ``wrap=True`` is not implemented.
+    """
+    if wrap:
+        raise NotImplementedError("'wrap=True' is not implemented")
+
+    if x.ndim < 2:
+        raise ValueError(f"'x' must have at least dimension 2: {x.ndim}")
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if inplace:
+        if not array_api_compat.is_writeable_array(x):  # spell: disable
+            raise ValueError(
+                f"'x' is not writable (cannot use 'inplace=True'): {type(x)}"
+            )
+        # NOTE: is_writable_array seems to restrict the type in fun ways
+        x = cast("ArrayND[ScalarTypeT]", x)
+
+        n, m = x.shape[-2:]
+        k = min(n, m)
+        idx = xp.arange(0, k, device=x.device)
+        x[idx, idx] = value
+    else:
+        n, m = x.shape[-2:]
+        k = min(n, m)
+        rows = xp.arange(n, device=x.device)[:, None]
+        cols = xp.arange(m, device=x.device)[None, :]
+        x = xp.where(rows == cols, value, x)
+
+    return x
 
 
 # }}}
