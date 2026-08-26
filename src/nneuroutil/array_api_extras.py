@@ -25,11 +25,11 @@ def to_namespace_dtype(xp: Any, dtype: DTypeLike) -> Any:
     Array API backend *xp*.
     """
     if dtype is None:
-        raise ValueError("'dtype' cannot be done (the default is backend specific)")
+        raise ValueError("'dtype' cannot be None (the default is backend specific)")
 
     try:
         dtype = np.dtype(dtype)
-    except ValueError:
+    except TypeError:
         # NOTE: this assumes that the dtype is backend specific. This can also
         # fail for just an incorrect dtype thing, but oh well..
         return dtype
