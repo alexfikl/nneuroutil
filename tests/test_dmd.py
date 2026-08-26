@@ -243,10 +243,10 @@ def test_build_full_dmd_errors(xp: Any) -> None:
 def test_build_full_extended_dmd(
     xp: Any, method: Literal["pinv", "ridge"], *, use_trajectory: bool
 ) -> None:
+    # NOTE: keep the trajectory short, as the x^2 grows too fast in this case
     x0 = 0.7
-    # NOTE: keep the trajectory short, as the [x, x^2] features over a
-    # doubling map grow quadratically and make the lifted matrix ill-conditioned.
     xs = [x0]
+
     for _ in range(12):
         xs.append(2.0 * xs[-1])
     S = xp.asarray(xs, dtype=xp.float64)[:, None]
