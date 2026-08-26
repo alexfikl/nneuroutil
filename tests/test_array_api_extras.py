@@ -9,7 +9,13 @@ from typing import Any
 import numpy as np
 import pytest
 
-from nneuroutil.array_api_extras import array_equal, deinterleave, histogram, interleave
+from nneuroutil.array_api_extras import (
+    array_equal,
+    deinterleave,
+    fill_diagonal,
+    histogram,
+    interleave,
+)
 from nneuroutil.helpers import module_logger
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -54,6 +60,68 @@ def test_deinterleave_odd_size(xp: Any) -> None:
 
     with pytest.raises(ValueError, match="must be even"):
         deinterleave(z, axis=-1)
+
+
+# }}}
+
+
+# {{{ test_fill_diagonal
+
+
+@pytest.mark.parametrize("shape", [(4, 4), (3, 5), (5, 3)])
+def test_fill_diagonal(xp: Any, shape: tuple[int, int]) -> None:
+    rng = np.random.default_rng(seed=42)
+    a = xp.asarray(rng.standard_normal(shape))
+
+    x = fill_diagonal(a, 1.0, inplace=False)
+
+    # the diagonal is set to 'value' and the rest of the array is unchanged
+    expected = xp.where(xp.eye(*shape, dtype=bool), 1.0, a)
+    assert array_equal(x, expected)
+
+
+def test_fill_diagonal_3d(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    a = xp.asarray(rng.standard_normal((2, 3, 3)))
+
+    x = fill_diagonal(a, 2.0, inplace=False)
+
+    # the diagonal of each slice of the trailing two axes is set to 'value'
+    expected = xp.where(xp.eye(3, dtype=bool), 2.0, a)
+    assert array_equal(x, expected)
+
+
+def test_fill_diagonal_inplace(xp: Any) -> None:
+    if "jax" in xp.__name__:
+        pytest.skip("jax arrays are immutable")
+
+    rng = np.random.default_rng(seed=42)
+    a = xp.asarray(rng.standard_normal((4, 4)))
+
+    x = fill_diagonal(a, 1.0, inplace=True)
+
+    # the input is modified in place and the same object is returned
+    assert x is a
+    assert array_equal(xp.diagonal(a), xp.full((4,), 1.0, dtype=a.dtype))
+
+
+def test_fill_diagonal_not_writable(xp: Any) -> None:
+    if "jax" in xp.__name__ or "torch" in xp.__name__:
+        pytest.skip("only numpy supports read-only arrays")
+
+    a = xp.asarray(np.eye(3))
+    a.flags.writeable = False  # spell: disable
+
+    with pytest.raises(ValueError, match="not writable"):
+        fill_diagonal(a, 1.0, inplace=True)
+
+
+def test_fill_diagonal_validation(xp: Any) -> None:
+    with pytest.raises(ValueError, match="at least dimension 2"):
+        fill_diagonal(xp.asarray(np.array([1.0, 2.0, 3.0])), 1.0, inplace=False)
+
+    with pytest.raises(NotImplementedError, match="not implemented"):
+        fill_diagonal(xp.asarray(np.eye(2)), 1.0, wrap=True, inplace=False)
 
 
 # }}}
