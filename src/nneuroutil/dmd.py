@@ -387,7 +387,34 @@ def build_full_extended_dmd(
     method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
-) -> Array2D[ScalarTypeT]:
+) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
+    r"""Construct a DMD approximation of the system in the space of the *observables*.
+
+    Each observable :math:`g` is evaluated on the snapshots and its output is
+    appended to the feature axis, lifting the system into a space of shape
+    ``(nsnapshots, sum(d_g))``. The returned operator :math:`A` acts on this
+    lifted space.
+
+    To evolve a state :math:`x` with the resulting operator, lift it and
+    apply :math:`A` from the right, then finally project it back to the state space.
+
+    .. code:: python
+
+        z = xp.concat([g(x[None, :]) for g in observables], axis=1)
+        z = z @ A
+        X = z @ C
+
+    :arg observables: sequence of maps :math:`g(x)`, each returning an array
+        of shape ``(nsnapshots, d_g)``.
+    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg Y: optional outputs of the same shape as *X*. If given, the operator
+        is fit on the pairs ``(X, Y)``; otherwise *X* is treated as a single
+        trajectory and the pairs ``(X[:-1], X[1:])`` are used.
+
+    :returns: a tuple of ``(A, C)`` matrices, where the :math:`A` matrix can be
+        used to evolve the system in the lifted space and :math:`C` can be used
+        to project back to the state space.
+    """
     if X.ndim != 2:
         raise ValueError(
             f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
@@ -398,7 +425,7 @@ def build_full_extended_dmd(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
         )
 
-    if Y is not None and X.shape != Y.shape:
+    if Y is not None and X.shape[0] != Y.shape[0]:
         raise ValueError(
             f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
         )
@@ -418,6 +445,7 @@ def build_full_extended_dmd(
         X_lift = lift(X, xp=xp)
         Y_lift = X_lift[1:, :]
         X_lift = X_lift[:-1, :]
+        X = X[:-1]
     else:
         if xp is None:
             xp = array_api_compat.array_namespace(X, Y)
@@ -425,7 +453,10 @@ def build_full_extended_dmd(
         X_lift = lift(X, xp=xp)
         Y_lift = lift(Y, xp=xp)
 
-    return build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
+    A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
+    C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp)
+
+    return A, C
 
 
 # }}}
