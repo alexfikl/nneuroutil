@@ -259,7 +259,7 @@ def build_full_dmd(
     1. `pinv`: using the pseudo-inverse :math:`A^* = X^\dagger Y`. This is more
         accurate and numerically stable for ill-conditioned :math:`X`.
     2. `ridge`: using a ridge regression on the normal equations. This is more
-        efficient and more differentiable.
+        efficient and differentiable.
 
     :arg eps: tolerance used to regularize the pseudo-inverse. This has different
         meanings based on the method being used: (1) a relative tolerance on the
