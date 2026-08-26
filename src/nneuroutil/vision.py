@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import array_api_compat
 import numpy as np
@@ -11,7 +11,41 @@ import numpy as np
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array1D, Array2D
 
+if TYPE_CHECKING:
+    from numpy.typing import DTypeLike
+
 log = module_logger(__name__)
+
+# {{{ as_grayscale
+
+
+def as_grayscale(
+    x: Array2D[np.floating[Any]],
+    *,
+    dtype: DTypeLike | None = None,
+    xp: Any = None,
+) -> Array2D[np.integer[Any]]:
+    """Convert the 2D array *x* to a grayscale image.
+
+    This is done by normalizing the array to :math:`[0, 255]` and casting to the
+    given *dtype*.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if dtype is None:
+        dtype = np.uint8
+
+    xmin, xmax = xp.min(x), xp.max(x)
+    dx = 1.0 if xmin == xmax else (xmax - xmin)
+
+    x = 255 * (x - xmin) / dx
+    x = xp.astype(xp.clip(x, 0, 255), dtype)
+
+    return x
+
+# }}}
+
 
 # {{{ otsu_threshold
 
