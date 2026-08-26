@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, Literal
 
 import array_api_compat
 import numpy as np
 
 from nneuroutil.helpers import module_logger, register_dataclass
-from nneuroutil.typing import Array1D, Array2D, ArrayND
+from nneuroutil.typing import Array1D, Array2D, ArrayND, ScalarTypeT
 
 log = module_logger(__name__)
 
@@ -20,21 +20,21 @@ log = module_logger(__name__)
 
 @register_dataclass
 @dataclass(frozen=True)
-class DMD:
-    Ahat: Array2D[np.inexact[Any]]
+class DMD(Generic[ScalarTypeT]):
+    Ahat: Array2D[ScalarTypeT]
     """Reduced-order model operator of shape :math:`(r, r)` with rank
     :attr:`reduced_size`.
     """
 
-    U: Array2D[np.inexact[Any]]
+    U: Array2D[ScalarTypeT]
     """Temporal modes as an array of shape :math:`(n - 1, r)`."""
-    S: Array1D[np.floating[Any]]
+    S: Array1D[ScalarTypeT]
     """Singular values as an array of shape :math:`(r,)`."""
-    Vh: Array2D[np.inexact[Any]]
+    Vh: Array2D[ScalarTypeT]
     """Spatial modes as an array of shape :math:`(r, d)`."""
 
     @property
-    def dtype(self) -> np.dtype[Any]:
+    def dtype(self) -> np.dtype[ScalarTypeT]:
         """The :class:`~numpy.dtype` of this operator."""
         return self.Ahat.dtype
 
@@ -60,48 +60,48 @@ class DMD:
 
     def eigendecomposition(
         self,
-    ) -> tuple[Array1D[np.inexact[Any]], Array2D[np.inexact[Any]]]:
+    ) -> tuple[Array1D[ScalarTypeT], Array2D[ScalarTypeT]]:
         """Compute the eigendecomposition of :attr:`Ahat`."""
         xp = array_api_compat.array_namespace(self.Ahat)
 
         eigs, eigenvectors = xp.linalg.eig(self.Ahat)
         return eigs, eigenvectors
 
-    def encode(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
+    def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         """Project the full state *x* to the reduced coordinates."""
         assert x.shape[0] == self.full_size
 
         xp = array_api_compat.array_namespace(x, self.Vh)
         return xp.einsum("ij,j...->i...", self.Vh, x)
 
-    def evolve(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
+    def evolve(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         """Evolve the reduced-order model."""
         assert x.shape[0] == self.reduced_size
 
         xp = array_api_compat.array_namespace(x, self.Ahat)
         return xp.einsum("ij,j...->i...", self.Ahat, x)
 
-    def decode(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
+    def decode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         """Reconstruct the full state from the reduced state *x*."""
         assert x.shape[0] == self.reduced_size
 
         xp = array_api_compat.array_namespace(x, self.Vh)
         return xp.einsum("ij,i...->j...", xp.conj(self.Vh), x)
 
-    def __matmul__(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
+    def __matmul__(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
-    def __call__(self, x: ArrayND[np.inexact[Any]]) -> ArrayND[np.inexact[Any]]:
+    def __call__(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         """Evolve the reduced-order model."""
         return self.evolve(x)
 
 
 def reconstruct(
     dmd: DMD,
-    x0: Array1D[np.inexact[Any]],
+    x0: Array1D[ScalarTypeT],
     steps: int,
-) -> Array2D[np.inexact[Any]]:
+) -> Array2D[ScalarTypeT]:
     """
     :arg x0: initial condition for the system. If this is the size of the
         reduced system, we assume that it represents the amplitudes of the DMD
@@ -136,13 +136,13 @@ def reconstruct(
 
 
 def total_least_squares(
-    X: Array2D[np.inexact[Any]],
-    Y: Array2D[np.inexact[Any]],
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT],
     *,
     rank: int | None = None,
     eps: float | None = None,
     xp: Any = None,
-) -> tuple[Array2D[np.inexact[Any]], Array2D[np.inexact[Any]]]:
+) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
     """Apply Total Least Squares de-biasing to the dataset.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
@@ -191,8 +191,8 @@ def total_least_squares(
 
 
 def build_dmd(
-    X: Array2D[np.inexact[Any]],
-    Y: Array2D[np.inexact[Any]],
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT],
     *,
     rank: int | None = None,
     eps: float | None = None,
@@ -234,6 +234,93 @@ def build_dmd(
     assert Ahat.shape[0] == Ahat.shape[1]
 
     return DMD(Ahat, U=U, S=S, Vh=Vh)
+
+
+# }}}
+
+
+# {{{ build_dmd_pinv
+
+
+def build_full_dmd(
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT],
+    *,
+    method: Literal["pinv", "ridge"] = "pinv",
+    eps: float | None = None,
+    xp: Any = None,
+) -> Array2D[ScalarTypeT]:
+    r"""Compute the full DMD operator using a pseudo-inverse.
+
+    This is very inefficient for large system, but can work for toy examples. We
+    want to solve :math:`Y = X A` for the operator :math:`A`. The implemented
+    methods are:
+
+    1. `pinv`: using the pseudo-inverse :math:`A^* = X^\dagger Y`. This is more
+        accurate and numerically stable for ill-conditioned :math:`X`.
+    2. `ridge`: using a ridge regression on the normal equations. This is more
+        efficient and more differentiable.
+
+    :arg eps: tolerance used to regularize the pseudo-inverse. This has different
+        meanings based on the method being used: (1) a relative tolerance on the
+        singular values; (2) a ridge parameter.
+    """
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
+    if Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
+    if X.shape != Y.shape:
+        raise ValueError(
+            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
+        )
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X, Y)
+    else:
+        assert array_api_compat.array_namespace(X, Y) is xp
+
+    nsnapshots, d = X.shape
+    if eps is None:
+        eps = max(nsnapshots, d) * xp.finfo(X.dtype).eps
+
+    if method == "pinv":
+        # NOTE: this essentially does a least squares fit for `Y = X A`. We
+        # don't construct the pseudo-inverse directly to avoid the extra cost.
+        U, S, Vh = xp.linalg.svd(X, full_matrices=False)
+
+        S = np.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
+
+        UY = xp.conj(U).T @ Y
+        VS = xp.conj(Vh).T * S
+        A = VS @ UY
+    elif method == "ridge":
+        # NOTE: this tries to solve the regularized optimization problem
+        #   A^* = argmin |X A - Y|^2 + \epsilon |A|^2
+        # Taking the gradient and setting it to zero gives the normal equations
+        #   (X^T X + \epsilon I) A = X^T Y
+        # which have size (d, d). To avoid squaring all those ill-conditioned
+        # matrices, we instead solve
+        #   A^* = argmin |[X, \sqrt{\epsilon} I] A - [Y, O]|^2
+
+        I = xp.eye(d, d, dtype=X.dtype, device=X.device)  # ruff: ignore[ambiguous-variable-name]
+        O = xp.zeros((d, d), dtype=Y.dtype, device=Y.device)  # ruff: ignore[ambiguous-variable-name]
+
+        # FIXME: make eps relative as well? a bit expensive..
+        X = xp.concat([X, eps**0.5 * I], axis=0)
+        Y = xp.concat([Y, O], axis=0)
+
+        Q, R = xp.linalg.qr(X, mode="reduced")
+        A = xp.linalg.solve(R, xp.conj(Q).T @ Y)
+    else:
+        raise ValueError(f"unknown method: {method!r}")
+
+    return A
 
 
 # }}}
