@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import array_api_compat
 import numpy as np
@@ -11,7 +11,33 @@ import numpy as np
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array1D, ArrayND
 
+if TYPE_CHECKING:
+    from numpy.typing import DTypeLike
+
 log = module_logger(__name__)
+
+
+# {{{ to_dtype
+
+
+def to_namespace_dtype(xp: Any, dtype: DTypeLike) -> Any:
+    """Convert the :class:`numpy.dtype` *dtype* into one supported by the
+    Array API backend *xp*.
+    """
+    if dtype is None:
+        raise ValueError("'dtype' cannot be done (the default is backend specific)")
+
+    try:
+        dtype = np.dtype(dtype)
+    except ValueError:
+        # NOTE: this assumes that the dtype is backend specific. This can also
+        # fail for just an incorrect dtype thing, but oh well..
+        return dtype
+
+    return xp.asarray(np.asarray(0, dtype=dtype)).dtype
+
+
+# }}}
 
 
 # {{{ array_equal
