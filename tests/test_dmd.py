@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from nneuroutil.helpers import module_logger, spectrum_error
+from nneuroutil.typing import Array2D
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
@@ -229,6 +230,78 @@ def test_build_full_dmd_errors(xp: Any) -> None:
         build_full_dmd(X, X[:-1], xp=xp)
     with pytest.raises(ValueError, match="unknown method"):
         build_full_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
+
+
+# }}}
+
+
+# {{{ test_build_full_extended_dmd
+
+
+@pytest.mark.parametrize("method", ["pinv", "ridge"])
+@pytest.mark.parametrize("use_trajectory", [True, False])
+def test_build_full_extended_dmd(
+    xp: Any, method: Literal["pinv", "ridge"], *, use_trajectory: bool
+) -> None:
+    x0 = 0.7
+    # NOTE: keep the trajectory short, as the [x, x^2] features over a
+    # doubling map grow quadratically and make the lifted matrix ill-conditioned.
+    xs = [x0]
+    for _ in range(12):
+        xs.append(2.0 * xs[-1])
+    S = xp.asarray(xs, dtype=xp.float64)[:, None]
+
+    def identity(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+        return x
+
+    def square(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+        return x**2
+
+    from nneuroutil.dmd import build_full_extended_dmd
+
+    observables = [identity, square]
+    if use_trajectory:
+        A, C = build_full_extended_dmd(observables, S, method=method, xp=xp)
+    else:
+        A, C = build_full_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+
+    # the lifted dynamics [x, x^2] -> [2x, 4x^2] are exactly linear
+    A_ref = xp.asarray([[2.0, 0.0], [0.0, 4.0]], dtype=A.dtype)
+    C_ref = xp.asarray([[1.0], [0.0]], dtype=C.dtype)
+    assert A.shape == (2, 2)
+    assert C.shape == (2, 1)
+    assert xp.all(xp.abs(A - A_ref) < 1.0e-9)
+    assert xp.all(xp.abs(C - C_ref) < 1.0e-9)
+
+    # predict: lift -> evolve -> decode
+    z = xp.asarray([[x0, x0**2]], dtype=A.dtype)
+    for _ in range(10):
+        z = z @ A  # ruff: ignore[non-augmented-assignment]
+    x_pred = float((z @ C)[0, 0])
+    x_ref = 2.0**10 * x0
+
+    error = abs(x_pred - x_ref)
+    log.info(
+        "[%s] extended DMD 10-step error: %.3e (method=%s, use_trajectory=%s)",
+        xp.__name__,
+        error,
+        method,
+        use_trajectory,
+    )
+    assert error < 1.0e-10
+
+
+def test_build_full_extended_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_full_extended_dmd
+
+    X = xp.asarray(np.random.default_rng(42).standard_normal((16, 3)))
+
+    with pytest.raises(ValueError, match="must be of shape"):
+        build_full_extended_dmd([], X[..., None], xp=xp)
+    with pytest.raises(ValueError, match="no 'observables'"):
+        build_full_extended_dmd([], X, xp=xp)
+    with pytest.raises(ValueError, match="different shapes"):
+        build_full_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
 
 
 # }}}

@@ -344,7 +344,7 @@ def build_full_dmd(
         # don't construct the pseudo-inverse directly to avoid the extra cost.
         U, S, Vh = xp.linalg.svd(X, full_matrices=False)
 
-        S = np.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
+        S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
         UY = xp.conj(U).T @ Y
         VS = xp.conj(Vh).T * S
