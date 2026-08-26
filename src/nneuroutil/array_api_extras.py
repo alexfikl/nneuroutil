@@ -161,11 +161,19 @@ def histogram(
     elif not fallback and array_api_compat.is_torch_array(x):
         import torch
 
-        # NOTE: torch.histogram does not work for integers, so we cast it
-        if not (x.is_floating_point() or x.is_complex()):
-            x = x.to(torch.get_default_dtype())
+        if x.device.type == "cpu":
+            # NOTE: torch.histogram does not work for integers, so we cast it
+            if not (x.is_floating_point() or x.is_complex()):
+                x = x.to(torch.get_default_dtype())
 
-        return torch.histogram(x, bins, range=range, density=density)
+            return torch.histogram(x, bins, range=range, density=density)
+        else:
+            from warnings import warn
+
+            warn(
+                f"'torch.histogram' does not support {x.device}: using fallback.",
+                stacklevel=2,
+            )
 
     if xp is None:
         xp = array_api_compat.array_namespace(x)
@@ -191,7 +199,7 @@ def histogram(
 
     # compute where each element in x falls using searchsorted
     dtype = xp.result_type(x.dtype, xp.float64)
-    edges = xp.linspace(xmin, xmax, bins + 1, dtype=dtype)
+    edges = xp.linspace(xmin, xmax, bins + 1, dtype=dtype, device=x.device)
     idx = xp.searchsorted(edges, x, side="right") - 1
 
     # clamp values at the last edge into the last bin, like numpy does
@@ -205,9 +213,14 @@ def histogram(
     # (O(n log n)) instead of building an O(n * bins) boolean matrix
     sorted_idx = xp.sort(idx)
     boundaries = xp.searchsorted(
-        sorted_idx, xp.arange(1, bins + 1, dtype=idx.dtype), side="left"
+        sorted_idx,
+        xp.arange(1, bins + 1, dtype=idx.dtype, device=x.device),
+        side="left",
     )
-    pad = xp.concatenate([xp.zeros((1,), dtype=boundaries.dtype), boundaries])
+    pad = xp.concatenate([
+        xp.zeros((1,), dtype=boundaries.dtype, device=x.device),
+        boundaries,
+    ])
     counts = xp.diff(pad)
 
     if density:

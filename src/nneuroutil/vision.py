@@ -44,6 +44,7 @@ def as_grayscale(
 
     return x
 
+
 # }}}
 
 
