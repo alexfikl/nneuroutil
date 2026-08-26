@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, Literal
 
@@ -367,6 +368,60 @@ def build_full_dmd(
         raise ValueError(f"unknown method: {method!r}")
 
     return A
+
+
+# }}}
+
+
+# {{{ build_full_extended_dmd
+
+def build_full_extended_dmd(
+    observables: Sequence[Callable[[Array2D[ScalarTypeT]], Array2D[ScalarTypeT]]],
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
+    *,
+    method: Literal["pinv", "ridge"] = "ridge",
+    eps: float | None = None,
+    xp: Any = None,
+) -> Array2D[ScalarTypeT]:
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
+    if Y is not None and Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
+    if Y is not None and X.shape != Y.shape:
+        raise ValueError(
+            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
+        )
+
+    if not observables:
+        raise ValueError("no 'observables' provided (use at least the identity map)")
+
+    def lift(x: Array2D[ScalarTypeT], *, xp: Any) -> Array2D[ScalarTypeT]:
+        return xp.concat(
+            [xp.reshape(g(x), (x.shape[0], -1)) for g in observables], axis=1
+        )
+
+    if Y is None:
+        if xp is None:
+            xp = array_api_compat.array_namespace(X)
+
+        X_lift = lift(X, xp=xp)
+        Y_lift = X_lift[1:, :]
+        X_lift = X_lift[:-1, :]
+    else:
+        if xp is None:
+            xp = array_api_compat.array_namespace(X, Y)
+
+        X_lift = lift(X, xp=xp)
+        Y_lift = lift(Y, xp=xp)
+
+    return build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
 
 
 # }}}
