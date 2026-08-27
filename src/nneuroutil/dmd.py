@@ -12,7 +12,7 @@ import array_api_compat
 import numpy as np
 
 from nneuroutil.helpers import module_logger, register_dataclass
-from nneuroutil.typing import Array1D, Array2D, ArrayND, ScalarTypeT
+from nneuroutil.typing import Array0D, Array1D, Array2D, ArrayND, ScalarTypeT
 
 log = module_logger(__name__)
 
@@ -508,29 +508,57 @@ def total_least_squares(
 def relative_forecast_error(
     dmd: DMDBase[ScalarTypeT],
     X: Array2D[ScalarTypeT],
-) -> ArrayND[np.floating[Any]]:
+    Xpred: Array2D[ScalarTypeT] | None = None,
+    *,
+    xp: Any = None,
+) -> Array0D[np.floating[Any]]:
     """Per-step relative error of :meth:`DMDBase.predict` against snapshots *X*."""
-    xp = array_api_compat.array_namespace(X)
+    if xp is None:
+        xp = array_api_compat.array_namespace(X)
 
-    X_pred = dmd.predict(X[0], X.shape[0] - 1, full=True)
-    return xp.linalg.norm(X_pred - X, axis=-1) / xp.linalg.norm(X)
+    if Xpred is None:
+        Xpred = dmd.predict(X[0], X.shape[0] - 1, full=True)
+
+    if X.shape != Xpred.shape:
+        raise ValueError(
+            f"'X' and 'Xpred' must have the same shape: {X.shape} and {Xpred.shape}"
+        )
+
+    xnorm = xp.linalg.norm(X)
+    if abs(xnorm) < 100 * xp.finfo(X.dtype).eps:
+        xnorm = 1.0
+
+    return xp.linalg.norm(Xpred - X, axis=-1) / xnorm
 
 
 def fit_residual(
     dmd: DMDBase[ScalarTypeT],
     X1: Array2D[ScalarTypeT],
     X2: Array2D[ScalarTypeT],
-) -> float:
+    *,
+    xp: Any = None,
+) -> Array0D[np.floating[Any]]:
     """Relative residual of the one-step prediction on the training pairs."""
-    xp = array_api_compat.array_namespace(X1, X2)
+    if xp is None:
+        xp = array_api_compat.array_namespace(X1, X2)
 
     X_fit = dmd.decode(dmd.evolve(dmd.encode(X1)))
-    return float(xp.linalg.norm(X_fit - X2) / xp.linalg.norm(X2))
+
+    x2norm = xp.linalg.norm(X2)
+    if abs(x2norm) < 100 * xp.finfo(X2.dtype).eps:
+        x2norm = 1.0
+
+    return xp.linalg.norm(X_fit - X2) / x2norm
 
 
-def cumulative_energy(S: Array1D[ScalarTypeT]) -> Array1D[np.floating[Any]]:
+def cumulative_energy(
+    S: Array1D[ScalarTypeT],
+    *,
+    xp: Any = None,
+) -> Array1D[np.floating[Any]]:
     """Normalized cumulative energy of the singular values *S*."""
-    xp = array_api_compat.array_namespace(S)
+    if xp is None:
+        xp = array_api_compat.array_namespace(S)
 
     S2 = xp.abs(S) ** 2
     return xp.cumulative_sum(S2) / xp.sum(S2)

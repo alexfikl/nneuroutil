@@ -309,6 +309,106 @@ def test_build_full_extended_dmd_errors(xp: Any) -> None:
 
 # }}}
 
+
+# {{{ test_diagnostics
+
+
+@pytest.mark.parametrize("flavor", ["reduced", "full", "extended"])
+def test_relative_forecast_error(xp: Any, flavor: str) -> None:
+    from nneuroutil.dmd import (
+        build_dmd,
+        build_full_dmd,
+        build_full_extended_dmd,
+        relative_forecast_error,
+    )
+
+    rng = np.random.default_rng(seed=42)
+    ndim = 6
+    nsnapshots = 32
+
+    A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
+    xs = [xp.asarray(rng.standard_normal(ndim))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    if flavor == "reduced":
+        dmd = build_dmd(X[:-1], X[1:], xp=xp)
+    elif flavor == "full":
+        dmd = build_full_dmd(X[:-1], X[1:], xp=xp)
+    elif flavor == "extended":
+        dmd = build_full_extended_dmd([lambda z: z], X, xp=xp)
+    else:
+        raise ValueError(f"unknown flavor: {flavor!r}")
+
+    err = relative_forecast_error(dmd, X)
+
+    assert err.shape == (X.shape[0],)
+    log.info(
+        "[%s] %s forecast error (max): %.3e",
+        xp.__name__,
+        flavor,
+        float(xp.max(err)),
+    )
+    assert float(xp.max(err)) < 1.0e-10
+
+
+@pytest.mark.parametrize("flavor", ["reduced", "full", "extended"])
+def test_fit_residual(xp: Any, flavor: str) -> None:
+    from nneuroutil.dmd import (
+        build_dmd,
+        build_full_dmd,
+        build_full_extended_dmd,
+        fit_residual,
+    )
+
+    rng = np.random.default_rng(seed=42)
+    ndim = 6
+    nsnapshots = 32
+
+    A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
+    xs = [xp.asarray(rng.standard_normal(ndim))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    X1, X2 = X[:-1], X[1:]
+    if flavor == "reduced":
+        dmd = build_dmd(X1, X2, xp=xp)
+    elif flavor == "full":
+        dmd = build_full_dmd(X1, X2, xp=xp)
+    elif flavor == "extended":
+        dmd = build_full_extended_dmd([lambda z: z], X, xp=xp)
+    else:
+        raise ValueError(f"unknown flavor: {flavor!r}")
+
+    resid = float(fit_residual(dmd, X1, X2))  # ty: ignore[invalid-argument-type]
+    log.info("[%s] %s fit residual: %.3e", xp.__name__, flavor, resid)
+    assert resid < 1.0e-10
+
+    # NOTE: a truncated model must explain the data worse
+    if flavor == "reduced":
+        dmd = build_dmd(X1, X2, rank=1, xp=xp)
+        resid_trunc = float(fit_residual(dmd, X1, X2))  # ty: ignore[invalid-argument-type]
+        log.info("[%s] rank-1 fit residual: %.3e", xp.__name__, resid_trunc)
+        assert resid_trunc > resid
+
+
+def test_cumulative_energy(xp: Any) -> None:
+    from nneuroutil.dmd import cumulative_energy
+
+    S = xp.asarray([3.0, 4.0, -5.0])
+    ce = cumulative_energy(S)
+    ce_ref = xp.asarray([9.0 / 50.0, 25.0 / 50.0, 1.0])
+    log.info("[%s] cumulative_energy: %s", xp.__name__, xp.asarray(ce))
+
+    assert xp.all(xp.abs(ce - ce_ref) < 1.0e-13)
+    assert ce.shape == S.shape
+    assert float(xp.min(ce[1:] - ce[:-1])) >= 0.0
+
+
+# }}}
+
 if __name__ == "__main__":
     import sys
 
