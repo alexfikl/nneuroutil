@@ -504,4 +504,38 @@ def total_least_squares(
 # }}}
 
 
+# {{{ diagnostics
+
+
+def relative_forecast_error(
+    dmd: DMDBase[ScalarTypeT],
+    X: Array2D[ScalarTypeT],
+) -> ArrayND[np.floating[Any]]:
+    """Per-step relative error of :meth:`DMDBase.predict` against snapshots *X*."""
+    xp = array_api_compat.array_namespace(X)
+
+    X_pred = dmd.predict(X[0], X.shape[0] - 1, full=True)
+    return xp.linalg.norm(X_pred - X, axis=-1) / xp.linalg.norm(X)
+
+
+def fit_residual(
+    dmd: DMDBase[ScalarTypeT],
+    X1: Array2D[ScalarTypeT],
+    X2: Array2D[ScalarTypeT],
+) -> float:
+    """Relative residual of the one-step prediction on the training pairs."""
+    xp = array_api_compat.array_namespace(X1, X2)
+
+    X_fit = dmd.decode(dmd.evolve(dmd.encode(X1)))
+    return float(xp.linalg.norm(X_fit - X2) / xp.linalg.norm(X2))
+
+
+def cumulative_energy(S: Array1D[ScalarTypeT]) -> Array1D[np.floating[Any]]:
+    """Normalized cumulative energy of the singular values *S*."""
+    xp = array_api_compat.array_namespace(S)
+
+    S2 = xp.abs(S) ** 2
+    return xp.cumulative_sum(S2) / xp.sum(S2)
+
+
 # }}}
