@@ -361,7 +361,7 @@ class FullExtendedDMD(DMDBase[ScalarTypeT]):
 
     @property
     def physical_dim(self) -> int:
-        return self.C.shape[0]
+        return self.C.shape[1]
 
     def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
         assert x.shape[-1] == self.physical_dim
