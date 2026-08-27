@@ -23,8 +23,21 @@ log = module_logger(__name__)
 @register_dataclass
 @dataclass(frozen=True)
 class DMDBase(ABC, Generic[ScalarTypeT]):
+    """Base class for linear approximations of a dynamical system in a lifted space.
+
+    All states are assumed to have their spatial dimension on the last axis,
+    e.g. snapshots of shape ``(nsnapshots, ndim)``. The dynamics are given by
+
+    .. code:: python
+
+        xhat_next = self.evolve(self.encode(x))
+
+    where :meth:`encode` maps the physical state into the lifted space and
+    :attr:`A` acts on its last dimension.
+    """
+
     A: Array2D[ScalarTypeT]
-    """Linear approximation on the lifted coordinates."""
+    """Linear evolution operator acting on the lifted space."""
 
     @property
     def dtype(self) -> np.dtype[ScalarTypeT]:
@@ -43,15 +56,15 @@ class DMDBase(ABC, Generic[ScalarTypeT]):
 
     @abstractmethod
     def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Project the physical state *x* into the lifted space."""
+        """Project the physical state ``(..., d)`` into the lifted space."""
 
     @abstractmethod
     def decode(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Project the lifted state *xhat* into the physical space."""
+        """Project the lifted state ``(..., r)`` into the physical space."""
 
     @abstractmethod
     def evolve(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Evolve the system in the lifted space."""
+        """Advance the lifted state ``(..., r)`` by a single time step."""
 
     def predict(
         self,
@@ -60,6 +73,14 @@ class DMDBase(ABC, Generic[ScalarTypeT]):
         *,
         full: bool = False,
     ) -> ArrayND[ScalarTypeT]:
+        """Evolve the initial condition *x0* forward for *maxit* steps.
+
+        :arg x0: initial condition with its spatial dimension on the last axis.
+        :arg maxit: number of time steps to take.
+        :arg full: if ``True``, also include intermediate steps and *x0* itself;
+            the result is stacked along a new leading axis. Otherwise, only the
+            final state is returned.
+        """
         xp = array_api_compat.array_namespace(x0)
 
         assert x0.shape[-1] == self.physical_dim
@@ -90,12 +111,18 @@ class DMDBase(ABC, Generic[ScalarTypeT]):
 @register_dataclass
 @dataclass(frozen=True)
 class ReducedDMD(DMDBase[ScalarTypeT]):
+    """Rank-truncated DMD model built from the SVD of the snapshot matrix.
+
+    The lifted space is the space spanned by the leading right singular
+    vectors :attr:`Vh`.
+    """
+
     U: Array2D[ScalarTypeT]
-    """Temporal modes as an array of shape :math:`(n - 1, r)`."""
+    """Left singular vectors as an array of shape :math:`(n - 1, r)`."""
     S: Array1D[ScalarTypeT]
     """Singular values as an array of shape :math:`(r,)`."""
     Vh: Array2D[ScalarTypeT]
-    """Spatial modes as an array of shape :math:`(r, d)`."""
+    """Right singular vectors as an array of shape :math:`(r, d)`."""
 
     @property
     def physical_dim(self) -> int:
@@ -133,8 +160,6 @@ def build_dmd(
     For robust results, it is recommended to apply the :func:`total_least_squares`
     algorithm to the snapshots, so that any noise is handled consistently.
 
-    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
-    :arg Y: system outputs of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     :arg eps: a minimum absolute tolerance for singular values. Note that this
         is a data-dependent slice and some frameworks (e.g. ``jax``) will not
@@ -197,6 +222,12 @@ def build_dmd(
 @register_dataclass
 @dataclass(frozen=True)
 class FullDMD(DMDBase[ScalarTypeT]):
+    """DMD model for which the lifted space is the physical space itself.
+
+    The encoding and decoding steps are both the identity and :attr:`A`
+    acts directly on states of shape ``(..., d)``.
+    """
+
     @property
     def physical_dim(self) -> int:
         return self.A.shape[0]
@@ -226,11 +257,10 @@ def build_full_dmd(
     eps: float | None = None,
     xp: Any = None,
 ) -> FullDMD[ScalarTypeT]:
-    r"""Compute the full DMD operator using a pseudo-inverse.
+    r"""Fit a linear model :math:`Y = X A` on snapshot pairs.
 
-    This is very inefficient for large system, but can work for toy examples. We
-    want to solve :math:`Y = X A` for the operator :math:`A`. The implemented
-    methods are:
+    This is very inefficient for large systems, but can work for toy examples.
+    The implemented methods are:
 
     1. `pinv`: using the pseudo-inverse :math:`A^* = X^\dagger Y`. This is more
         accurate and numerically stable for ill-conditioned :math:`X`.
@@ -239,7 +269,10 @@ def build_full_dmd(
 
     :arg eps: tolerance used to regularize the pseudo-inverse. This has different
         meanings based on the method being used: (1) a relative tolerance on the
-        singular values; (2) a ridge parameter.
+        singular values; (2) a ridge parameter. If not given, it is chosen as
+        ``max(n, d) * eps_machine``.
+
+    :returns: an approximation of the full-state dynamics.
     """
     if X.ndim != 2:
         raise ValueError(
@@ -314,8 +347,17 @@ def build_full_dmd(
 @register_dataclass
 @dataclass(frozen=True)
 class FullExtendedDMD(DMDBase[ScalarTypeT]):
+    """DMD model in the space of nonlinear observables.
+
+    The lifted state is obtained by concatenating the outputs of
+    :attr:`observables` along the last axis and the physical state is
+    recovered by applying the decoder :attr:`C`.
+    """
+
     C: Array2D[ScalarTypeT]
+    """Decoder mapping the lifted space back to the physical space."""
     observables: tuple[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]], ...]
+    """Sequence of maps lifting the physical state into the observable space."""
 
     @property
     def physical_dim(self) -> int:
@@ -355,29 +397,31 @@ def build_full_extended_dmd(
     r"""Construct a DMD approximation of the system in the space of the *observables*.
 
     Each observable :math:`g` is evaluated on the snapshots and its output is
-    appended to the feature axis, lifting the system into a space of shape
-    ``(nsnapshots, sum(d_g))``. The returned operator :math:`A` acts on this
-    lifted space.
+    appended to the last axis, lifting the system into a space of shape
+    ``(nsnapshots, sum(d_g))``. The returned operator :attr:`FullExtendedDMD.A`
+    acts on this lifted space.
 
-    To evolve a state :math:`x` with the resulting operator, lift it and
-    apply :math:`A` from the right, then finally project it back to the state space.
+    Evolution of a state :math:`x` can be performed with
+    :meth:`DMDBase.predict`, or manually as
 
     .. code:: python
 
-        z = xp.concat([g(x[None, :]) for g in observables], axis=1)
-        z = z @ A
-        X = z @ C
+        z = xp.concat([g(x) for g in observables], axis=-1)
+        z = xp.einsum("...j,ji->...i", z, dmd.A)
+        x_next = xp.einsum("...j,ji->...i", z, dmd.C)
 
-    :arg observables: sequence of maps :math:`g(x)`, each returning an array
-        of shape ``(nsnapshots, d_g)``.
-    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg observables: sequence of maps :math:`g(x)`, each taking states with the
+        spatial dimension on the last axis and returning an array of shape
+        ``(..., d_g)``.
     :arg Y: optional outputs of the same shape as *X*. If given, the operator
         is fit on the pairs ``(X, Y)``; otherwise *X* is treated as a single
         trajectory and the pairs ``(X[:-1], X[1:])`` are used.
+    :arg first_observable_is_state: if ``True``, use an exact (rectangular)
+        identity decoder built from the first observable, instead of fitting
+        one by regression.
 
-    :returns: a tuple of ``(A, C)`` matrices, where the :math:`A` matrix can be
-        used to evolve the system in the lifted space and :math:`C` can be used
-        to project back to the state space.
+    :returns: a DMD approximation of the lifted dynamics together with its
+        decoder back to the physical space.
     """
     if X.ndim != 2:
         raise ValueError(
@@ -442,8 +486,6 @@ def total_least_squares(
 ) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
     """Apply Total Least Squares de-biasing to the dataset.
 
-    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
-    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     :arg eps: a minimum absolute tolerance for singular values. Note that this
         is a data-dependent slice and some frameworks (e.g. ``jax``) will not
@@ -511,8 +553,14 @@ def relative_forecast_error(
     Xpred: Array2D[ScalarTypeT] | None = None,
     *,
     xp: Any = None,
-) -> Array0D[np.floating[Any]]:
-    """Per-step relative error of :meth:`DMDBase.predict` against snapshots *X*."""
+) -> Array1D[np.floating[Any]]:
+    r"""Compute the per-step relative error of a forecast against *X*.
+
+    The error at step :math:`k` is given by :math:`\|x_k - \hat{x}_k\| / \|X\|`,
+    where the denominator is the norm of the whole trajectory to keep the
+    errors bounded as amplitudes decay. By default, the forecast is generated
+    from ``X[0]`` with :meth:`DMDBase.predict`.
+    """
     if xp is None:
         xp = array_api_compat.array_namespace(X)
 
@@ -538,7 +586,12 @@ def fit_residual(
     *,
     xp: Any = None,
 ) -> Array0D[np.floating[Any]]:
-    """Relative residual of the one-step prediction on the training pairs."""
+    r"""Compute the relative one-step residual of the fitted model.
+
+    Measures how well the model explains the training pairs by comparing
+    ``dmd.decode(dmd.evolve(dmd.encode(X1)))`` against *X2*, normalized by the
+    norm of *X2*.
+    """
     if xp is None:
         xp = array_api_compat.array_namespace(X1, X2)
 
@@ -556,7 +609,7 @@ def cumulative_energy(
     *,
     xp: Any = None,
 ) -> Array1D[np.floating[Any]]:
-    """Normalized cumulative energy of the singular values *S*."""
+    r"""Compute the normalized cumulative energy of singular values *S*."""
     if xp is None:
         xp = array_api_compat.array_namespace(S)
 
