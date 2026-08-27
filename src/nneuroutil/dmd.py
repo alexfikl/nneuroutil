@@ -196,8 +196,9 @@ def total_least_squares(
         mask = xp.abs(S) > eps
         U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
-    X = U @ xp.diag(S) @ Vh[:, :dx]
-    Y = U @ xp.diag(S) @ Vh[:, dx:]
+    US = U * S
+    X = US @ Vh[:, :dx]
+    Y = US @ Vh[:, dx:]
 
     return X, Y
 
@@ -269,7 +270,7 @@ def build_dmd(
         U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
     # construct reduced order model
-    Ahat = Vh @ xp.conj(Y).T @ U @ xp.diag(1 / S)
+    Ahat = Vh @ xp.conj(Y).T @ (U / S)
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
