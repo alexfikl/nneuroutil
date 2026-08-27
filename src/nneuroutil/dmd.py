@@ -391,6 +391,7 @@ def build_full_extended_dmd(
     *,
     method: Literal["pinv", "ridge"] = "ridge",
     first_observable_is_state: bool = False,
+    rank: int | None = None,
     eps: float | None = None,
     xp: Any = None,
 ) -> FullExtendedDMD[ScalarTypeT]:
@@ -460,6 +461,9 @@ def build_full_extended_dmd(
 
         X_lift = lift(X, xp=xp)
         Y_lift = lift(Y, xp=xp)
+
+    if rank is not None:
+        X_lift, Y_lift = total_least_squares(X_lift, Y_lift, rank=rank, eps=eps)
 
     A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
     if first_observable_is_state:
