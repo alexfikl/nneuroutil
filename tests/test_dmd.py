@@ -149,7 +149,7 @@ def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
         A = build_full_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
         A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
 
-        error = np.linalg.norm(np.asarray(A) - A_ref)
+        error = xp.linalg.norm(A - xp.asarray(A_ref))
         log.info(
             "[%s] pinv error: %.3e (complex=%s eps=%.1e)",
             xp.__name__,
@@ -188,7 +188,7 @@ def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
         Y_aug = np.concatenate([Y_ref, np.zeros((d, d), dtype=Y_ref.dtype)])
         A_ref = np.linalg.lstsq(X_aug, Y_aug, rcond=None)[0]
 
-        error = np.linalg.norm(np.asarray(A) - A_ref)
+        error = xp.linalg.norm(A - xp.asarray(A_ref))
         log.info(
             "[%s] ridge error: %.3e (complex=%s eps=%.1e)",
             xp.__name__,
@@ -212,7 +212,7 @@ def test_build_full_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -
     A = build_full_dmd(X, Y, method=method, xp=xp).A
     A_ref = np.linalg.lstsq(np.asarray(X), np.asarray(Y), rcond=None)[0]
 
-    error = np.linalg.norm(np.asarray(A) - A_ref)
+    error = xp.linalg.norm(A - xp.asarray(A_ref))
     log.info("[%s] default eps error: %.3e (method=%s)", xp.__name__, error, method)
     assert error < 1.0e-12
 
