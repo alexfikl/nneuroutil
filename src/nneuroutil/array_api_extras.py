@@ -260,8 +260,6 @@ def histogram(
 
     if xp is None:
         xp = array_api_compat.array_namespace(x)
-    else:
-        assert array_api_compat.array_namespace(x) is xp
 
     # implement a fallback for other array libraries
     if range is None:

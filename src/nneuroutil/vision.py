@@ -75,8 +75,6 @@ def otsu_threshold_from_image(
     """
     if xp is None:
         xp = array_api_compat.array_namespace(img)
-    else:
-        assert array_api_compat.array_namespace(img) is xp
 
     if img.ndim != 2:
         raise ValueError(f"'img' is not a 2D array: {img.shape}")
@@ -115,14 +113,10 @@ def otsu_threshold_from_histogram(
         counts, centers = hist
         if xp is None:
             xp = array_api_compat.array_namespace(counts, centers)
-        else:
-            assert array_api_compat.array_namespace(counts, centers) is xp
     else:
         counts = hist
         if xp is None:
             xp = array_api_compat.array_namespace(counts)
-        else:
-            assert array_api_compat.array_namespace(counts) is xp
 
         centers = xp.arange(array_api_compat.size(counts))  # ty: ignore[no-matching-overload]
 

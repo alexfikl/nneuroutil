@@ -264,8 +264,6 @@ def build_full_dmd(
 
     if xp is None:
         xp = array_api_compat.array_namespace(X, Y)
-    else:
-        assert array_api_compat.array_namespace(X, Y) is xp
 
     if eps is None:
         eps = max(n, dx, dy) * xp.finfo(X.dtype).eps
