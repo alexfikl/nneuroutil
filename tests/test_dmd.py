@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from nneuroutil.helpers import module_logger, spectrum_error
-from nneuroutil.typing import Array2D
+from nneuroutil.typing import ArrayND
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
@@ -59,17 +59,17 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
     x_ref = A @ x
     x_dmd = dmd.decode(dmd.evolve(dmd.encode(x)))
 
-    error = float(xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref))
+    error = xp.linalg.norm(x_dmd - x_ref) / xp.linalg.norm(x_ref)
     log.info(
         "[%s] DMD classic relative error: %.3e (rank=%d)",
         xp.__name__,
         error,
-        dmd.reduced_size,
+        dmd.lifted_dim,
     )
     assert error < 1.0e-14
 
     # check eigenvalues
-    lambdas, _ = dmd.eigendecomposition()
+    lambdas = xp.linalg.eigvals(dmd.A)
     assert xp.all(xp.abs(lambdas) < 1.0 + 1.0e-10)
     log.info("[%s] Largest eigenvalue: %.3e", xp.__name__, xp.max(xp.abs(lambdas)))
 
@@ -112,8 +112,8 @@ def test_dmd_tls(sigma: float) -> None:
 
     # compare eigenvalues
     eig_ref = np.linalg.eigvals(A)
-    eig_dmd, _ = dmd_ref.eigendecomposition()
-    eig_tls, _ = dmd_tls.eigendecomposition()
+    eig_dmd = np.linalg.eigvals(np.asarray(dmd_ref.A))
+    eig_tls = np.linalg.eigvals(np.asarray(dmd_tls.A))
 
     eig_ref_index = np.argsort(-np.abs(eig_ref))
     error_dmd = spectrum_error(eig_dmd, eig_ref[eig_ref_index[:rank]])  # ty: ignore[invalid-argument-type]
@@ -146,10 +146,10 @@ def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 0.1]:
-        A = build_full_dmd(X, Y, method="pinv", eps=eps, xp=xp)
+        A = build_full_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
         A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
 
-        error = float(np.linalg.norm(np.asarray(A) - A_ref))
+        error = np.linalg.norm(np.asarray(A) - A_ref)
         log.info(
             "[%s] pinv error: %.3e (complex=%s eps=%.1e)",
             xp.__name__,
@@ -180,7 +180,7 @@ def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 1.0e-4]:
-        A = build_full_dmd(X, Y, method="ridge", eps=eps, xp=xp)
+        A = build_full_dmd(X, Y, method="ridge", eps=eps, xp=xp).A
 
         X_ref = np.asarray(X)
         Y_ref = np.asarray(Y)
@@ -188,7 +188,7 @@ def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
         Y_aug = np.concatenate([Y_ref, np.zeros((d, d), dtype=Y_ref.dtype)])
         A_ref = np.linalg.lstsq(X_aug, Y_aug, rcond=None)[0]
 
-        error = float(np.linalg.norm(np.asarray(A) - A_ref))
+        error = np.linalg.norm(np.asarray(A) - A_ref)
         log.info(
             "[%s] ridge error: %.3e (complex=%s eps=%.1e)",
             xp.__name__,
@@ -209,10 +209,10 @@ def test_build_full_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -
 
     from nneuroutil.dmd import build_full_dmd
 
-    A = build_full_dmd(X, Y, method=method, xp=xp)
+    A = build_full_dmd(X, Y, method=method, xp=xp).A
     A_ref = np.linalg.lstsq(np.asarray(X), np.asarray(Y), rcond=None)[0]
 
-    error = float(np.linalg.norm(np.asarray(A) - A_ref))
+    error = np.linalg.norm(np.asarray(A) - A_ref)
     log.info("[%s] default eps error: %.3e (method=%s)", xp.__name__, error, method)
     assert error < 1.0e-12
 
@@ -251,19 +251,22 @@ def test_build_full_extended_dmd(
         xs.append(2.0 * xs[-1])
     S = xp.asarray(xs, dtype=xp.float64)[:, None]
 
-    def identity(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+    def identity(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x
 
-    def square(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+    def square(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x**2
 
     from nneuroutil.dmd import build_full_extended_dmd
 
     observables = [identity, square]
     if use_trajectory:
-        A, C = build_full_extended_dmd(observables, S, method=method, xp=xp)
+        dmd = build_full_extended_dmd(observables, S, method=method, xp=xp)
     else:
-        A, C = build_full_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+        dmd = build_full_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+
+    A = dmd.A
+    C = dmd.C
 
     # the lifted dynamics [x, x^2] -> [2x, 4x^2] are exactly linear
     A_ref = xp.asarray([[2.0, 0.0], [0.0, 4.0]], dtype=A.dtype)
@@ -277,7 +280,7 @@ def test_build_full_extended_dmd(
     z = xp.asarray([[x0, x0**2]], dtype=A.dtype)
     for _ in range(10):
         z = z @ A  # ruff: ignore[non-augmented-assignment]
-    x_pred = float((z @ C)[0, 0])
+    x_pred = (z @ C)[0, 0]
     x_ref = 2.0**10 * x0
 
     error = abs(x_pred - x_ref)
