@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, Literal
@@ -16,17 +17,79 @@ from nneuroutil.typing import Array1D, Array2D, ArrayND, ScalarTypeT
 log = module_logger(__name__)
 
 
-# {{{ DMD
+# {{{ DMDBase
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class DMD(Generic[ScalarTypeT]):
-    Ahat: Array2D[ScalarTypeT]
-    """Reduced-order model operator of shape :math:`(r, r)` with rank
-    :attr:`reduced_size`.
-    """
+class DMDBase(ABC, Generic[ScalarTypeT]):
+    A: Array2D[ScalarTypeT]
+    """Linear approximation on the lifted coordinates."""
 
+    @property
+    def dtype(self) -> np.dtype[ScalarTypeT]:
+        """The :class:`~numpy.dtype` of this operator."""
+        return self.A.dtype
+
+    @property
+    def lifted_dim(self) -> int:
+        """The dimension of the lifted space."""
+        return self.A.shape[0]
+
+    @property
+    @abstractmethod
+    def physical_dim(self) -> int:
+        """The dimension of the physical space."""
+
+    @abstractmethod
+    def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        """Project the physical state *x* into the lifted space."""
+
+    @abstractmethod
+    def decode(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        """Project the lifted state *xhat* into the physical space."""
+
+    @abstractmethod
+    def evolve(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        """Evolve the system in the lifted space."""
+
+    def predict(
+        self,
+        x0: ArrayND[ScalarTypeT],
+        maxit: int,
+        *,
+        full: bool = False,
+    ) -> ArrayND[ScalarTypeT]:
+        xp = array_api_compat.array_namespace(x0)
+
+        assert x0.shape[-1] == self.physical_dim
+        xhat = self.encode(x0)
+
+        if full:
+            result = [x0]
+            for _ in range(maxit):
+                xhat = self.evolve(xhat)
+                result.append(self.decode(xhat))
+
+            result = xp.stack(result, axis=0)
+        else:
+            for _ in range(maxit):
+                xhat = self.evolve(xhat)
+
+            result = self.decode(xhat)
+
+        return result
+
+
+# }}}
+
+
+# {{{ reduced DMD
+
+
+@register_dataclass
+@dataclass(frozen=True)
+class ReducedDMD(DMDBase[ScalarTypeT]):
     U: Array2D[ScalarTypeT]
     """Temporal modes as an array of shape :math:`(n - 1, r)`."""
     S: Array1D[ScalarTypeT]
@@ -35,178 +98,26 @@ class DMD(Generic[ScalarTypeT]):
     """Spatial modes as an array of shape :math:`(r, d)`."""
 
     @property
-    def dtype(self) -> np.dtype[ScalarTypeT]:
-        """The :class:`~numpy.dtype` of this operator."""
-        return self.Ahat.dtype
-
-    @property
-    def ndim(self) -> int:
-        """Number of array dimensions (here 2)."""
-        return 2
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        """Tuple of array dimensions."""
-        return self.Ahat.shape
-
-    @property
-    def reduced_size(self) -> int:
-        """The rank (size) of the reduced order model."""
-        return self.Ahat.shape[0]
-
-    @property
-    def full_size(self) -> int:
-        """The size of the full model."""
+    def physical_dim(self) -> int:
         return self.Vh.shape[1]
 
-    def eigendecomposition(
-        self,
-    ) -> tuple[Array1D[ScalarTypeT], Array2D[ScalarTypeT]]:
-        """Compute the eigendecomposition of :attr:`Ahat`."""
-        xp = array_api_compat.array_namespace(self.Ahat)
-
-        eigs, eigenvectors = xp.linalg.eig(self.Ahat)
-        return eigs, eigenvectors
-
     def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Project the full state *x* to the reduced coordinates."""
-        assert x.shape[0] == self.full_size
+        assert x.shape[-1] == self.physical_dim
 
         xp = array_api_compat.array_namespace(x, self.Vh)
-        return xp.einsum("ij,j...->i...", self.Vh, x)
+        return xp.einsum("...j,ij->...i", x, self.Vh)
 
-    def evolve(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Evolve the reduced-order model."""
-        assert x.shape[0] == self.reduced_size
+    def decode(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
 
-        xp = array_api_compat.array_namespace(x, self.Ahat)
-        return xp.einsum("ij,j...->i...", self.Ahat, x)
+        xp = array_api_compat.array_namespace(xhat, self.Vh)
+        return xp.einsum("...i,ij->...j", xhat, xp.conj(self.Vh))
 
-    def decode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Reconstruct the full state from the reduced state *x*."""
-        assert x.shape[0] == self.reduced_size
+    def evolve(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
 
-        xp = array_api_compat.array_namespace(x, self.Vh)
-        return xp.einsum("ij,i...->j...", xp.conj(self.Vh), x)
-
-    def __matmul__(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Evolve the reduced-order model."""
-        return self.evolve(x)
-
-    def __call__(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
-        """Evolve the reduced-order model."""
-        return self.evolve(x)
-
-
-def reconstruct(
-    dmd: DMD,
-    x0: Array1D[ScalarTypeT],
-    steps: int,
-) -> Array2D[ScalarTypeT]:
-    """
-    :arg x0: initial condition for the system. If this is the size of the
-        reduced system, we assume that it represents the amplitudes of the DMD
-        modes of the initial condition. Otherwise, the initial condition is
-        projected onto the DMD modes.
-    :arg steps: number of steps to compute.
-    """
-    xp = array_api_compat.array_namespace(x0, dmd.Ahat)
-
-    # determine the DMD modes
-    lambdas, vs = dmd.eigendecomposition()
-    Phi = dmd.decode(vs)
-
-    # project the initial condition on the modes by least squares
-    if x0.shape == (dmd.reduced_size,):
-        b = x0
-    else:
-        b, _, _, _ = xp.linalg.lstsq(Phi, x0)
-
-    # compute all iterations of the operator
-    n = xp.arange(steps, device=x0.device, dtype=x0.dtype)
-    Lambda = lambdas[None, :] ** n
-
-    # apply the operator
-    return (Lambda * b[None, :]) @ xp.conj(Phi).T
-
-
-# }}}
-
-
-# {{{ total-least-squares
-
-
-def total_least_squares(
-    X: Array2D[ScalarTypeT],
-    Y: Array2D[ScalarTypeT] | None = None,
-    *,
-    rank: int | None = None,
-    eps: float | None = None,
-    xp: Any = None,
-) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
-    """Apply Total Least Squares de-biasing to the dataset.
-
-    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
-    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
-    :arg rank: if given, the desired fixed rank of the approximation.
-    :arg eps: a minimum absolute tolerance for singular values. Note that this
-        is a data-dependent slice and some frameworks (e.g. ``jax``) will not
-        be able to compile it.
-    """
-    if X.ndim != 2:
-        raise ValueError(
-            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
-        )
-
-    if Y is None:
-        Y = X[:-1, :]
-        X = X[1:, :]
-
-    if Y.ndim != 2:
-        raise ValueError(
-            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
-        )
-
-    n, dx = X.shape
-    n, dy = Y.shape
-    if X.shape[0] != Y.shape[0]:
-        raise ValueError(
-            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
-        )
-
-    if xp is None:
-        xp = array_api_compat.array_namespace(X, Y)
-
-    if rank is not None and not 0 < rank < min(dx, dy):
-        raise ValueError(f"'rank' must be in (0, {min(dx, dy)}): {rank}")
-
-    if eps is not None and eps < 0:
-        raise ValueError(f"'eps' must be positive: {eps}")
-
-    Z = xp.concat([X, Y], axis=1)
-    assert Z.shape == (n, dx + dy)
-
-    U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
-    S = xp.astype(S, X.dtype)
-
-    if rank is not None:
-        U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
-
-    if eps is not None:
-        mask = xp.abs(S) > eps
-        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
-
-    US = U * S
-    X = US @ Vh[:, :dx]
-    Y = US @ Vh[:, dx:]
-
-    return X, Y
-
-
-# }}}
-
-
-# {{{ classic DMD
+        xp = array_api_compat.array_namespace(xhat, self.A)
+        return xp.einsum("...j,ij->...i", xhat, self.A)
 
 
 def build_dmd(
@@ -216,14 +127,14 @@ def build_dmd(
     rank: int | None = None,
     eps: float | None = None,
     xp: Any = None,
-) -> DMD:
+) -> ReducedDMD[ScalarTypeT]:
     """Construct a DMD approximation of the system with snapshots *X* and outputs *Y*.
 
     For robust results, it is recommended to apply the :func:`total_least_squares`
-    algorithm to the snapshots, so that the noise is handled consistently.
+    algorithm to the snapshots, so that any noise is handled consistently.
 
     :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
-    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
+    :arg Y: system outputs of shape ``(nsnapshots, ndim)``.
     :arg rank: if given, the desired fixed rank of the approximation.
     :arg eps: a minimum absolute tolerance for singular values. Note that this
         is a data-dependent slice and some frameworks (e.g. ``jax``) will not
@@ -274,13 +185,35 @@ def build_dmd(
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
-    return DMD(Ahat, U=U, S=S, Vh=Vh)
+    return ReducedDMD(A=Ahat, U=U, S=S, Vh=Vh)
 
 
 # }}}
 
 
-# {{{ build_dmd_pinv
+# {{{ build_full_dmd
+
+
+@register_dataclass
+@dataclass(frozen=True)
+class FullDMD(DMDBase[ScalarTypeT]):
+    @property
+    def physical_dim(self) -> int:
+        return self.A.shape[0]
+
+    def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert x.shape[-1] == self.physical_dim
+        return x
+
+    def decode(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
+        return xhat
+
+    def evolve(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
+
+        xp = array_api_compat.array_namespace(xhat, self.A)
+        return xp.einsum("...j,ji->...i", xhat, self.A)
 
 
 def build_full_dmd(
@@ -292,7 +225,7 @@ def build_full_dmd(
     method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
-) -> Array2D[ScalarTypeT]:
+) -> FullDMD[ScalarTypeT]:
     r"""Compute the full DMD operator using a pseudo-inverse.
 
     This is very inefficient for large system, but can work for toy examples. We
@@ -371,7 +304,7 @@ def build_full_dmd(
     else:
         raise ValueError(f"unknown method: {method!r}")
 
-    return A
+    return FullDMD(A)
 
 
 # }}}
@@ -380,8 +313,39 @@ def build_full_dmd(
 # {{{ build_full_extended_dmd
 
 
+@register_dataclass
+@dataclass(frozen=True)
+class FullExtendedDMD(DMDBase[ScalarTypeT]):
+    C: Array2D[ScalarTypeT]
+    observables: tuple[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]], ...]
+
+    @property
+    def physical_dim(self) -> int:
+        return self.C.shape[0]
+
+    def encode(self, x: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert x.shape[-1] == self.physical_dim
+
+        xp = array_api_compat.array_namespace(x, self.A)
+        return xp.concat(
+            [xp.reshape(g(x), (*x.shape[:-1], -1)) for g in self.observables], axis=-1
+        )
+
+    def decode(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
+
+        xp = array_api_compat.array_namespace(xhat, self.C)
+        return xp.einsum("...j,ji->...i", xhat, self.C)
+
+    def evolve(self, xhat: ArrayND[ScalarTypeT]) -> ArrayND[ScalarTypeT]:
+        assert xhat.shape[-1] == self.lifted_dim
+
+        xp = array_api_compat.array_namespace(xhat, self.A)
+        return xp.einsum("...j,ji->...i", xhat, self.A)
+
+
 def build_full_extended_dmd(
-    observables: Sequence[Callable[[Array2D[ScalarTypeT]], Array2D[ScalarTypeT]]],
+    observables: Sequence[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]]],
     X: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
     *,
@@ -389,7 +353,7 @@ def build_full_extended_dmd(
     first_observable_is_state: bool = False,
     eps: float | None = None,
     xp: Any = None,
-) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
+) -> FullExtendedDMD[ScalarTypeT]:
     r"""Construct a DMD approximation of the system in the space of the *observables*.
 
     Each observable :math:`g` is evaluated on the snapshots and its output is
@@ -455,13 +419,89 @@ def build_full_extended_dmd(
         X_lift = lift(X, xp=xp)
         Y_lift = lift(Y, xp=xp)
 
-    A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
+    A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
     if first_observable_is_state:
-        C = xp.eye(X.shape[1], X_lift.shape[1], dtype=X.dtype, device=X.device)
+        C = xp.eye(X_lift.shape[1], X.shape[1], dtype=X.dtype, device=X.device)
     else:
-        C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp)
+        C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp).A
 
-    return A, C
+    return FullExtendedDMD(A=A, C=C, observables=tuple(observables))
+
+
+# }}}
+
+
+# {{{ total-least-squares
+
+
+def total_least_squares(
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
+    *,
+    rank: int | None = None,
+    eps: float | None = None,
+    xp: Any = None,
+) -> tuple[Array2D[ScalarTypeT], Array2D[ScalarTypeT]]:
+    """Apply Total Least Squares de-biasing to the dataset.
+
+    :arg X: system snapshots of shape ``(nsnapshots, ndim)``.
+    :arg Y: system outpyts of shape ``(nsnapshots, ndim)``.
+    :arg rank: if given, the desired fixed rank of the approximation.
+    :arg eps: a minimum absolute tolerance for singular values. Note that this
+        is a data-dependent slice and some frameworks (e.g. ``jax``) will not
+        be able to compile it.
+    """
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
+    if Y is None:
+        Y = X[:-1, :]
+        X = X[1:, :]
+
+    if Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
+    n, dx = X.shape
+    n, dy = Y.shape
+    if X.shape[0] != Y.shape[0]:
+        raise ValueError(
+            f"inputs 'X' and outputs 'Y' have different shapes: {X.shape} and {Y.shape}"
+        )
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X, Y)
+
+    if rank is not None and not 0 < rank < min(dx, dy):
+        raise ValueError(f"'rank' must be in (0, {min(dx, dy)}): {rank}")
+
+    if eps is not None and eps < 0:
+        raise ValueError(f"'eps' must be positive: {eps}")
+
+    Z = xp.concat([X, Y], axis=1)
+    assert Z.shape == (n, dx + dy)
+
+    U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
+    S = xp.astype(S, X.dtype)
+
+    if rank is not None:
+        U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+
+    if eps is not None:
+        mask = xp.abs(S) > eps
+        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+
+    US = U * S
+    X = US @ Vh[:, :dx]
+    Y = US @ Vh[:, dx:]
+
+    return X, Y
+
+
+# }}}
 
 
 # }}}
