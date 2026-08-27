@@ -456,10 +456,7 @@ def build_full_extended_dmd(
 
     A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp)
     if first_observable_is_state:
-        from nneuroutil.array_api_extras import fill_diagonal
-
-        C = xp.zeros((X.shape[1], X_lift.shape[1]), dtype=X.dtype, device=X.device)
-        C = fill_diagonal(C, 1.0, wrap=False, inplace=False, xp=xp)
+        C = xp.eye(X.shape[1], X_lift.shape[1], dtype=X.dtype, device=X.device)
     else:
         C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp)
 
