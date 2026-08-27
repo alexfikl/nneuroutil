@@ -36,11 +36,18 @@ def g_identity(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
 
 
 def g_sqr(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
-    return x**2
+    return np.concat([x**2, x[..., :1] * x[..., 1:]], axis=-1)
 
 
-def g_friction(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
-    return mu * (1.0 - x[..., 0:1] ** 2) * x[..., 1:2]
+def g_cubic(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+    return np.concat(
+        [
+            x**3,
+            x[..., :1] * x[..., 1:] ** 2,
+            x[..., :1] ** 2 * x[..., 1:],
+        ],
+        axis=-1,
+    )
 
 
 # }}}
@@ -81,31 +88,37 @@ log.info("Rank for 99.9%% energy: %d", rank)
 
 # {{{ add noise
 
-sigma = 0.01 * np.linalg.norm(X) / np.sqrt(X.size)
-X_noisy = X + sigma * rng.standard_normal(X.shape)
-X1, X2 = X_noisy[:-1], X_noisy[1:]
+sigma = 0.005 * np.linalg.norm(X) / np.sqrt(X.size)
+X1, X2 = X[:-1], X[1:]
+
+X1 = X1 + sigma * rng.standard_normal(X1.shape)  # ruff: ignore[non-augmented-assignment]
+X2 = X2 + sigma * rng.standard_normal(X2.shape)  # ruff: ignore[non-augmented-assignment]
 
 # }}}
 
 # {{{ fit models
 
 models: dict[str, Any] = {}
-models["R-DMD"] = dmd.build_dmd(X1, X2)
-models["F-DMD"] = dmd.build_full_dmd(X1, X2, method="ridge")
-models["FE-DMD"] = dmd.build_full_extended_dmd(
-    [g_identity, g_sqr, g_friction], X1, X2, method="ridge"
+models["DMD (pinv)"] = dmd.build_dmd(X1, X2)
+models["DMD (ridge)"] = dmd.build_full_dmd(X1, X2, method="ridge")
+models["EDMD"] = dmd.build_full_extended_dmd(
+    [g_identity, g_sqr, g_cubic],
+    X1,
+    X2,
+    first_observable_is_state=True,
+    method="ridge",
 )
 
 # }}}
 
 # {{{ gather statistics
 
-horizon = int(5.0 / dt)
+horizon = int(15.0 / dt)
 
 table = Table("model", "fit residual", "forecast error")
 for name, model in models.items():
     resid = dmd.fit_residual(model, X1, X2)
-    err = dmd.relative_forecast_error(model, X_noisy)
+    err = dmd.relative_forecast_error(model, X1)
     table.add_row(name, f"{resid:9.5e}", f"{err[-horizon:].mean():9.5e}")
 
 log.info("Metrics:\n%s", stringify_table(table))
@@ -141,7 +154,7 @@ with figure(
 
     ax1.plot(X[:, 0], X[:, 1], color="k", label="reference")
     for i, (name, model) in enumerate(models.items()):
-        x_pred = model.predict(X_noisy[0], horizon, full=True)
+        x_pred = model.predict(X1[0], horizon, full=True)
         ax1.plot(
             x_pred[:, 0],
             x_pred[:, 1],
@@ -153,9 +166,9 @@ with figure(
     ax1.set_ylabel(r"$y$")
     ax1.legend(loc="upper right")
 
-    ax2.plot(t, X_noisy[:, 0], "k.", markersize=2, label="noisy")
+    ax2.plot(t[:-1], X1[:, 0], "k.", markersize=2, label="noisy")
     for i, (name, model) in enumerate(models.items()):
-        x_pred = model.predict(X_noisy[0], horizon, full=True)
+        x_pred = model.predict(X1[0], horizon, full=True)
         ax2.plot(t[: horizon + 1], x_pred[:, 0], styles[i % len(styles)], label=name)
 
     ax2.set_xlim(t[0], t[-1])
@@ -164,8 +177,8 @@ with figure(
     ax2.legend(loc="upper right")
 
     for i, (name, model) in enumerate(models.items()):
-        err = dmd.relative_forecast_error(model, X_noisy)
-        ax3.semilogy(t, err, styles[i % len(styles)], label=name)
+        err = dmd.relative_forecast_error(model, X1)
+        ax3.semilogy(t[:-1], err, styles[i % len(styles)], label=name)
 
     ax3.set_xlim(t[0], t[-1])
     ax3.set_ylim(bottom=1.0e-16)
