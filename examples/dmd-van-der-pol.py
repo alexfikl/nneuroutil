@@ -55,7 +55,7 @@ def g_cubic(x: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
 # {{{ evolve
 
 tspan = (0.0, 25.0)
-dt = 0.05
+dt = 0.1
 
 x0 = np.array([2.0, 0.0])
 t = np.arange(tspan[0], tspan[1] + dt, dt)
@@ -88,19 +88,17 @@ log.info("Rank for 99.9%% energy: %d", rank)
 
 # {{{ add noise
 
-sigma = 0.005 * np.linalg.norm(X) / np.sqrt(X.size)
-X1, X2 = X[:-1], X[1:]
-
-X1 = X1 + sigma * rng.standard_normal(X1.shape)  # ruff: ignore[non-augmented-assignment]
-X2 = X2 + sigma * rng.standard_normal(X2.shape)  # ruff: ignore[non-augmented-assignment]
+sigma = 0.01 * np.linalg.norm(X) / np.sqrt(X.size)
+X_noisy = X + sigma * rng.standard_normal(X.shape)
+X1, X2 = X_noisy[:-1], X_noisy[1:]
 
 # }}}
 
 # {{{ fit models
 
 models: dict[str, Any] = {}
-models["DMD (pinv)"] = dmd.build_dmd(X1, X2)
-models["DMD (ridge)"] = dmd.build_full_dmd(X1, X2, method="ridge")
+models["DMD"] = dmd.build_full_dmd(X1, X2, method="ridge")
+models["fbDMD"] = dmd.build_forward_backward_dmd(X1, X2, method="ridge")
 models["EDMD"] = dmd.build_full_extended_dmd(
     [g_identity, g_sqr, g_cubic],
     X1,
