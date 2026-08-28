@@ -544,9 +544,9 @@ def build_forward_backward_dmd(
     lam_f, vec_f = xp.linalg.eig(A_f)
     lam_b, vec_b = xp.linalg.eig(A_b)
 
-    A_fb = ((vec_f * xp.sqrt(lam_f)) @ xp.linalg.inv(vec_f)) @ (
-        (vec_b * (1.0 / xp.sqrt(lam_b))) @ xp.linalg.inv(vec_b)
-    )
+    A_f_sqrt = (vec_f * xp.sqrt(lam_f)) @ xp.linalg.inv(vec_f)
+    A_b_sqrt = (vec_b * (1.0 / xp.sqrt(lam_b))) @ xp.linalg.inv(vec_b)
+    A_fb = A_f_sqrt @ A_b_sqrt
 
     # NOTE: the principal square root of a real matrix is real, but the
     # eigendecomposition based construction may leave a small imaginary part
