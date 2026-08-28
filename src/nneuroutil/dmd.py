@@ -541,11 +541,11 @@ def build_forward_backward_dmd(
     A_f = build_full_dmd(X, Y, method=method, eps=eps, xp=xp).A
     A_b = build_full_dmd(Y, X, method=method, eps=eps, xp=xp).A
 
-    lam_f, vec_f = xp.linalg.eig(A_f)
-    lam_b, vec_b = xp.linalg.eig(A_b)
+    lambda_f, v_f = xp.linalg.eig(A_f)
+    lambda_b, v_b = xp.linalg.eig(A_b)
 
-    A_f_sqrt = (vec_f * xp.sqrt(lam_f)) @ xp.linalg.inv(vec_f)
-    A_b_sqrt = (vec_b * (1.0 / xp.sqrt(lam_b))) @ xp.linalg.inv(vec_b)
+    A_f_sqrt = (v_f * xp.sqrt(lambda_f)) @ xp.linalg.inv(v_f)
+    A_b_sqrt = (v_b * (1.0 / xp.sqrt(lambda_b))) @ xp.linalg.inv(v_b)
     A_fb = A_f_sqrt @ A_b_sqrt
 
     # NOTE: the principal square root of a real matrix is real, but the

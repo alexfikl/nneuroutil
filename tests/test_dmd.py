@@ -123,6 +123,52 @@ def test_dmd_tls(sigma: float) -> None:
     assert error_tls < error_dmd
 
 
+@pytest.mark.parametrize("sigma", [0.05, 0.5])
+def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
+    from nneuroutil.dmd import build_dmd, build_forward_backward_dmd
+
+    rng = np.random.default_rng(seed=42)
+    nsnapshots = 128
+
+    # stable planar rotation; its eigenvalues sit close to the unit circle,
+    # so the forward-backward correction is well-conditioned and decisive
+    r, theta = 0.995, 0.7
+    A = r * np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)],
+    ])
+
+    A = xp.asarray(A)
+    xs = [xp.asarray(rng.standard_normal(2))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    sigma = sigma * xp.linalg.norm(X) / np.sqrt(np.prod(X.shape))
+    Xn = X + sigma * xp.asarray(rng.standard_normal(X.shape))
+    X1, X2 = Xn[:-1], Xn[1:]
+
+    dmd = build_dmd(X1, X2, xp=xp)
+    fb_dmd = build_forward_backward_dmd(X1, X2, xp=xp)
+
+    assert fb_dmd.A_forward.shape == (2, 2)
+    assert fb_dmd.A_backward.shape == (2, 2)
+
+    eig_ref = xp.asarray(np.linalg.eigvals(A))
+    lambda_dmd = xp.linalg.eigvals(dmd.A)
+    lambda_fb_dmd = xp.linalg.eigvals(fb_dmd.A)
+
+    error_plain = spectrum_error(lambda_dmd, eig_ref)
+    error_fb = spectrum_error(lambda_fb_dmd, eig_ref)
+    log.info(
+        "Noise %.3f Error DMD %.5e fbDMD %.5e",
+        sigma,
+        error_plain,
+        error_fb,
+    )
+    assert error_fb < error_plain
+
+
 # {{{ test_build_full_dmd
 
 
