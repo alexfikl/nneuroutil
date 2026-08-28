@@ -601,8 +601,12 @@ def total_least_squares(
     if xp is None:
         xp = array_api_compat.array_namespace(X, Y)
 
-    if rank is not None and not 0 < rank < min(dx, dy):
-        raise ValueError(f"'rank' must be in (0, {min(dx, dy)}): {rank}")
+    # NOTE: for (classic?) TLS, we want to project Y into the range of X. In
+    # that case, the rank cannot be larger than dx, because that would mean Y
+    # cannot be represented in that subspace. This seems reasonable, but we'll
+    # see..
+    if rank is not None and not 0 < rank <= min(n, dx):
+        raise ValueError(f"'rank' must be in (0, {min(n, dx)}]: {rank}")
 
     if eps is not None and eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
