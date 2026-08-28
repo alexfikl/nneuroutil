@@ -33,11 +33,8 @@ def as_grayscale(
     if xp is None:
         xp = array_api_compat.array_namespace(x)
 
-    from nneuroutil.array_api_extras import to_namespace_dtype
-
     if dtype is None:
-        dtype = np.dtype(np.uint8)
-    dtype = to_namespace_dtype(xp, dtype)
+        dtype = xp.uint8
 
     xmin, xmax = xp.min(x), xp.max(x)
     dx = 1.0 if xmin == xmax else (xmax - xmin)
