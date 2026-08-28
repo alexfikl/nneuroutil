@@ -477,6 +477,88 @@ def build_full_extended_dmd(
 # }}}
 
 
+# {{{ forward-backward dmd
+
+
+@register_dataclass
+@dataclass(frozen=True)
+class ForwardBackwardDMD(FullDMD[ScalarTypeT]):
+    """DMD model with forward-backward debiasing of the fitted operator.
+
+    The operator :attr:`A` is the geometric mean of a forward and a backward
+    least-squares fit, whose systematic errors-in-variables biases have
+    opposite signs and cancel to first order.
+    """
+
+    A_forward: Array2D[ScalarTypeT]
+    """Uncorrected operator fit on the pairs ``(X, Y)``."""
+    A_backward: Array2D[ScalarTypeT]
+    """Uncorrected operator fit on the pairs ``(Y, X)``."""
+
+
+def build_forward_backward_dmd(
+    X: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
+    *,
+    method: Literal["pinv", "ridge"] = "ridge",
+    eps: float | None = None,
+    xp: Any = None,
+) -> ForwardBackwardDMD[ScalarTypeT]:
+    r"""Construct a DMD approximation with forward-backward debiasing based on
+    [Dawson2016]_.
+
+    This is implemented in Algorithm 3 from [Dawson2016]_. The algorithm fits
+    the forward operator :math:`A_f` on the pairs ``(X, Y)`` and the backward
+    operator :math:`A_b` on the pairs ``(Y, X)``. It then combines them into the
+    geometric mean
+
+    .. math::
+
+        A = A_f^{1/2} A_b^{-1/2}
+
+    which cancels the first-order eigenvalue shrinkage that least-squares
+    fits exhibit on noisy snapshot pairs. In such setups, it may work better than
+    :class:`FullDMD` or :class:`FullExtendedDMD`.
+
+    .. [Dawson2016] S. T. M. Dawson, M. S. Hemati, M. O. Williams, C. W. Rowley,
+        *Characterizing and Correcting for the Effect of Sensor Noise in the
+        Dynamic Mode Decomposition*,
+        Experiments in Fluids, Vol. 57, pp. 42--42, 2016,
+        `doi:10.1007/s00348-016-2127-7 <https://doi.org/10.1007/s00348-016-2127-7>`__.
+
+    :arg method: regularized solver used for both fits.
+    :arg eps: tolerance for the regularized solver, see :func:`build_full_dmd`.
+
+    :returns: a model whose operator is the debiased forward-backward mean.
+    """
+    if Y is None:
+        Y = X[1:]
+        X = X[:-1]
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X, Y)
+
+    A_f = build_full_dmd(X, Y, method=method, eps=eps, xp=xp).A
+    A_b = build_full_dmd(Y, X, method=method, eps=eps, xp=xp).A
+
+    lam_f, vec_f = xp.linalg.eig(A_f)
+    lam_b, vec_b = xp.linalg.eig(A_b)
+
+    A_fb = ((vec_f * xp.sqrt(lam_f)) @ xp.linalg.inv(vec_f)) @ (
+        (vec_b * (1.0 / xp.sqrt(lam_b))) @ xp.linalg.inv(vec_b)
+    )
+
+    # NOTE: the principal square root of a real matrix is real, but the
+    # eigendecomposition based construction may leave a small imaginary part
+    if X.dtype not in {xp.complex64, xp.complex128}:
+        A_fb = xp.real(A_fb)
+
+    return ForwardBackwardDMD(A=A_fb, A_forward=A_f, A_backward=A_b)
+
+
+# }}}
+
+
 # {{{ total-least-squares
 
 
