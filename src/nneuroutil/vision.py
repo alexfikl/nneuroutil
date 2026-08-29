@@ -29,6 +29,8 @@ def as_grayscale(
 
     This is done by normalizing the array to :math:`[0, 255]` and casting to the
     given *dtype*.
+
+    :arg dtype: output array :class:`~numpy.dtype` (defaults to ``uint8``).
     """
     if xp is None:
         xp = array_api_compat.array_namespace(x)
