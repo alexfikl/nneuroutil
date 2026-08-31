@@ -679,11 +679,13 @@ def relative_forecast_error(
     if Xpred is None:
         Xpred = dmd.predict(X[0], maxit, full=True)
 
-    xnorm = xp.linalg.norm(X[: maxit + 1])
-    if abs(xnorm) < 100 * xp.finfo(X.dtype).eps:
-        xnorm = 1.0
+    error = xp.linalg.norm(Xpred[: maxit + 1] - X[: maxit + 1], axis=-1)
+    xnorm = xp.linalg.norm(X[: maxit + 1], axis=-1)
 
-    return xp.linalg.norm(Xpred[: maxit + 1] - X[: maxit + 1], axis=-1) / xnorm
+    xnorm = xp.linalg.norm(xnorm, axis=0, keepdims=True)
+    xnorm = xp.where(xnorm < 100 * xp.finfo(X.dtype).eps, 1.0, xnorm)
+
+    return error / xnorm
 
 
 def fit_residual(
