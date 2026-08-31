@@ -399,6 +399,85 @@ def test_relative_forecast_error(xp: Any, flavor: str) -> None:
     assert float(xp.max(err)) < 1.0e-10
 
 
+def test_relative_forecast_error_maxit(xp: Any) -> None:
+    from nneuroutil.dmd import build_dmd, relative_forecast_error
+
+    rng = np.random.default_rng(seed=42)
+    ndim = 6
+    nsnapshots = 32
+
+    A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
+    xs = [xp.asarray(rng.standard_normal(ndim))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    dmd = build_dmd(X[:-1], X[1:], xp=xp)
+
+    maxit = 10
+    err = relative_forecast_error(dmd, X, maxit=maxit)
+    assert err.shape == (maxit + 1,)
+    assert float(xp.max(err)) < 1.0e-10
+
+    err_1 = relative_forecast_error(dmd, X, maxit=1)
+    assert err_1.shape == (2,)
+    assert float(xp.max(err_1)) < 1.0e-10
+
+    err_default = relative_forecast_error(dmd, X)
+    err_full = relative_forecast_error(dmd, X, maxit=nsnapshots - 1)
+    assert err_full.shape == (nsnapshots,)
+    assert float(xp.max(xp.abs(err_full - err_default))) < 1.0e-14
+
+    Xpred = dmd.predict(X[0], nsnapshots - 1, full=True)
+    err_pred = relative_forecast_error(dmd, X, Xpred, maxit=maxit)
+    assert err_pred.shape == (maxit + 1,)
+    assert float(xp.max(xp.abs(err_pred - err))) < 1.0e-14
+
+    Xpred_short = dmd.predict(X[0], 15, full=True)
+    err_short = relative_forecast_error(dmd, X, Xpred_short)
+    assert err_short.shape == (16,)
+    assert float(xp.max(err_short)) < 1.0e-10
+
+    err_short_maxit = relative_forecast_error(dmd, X, Xpred_short, maxit=8)
+    assert err_short_maxit.shape == (9,)
+    assert float(xp.max(err_short_maxit)) < 1.0e-10
+
+
+def test_relative_forecast_error_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_dmd, relative_forecast_error
+
+    rng = np.random.default_rng(seed=42)
+    ndim = 6
+    nsnapshots = 32
+
+    A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
+    xs = [xp.asarray(rng.standard_normal(ndim))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    dmd = build_dmd(X[:-1], X[1:], xp=xp)
+
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X, maxit=0)
+
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X, maxit=-1)
+
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X, maxit=nsnapshots)
+
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X, maxit=nsnapshots + 5)
+
+    Xpred_short = dmd.predict(X[0], 10, full=True)
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X, Xpred_short, maxit=15)
+
+    with pytest.raises(ValueError, match="'maxit' must be in"):
+        relative_forecast_error(dmd, X[:1])
+
+
 @pytest.mark.parametrize("flavor", ["reduced", "full", "extended"])
 def test_fit_residual(xp: Any, flavor: str) -> None:
     from nneuroutil.dmd import (

@@ -656,6 +656,11 @@ def relative_forecast_error(
     where the denominator is the norm of the whole trajectory to keep the
     errors bounded as amplitudes decay. By default, the forecast is generated
     from ``X[0]`` with :meth:`DMDBase.predict`.
+
+    :arg Xpred: optional precomputed forecast trajectory. If not provided, it is
+        computed with :meth:`DMDBase.predict` from ``X[0]``.
+    :arg maxit: number of forecast steps to evaluate. If *None*, the maximum
+        number of available steps is used.
     """
     max_maxit = X.shape[0] if Xpred is None else min(Xpred.shape[0], X.shape[0])
     if maxit is None:
@@ -665,7 +670,11 @@ def relative_forecast_error(
         raise ValueError(f"'maxit' must be in (0, {max_maxit}): {maxit}")
 
     if xp is None:
-        xp = array_api_compat.array_namespace(X)
+        xp = (
+            array_api_compat.array_namespace(X)
+            if Xpred is None
+            else array_api_compat.array_namespace(X, Xpred)
+        )
 
     if Xpred is None:
         Xpred = dmd.predict(X[0], maxit, full=True)
