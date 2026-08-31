@@ -642,31 +642,39 @@ def relative_forecast_error(
     X: Array2D[ScalarTypeT],
     Xpred: Array2D[ScalarTypeT] | None = None,
     *,
+    maxit: int | None = None,
     xp: Any = None,
 ) -> Array1D[np.floating[Any]]:
     r"""Compute the per-step relative error of a forecast against *X*.
 
-    The error at step :math:`k` is given by :math:`\|x_k - \hat{x}_k\| / \|X\|`,
+    The error at step :math:`k` is given by
+
+    .. math::
+
+        E = \frac{\|x_k - \hat{x}_k\|}{\|X\|},
+
     where the denominator is the norm of the whole trajectory to keep the
     errors bounded as amplitudes decay. By default, the forecast is generated
     from ``X[0]`` with :meth:`DMDBase.predict`.
     """
+    max_maxit = X.shape[0] if Xpred is None else min(Xpred.shape[0], X.shape[0])
+    if maxit is None:
+        maxit = max_maxit - 1
+
+    if not 0 < maxit < max_maxit:
+        raise ValueError(f"'maxit' must be in (0, {max_maxit}): {maxit}")
+
     if xp is None:
         xp = array_api_compat.array_namespace(X)
 
     if Xpred is None:
-        Xpred = dmd.predict(X[0], X.shape[0] - 1, full=True)
+        Xpred = dmd.predict(X[0], maxit, full=True)
 
-    if X.shape != Xpred.shape:
-        raise ValueError(
-            f"'X' and 'Xpred' must have the same shape: {X.shape} and {Xpred.shape}"
-        )
-
-    xnorm = xp.linalg.norm(X)
+    xnorm = xp.linalg.norm(X[:maxit + 1])
     if abs(xnorm) < 100 * xp.finfo(X.dtype).eps:
         xnorm = 1.0
 
-    return xp.linalg.norm(Xpred - X, axis=-1) / xnorm
+    return xp.linalg.norm(Xpred[:maxit + 1] - X[:maxit + 1], axis=-1) / xnorm
 
 
 def fit_residual(
