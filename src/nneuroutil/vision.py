@@ -3,16 +3,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import array_api_compat
 import numpy as np
 
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array1D, Array2D
-
-if TYPE_CHECKING:
-    from numpy.typing import DTypeLike
 
 log = module_logger(__name__)
 
@@ -22,7 +19,7 @@ log = module_logger(__name__)
 def as_grayscale(
     x: Array2D[np.floating[Any]],
     *,
-    dtype: DTypeLike | None = None,
+    dtype: Any | None = None,
     xp: Any = None,
 ) -> Array2D[np.integer[Any]]:
     """Convert the 2D array *x* to a grayscale image.
