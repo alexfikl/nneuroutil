@@ -250,6 +250,7 @@ def figure(
         else:
             mp.show(block=True)
 
+        fig.clear()
         mp.close(fig)
 
 
