@@ -627,8 +627,7 @@ def total_least_squares(
 
     # NOTE: for (classic?) TLS, we want to project Y into the range of X. In
     # that case, the rank cannot be larger than dx, because that would mean Y
-    # cannot be represented in that subspace. This seems reasonable, but we'll
-    # see..
+    # cannot be represented in that subspace. This seems reasonable..
     if rank is not None and not 0 < rank <= min(n, dx):
         raise ValueError(f"'rank' must be in (0, {min(n, dx)}]: {rank}")
 
@@ -637,20 +636,39 @@ def total_least_squares(
 
     Z = xp.concat([X, Y], axis=1)
     assert Z.shape == (n, dx + dy)
+    d = dx + dy
 
-    U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
-    S = xp.astype(S, X.dtype)
+    if n >= 2 * d:
+        # NOTE: for tall matrices (n >= 2 d), compute thin QR first and perform
+        # SVD on the small (d, d) factor R. Then project without materializing U.
+        Q, R = xp.linalg.qr(Z, mode="reduced")
+        Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+        S = xp.astype(S, X.dtype)
 
-    if rank is not None:
-        U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+        if rank is not None:
+            Ur, S, Vh = Ur[:, :rank], S[:rank], Vh[:rank, :]
 
-    if eps is not None:
-        mask = xp.abs(S) > eps
-        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+        if eps is not None:
+            mask = xp.abs(S) > eps
+            Ur, S, Vh = Ur[:, mask], S[mask], Vh[mask, :]
 
-    US = U * S
-    X = US @ Vh[:, :dx]
-    Y = US @ Vh[:, dx:]
+        W = Ur * S
+        X = Q @ (W @ Vh[:, :dx])
+        Y = Q @ (W @ Vh[:, dx:])
+    else:
+        U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
+        S = xp.astype(S, X.dtype)
+
+        if rank is not None:
+            U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+
+        if eps is not None:
+            mask = xp.abs(S) > eps
+            U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+
+        US = U * S
+        X = US @ Vh[:, :dx]
+        Y = US @ Vh[:, dx:]
 
     return X, Y
 
