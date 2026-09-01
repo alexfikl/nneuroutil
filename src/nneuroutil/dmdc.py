@@ -415,13 +415,23 @@ def relative_forecast_error(
     maxit: int | None = None,
     xp: Any = None,
 ) -> Array1D[np.floating[Any]]:
-    r"""Compute the per-step relative error of a forecast with control against *X*."""
+    r"""Compute the per-step relative error of a forecast with control against *X*.
+
+    If *Xpred* is not provided, a forecast is built with :meth:`DMDcBase.predict`
+    using one control input per time step, so *U* must have exactly *maxit* rows.
+    """
     max_maxit = X.shape[0] if Xpred is None else min(Xpred.shape[0], X.shape[0])
     if maxit is None:
         maxit = max_maxit - 1
 
     if not 0 < maxit < max_maxit:
         raise ValueError(f"'maxit' must be in (0, {max_maxit}): {maxit}")
+
+    if Xpred is None and U.shape[0] != maxit:
+        raise ValueError(
+            f"'U' must have one control input per time step (maxit = {maxit}): "
+            f"{U.shape}"
+        )
 
     if xp is None:
         xp = (
