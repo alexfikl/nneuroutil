@@ -332,19 +332,30 @@ def build_full_dmd(
         #   A^* = argmin |X A - Y|^2 + \epsilon |A|^2
         # Taking the gradient and setting it to zero gives the normal equations
         #   (X^T X + \epsilon I) A = X^T Y
-        # which have size (d, d). To avoid squaring all those ill-conditioned
-        # matrices, we instead solve
-        #   A^* = argmin |[X, \sqrt{\epsilon} I] A - [Y, O]|^2
+        # which have size (d, d). To avoid squaring condition numbers while
+        # avoiding large augmented matrix allocations, we use a two-stage QR:
+        #   1. X = Q1 R1,  B1 = Q1^* Y
+        #   2. [R1; \sqrt{\epsilon} I] = Q2 R
+        #   3. R A = Q2[:d]^* B1
 
+        # Step 1: Orthogonal reduction of X -> preserves kappa(X)
+        Q1, R1 = xp.linalg.qr(X, mode="reduced")
+        B1 = xp.conj(Q1).T @ Y
+        del Q1
+
+        # Step 2: Regularized QR on the small (2 * dx, dx) stacked R1 factor
         I = xp.eye(dx, dx, dtype=X.dtype, device=X.device)  # ruff: ignore[ambiguous-variable-name]
-        O = xp.zeros((dx, dy), dtype=Y.dtype, device=Y.device)  # ruff: ignore[ambiguous-variable-name]
+        R_aug = xp.concat([R1, eps**0.5 * I], axis=0)
+        del R1
 
-        # FIXME: make eps relative as well? a bit expensive..
-        X = xp.concat([X, eps**0.5 * I], axis=0)
-        Y = xp.concat([Y, O], axis=0)
+        Q2, R = xp.linalg.qr(R_aug, mode="reduced")
+        del R_aug
 
-        Q, R = xp.linalg.qr(X, mode="reduced")
-        A = xp.linalg.solve(R, xp.conj(Q).T @ Y)
+        # Q2[:dx] acts on B1, Q2[dx:] acts on 0
+        rhs = xp.conj(Q2[:dx]).T @ B1
+        del Q2, B1
+
+        A = xp.linalg.solve(R, rhs)
     else:
         raise ValueError(f"unknown method: {method!r}")
 
