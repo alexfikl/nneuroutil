@@ -507,11 +507,16 @@ def build_full_extended_dmd(
     if rank is not None:
         X_lift, Y_lift = total_least_squares(X_lift, Y_lift, rank=rank, eps=eps)
 
-    A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
     if first_observable_is_state:
+        A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
         C = xp.eye(X_lift.shape[1], X.shape[1], dtype=X.dtype, device=X.device)
     else:
-        C = build_full_dmd(X_lift, X, method=method, eps=eps, xp=xp).A
+        # NOTE: this should avoid performing two SVDs on X_lift (for A and C)
+        YX_lift = xp.concat([Y_lift, X], axis=1)
+        result = build_full_dmd(X_lift, YX_lift, method=method, eps=eps, xp=xp).A
+
+        A = result[:, : Y_lift.shape[1]]
+        C = result[:, Y_lift.shape[1] :]
 
     return FullExtendedDMD(A=A, C=C, observables=tuple(observables))
 
@@ -661,7 +666,6 @@ def total_least_squares(
         # SVD on the small (d, d) factor R. Then project without materializing U.
         Q, R = xp.linalg.qr(Z, mode="reduced")
         Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
-        S = xp.astype(S, X.dtype)
 
         if rank is not None:
             Ur, S, Vh = Ur[:, :rank], S[:rank], Vh[:rank, :]
@@ -676,7 +680,6 @@ def total_least_squares(
         Y = Z[:, dx:]
     else:
         U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
-        S = xp.astype(S, X.dtype)
 
         if rank is not None:
             U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
