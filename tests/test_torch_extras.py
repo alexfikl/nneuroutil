@@ -452,6 +452,43 @@ def test_device_check_mode() -> None:
 # }}}
 
 
+# {{{ test_memory_tracker
+
+
+def test_memory_tracker() -> None:
+    from nneuroutil.torch_extras import CUDATorchSnapshot, TorchMemoryTracker
+
+    x = torch.randn(256, 256)
+
+    tracker = TorchMemoryTracker()
+    assert not tracker.is_cuda
+
+    tracker.record("start")
+    y = x @ x
+    tracker.record("after-matmul")
+
+    assert len(tracker.snapshots) == 2
+    assert tracker.snapshots[0].tag == "start"
+    assert tracker.snapshots[0].lineno > 0
+    assert tracker.snapshots[1].delta_rss_mb == (  # ty: ignore[unresolved-attribute]
+        tracker.snapshots[1].rss_mb - tracker.snapshots[0].rss_mb  # ty: ignore[unresolved-attribute]
+    )
+    assert not isinstance(tracker.snapshots[0], CUDATorchSnapshot)
+
+    # check labels and table rendering
+    labels = tracker.labels()
+    assert len(labels) == 5
+    assert labels[0][0] == "Line"
+
+    table = str(tracker)
+    assert "start" in table
+    assert "after-matmul" in table
+    assert y is not None
+
+
+# }}}
+
+
 if __name__ == "__main__":
     import sys
 
