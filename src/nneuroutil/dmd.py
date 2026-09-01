@@ -653,8 +653,9 @@ def total_least_squares(
             Ur, S, Vh = Ur[:, mask], S[mask], Vh[mask, :]
 
         W = Ur * S
-        X = Q @ (W @ Vh[:, :dx])
-        Y = Q @ (W @ Vh[:, dx:])
+        Z = Q @ (W @ Vh)
+        X = Z[:, :dx]
+        Y = Z[:, dx:]
     else:
         U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
         S = xp.astype(S, X.dtype)
@@ -666,9 +667,9 @@ def total_least_squares(
             mask = xp.abs(S) > eps
             U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
-        US = U * S
-        X = US @ Vh[:, :dx]
-        Y = US @ Vh[:, dx:]
+        Z = (U * S) @ Vh
+        X = Z[:, :dx]
+        Y = Z[:, dx:]
 
     return X, Y
 
