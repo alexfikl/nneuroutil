@@ -903,9 +903,16 @@ def get_default_device() -> torch.device:
 
 @dataclass(frozen=True)
 class CUDASnapshot(MemorySnapshot):
+    """A :class:`~nneuroutil.helpers.MemorySnapshot` with additional CUDA
+    memory usage.
+    """
+
     cuda_mb: float
+    """The currently allocated CUDA memory, in MiB."""
     delta_cuda_mb: float
+    """The change in allocated CUDA memory since the previous snapshot, in MiB."""
     peak_cuda_mb: float
+    """The peak allocated CUDA memory observed so far, in MiB."""
 
     def as_row(self) -> tuple[str, ...]:
         return (
@@ -917,14 +924,18 @@ class CUDASnapshot(MemorySnapshot):
 
 
 class CUDAMemoryTracker(MemoryTracker[CUDASnapshot]):
+    """A :class:`~nneuroutil.helpers.MemoryTracker` that also records the CUDA
+    memory usage of *device*.
+    """
+
     def __init__(self, device: Any = None) -> None:
         if not getattr(device, "type", "") == "cuda":
             raise ValueError(f"{type(self).__name__} does not support device: {device}")
 
         super().__init__(device)
 
-    def record(self, tag: str) -> CUDASnapshot:
-        mem = super().record(tag)
+    def make_record(self, tag: str, *, stacklevel: int = 2) -> CUDASnapshot:
+        mem = super().make_record(tag, stacklevel=stacklevel + 1)
 
         cuda_mb = torch.cuda.memory_allocated(self.device) / (1024.0**2)
         peak_cuda_mb = torch.cuda.max_memory_allocated(self.device) / (1024.0**2)

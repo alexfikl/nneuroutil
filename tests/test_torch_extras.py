@@ -462,9 +462,9 @@ def test_memory_tracker() -> None:
 
     tracker = make_memory_tracker()
 
-    tracker.record("start")
+    tracker.add_record("start")
     y = x @ x
-    tracker.record("after-matmul")
+    tracker.add_record("after-matmul")
 
     assert len(tracker.snapshots) == 2
     assert tracker.snapshots[0].tag == "start"

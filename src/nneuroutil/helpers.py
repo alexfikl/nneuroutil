@@ -292,13 +292,21 @@ class BlockTimer:
 
 @dataclass(frozen=True)
 class MemorySnapshot:
+    """A snapshot of the host memory usage at a given point in time."""
+
     lineno: int
+    """The line number where the snapshot was taken."""
     tag: str
+    """An identifier for the snapshot."""
     rss_mb: float
+    """The resident set size (RSS), in MiB."""
     delta_rss_mb: float
+    """The change in RSS since the previous snapshot, in MiB."""
     peak_rss_mb: float
+    """The peak RSS observed so far, in MiB."""
 
     def as_row(self) -> tuple[str, ...]:
+        """Format the snapshot as a table row."""
         return (
             f"L{self.lineno}",
             self.tag,
@@ -312,22 +320,43 @@ MemorySnapshotT = TypeVar("MemorySnapshotT", bound=MemorySnapshot)
 
 
 class MemoryTracker(Generic[MemorySnapshotT]):
+    """Track the host memory usage of the current process.
+
+    Use :meth:`add_record` to take a tagged snapshot and :meth:`as_table` (or
+    ``str(tracker)``) to render all the snapshots as a table.
+    """
+
+    device: Any
+    """The device on which to track memory (unused for host memory)."""
+    snapshots: list[MemorySnapshotT]
+    """The list of recorded snapshots."""
+
     def __init__(self, device: Any = None) -> None:
         self.device: Any = device
         self.snapshots: list[MemorySnapshotT] = []
 
-    def add_record(self, tag: str) -> None:
-        self.snapshots.append(self.record(tag))
+    def add_record(self, tag: str, *, stacklevel: int = 1) -> None:
+        """Record a snapshot with the given *tag*."""
+        self.snapshots.append(self.make_record(tag, stacklevel=stacklevel + 1))
 
-    def record(self, tag: str) -> MemorySnapshotT:
-        import inspect
-
-        frame = inspect.currentframe()
-        lineno = frame.f_back.f_lineno if frame and frame.f_back else 0
-
+    def make_record(self, tag: str, *, stacklevel: int = 1) -> MemorySnapshotT:
+        """Take a memory snapshot with the given *tag*."""
         import resource
 
-        rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        try:
+            lineno = sys._getframe(stacklevel).f_lineno
+        except (AttributeError, ValueError):
+            lineno = 0
+
+        # NOTE: we need psutil to get the actual memory usage. `resource` doesn't
+        # do that, just gets the "current peak usage" or whatnot.
+        try:
+            import psutil
+
+            rss_mb = psutil.Process().memory_info().rss / (1024.0**2)
+        except Exception:
+            rss_mb = 0.0
+
         peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
         delta_rss_mb = 0.0
         if self.snapshots:
@@ -345,6 +374,7 @@ class MemoryTracker(Generic[MemorySnapshotT]):
         )
 
     def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:  # ruff: ignore[no-self-use]
+        """Get the table column labels used by :meth:`as_table`."""
         return (
             ("Line", {"justify": "right"}),
             ("Checkpoint", {}),
@@ -358,6 +388,7 @@ class MemoryTracker(Generic[MemorySnapshotT]):
         title: str = "Memory",
         header_style: str = "bold",
     ) -> rich.table.Table:
+        """Build a :class:`rich.table.Table` with all the recorded snapshots."""
         from rich.table import Table
 
         table = Table(title=title, header_style=header_style)
