@@ -206,7 +206,7 @@ def build_dmd(
         U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
     # construct reduced order model
-    Ahat = Vh @ xp.conj(Y).T @ (U / S)
+    Ahat = Vh @ (xp.conj(Y).T @ (U / S))
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
