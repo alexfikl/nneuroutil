@@ -307,13 +307,26 @@ def build_full_dmd(
     if method == "pinv":
         # NOTE: this essentially does a least squares fit for `Y = X A`. We
         # don't construct the pseudo-inverse directly to avoid the extra cost.
-        U, S, Vh = xp.linalg.svd(X, full_matrices=False)
 
-        S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
+        if n >= 2 * dx:
+            # NOTE: if X is very tall (n >= 2 dx), doing a direct SVD is costly.
+            # We do a thin QR first and then an SVD on the small (dx, dx) R factor
+            # to save memory workspace and compute time.
 
-        UY = xp.conj(U).T @ Y
-        VS = xp.conj(Vh).T * S
-        A = VS @ UY
+            Q, R = xp.linalg.qr(X, mode="reduced")
+            Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+            S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
+
+            UY = xp.conj(Ur).T @ (xp.conj(Q).T @ Y)
+            VS = xp.conj(Vh).T * S
+            A = VS @ UY
+        else:
+            U, S, Vh = xp.linalg.svd(X, full_matrices=False)
+            S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
+
+            UY = xp.conj(U).T @ Y
+            VS = xp.conj(Vh).T * S
+            A = VS @ UY
     elif method == "ridge":
         # NOTE: this tries to solve the regularized optimization problem
         #   A^* = argmin |X A - Y|^2 + \epsilon |A|^2
