@@ -179,7 +179,7 @@ def build_dmd(
             f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
         )
 
-    _, dx = X.shape
+    n, dx = X.shape
     _, dy = Y.shape
     if X.shape[0] != Y.shape[0]:
         raise ValueError(
@@ -195,18 +195,36 @@ def build_dmd(
     if xp is None:
         xp = array_api_compat.array_namespace(X)
 
-    U, S, Vh = xp.linalg.svd(X, full_matrices=False)
-    S = xp.astype(S, X.dtype)
+    if n >= 2 * dx:
+        # NOTE: precondition with a QR to avoid SVD-ing very tall matrices
+        Q, R = xp.linalg.qr(X, mode="reduced")
+        Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
 
-    if rank is not None:
-        U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+        if rank is not None:
+            Ur, S, Vh = Ur[:, :rank], S[:rank], Vh[:rank, :]
 
-    if eps is not None:
-        mask = xp.abs(S) > eps
-        U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+        if eps is not None:
+            mask = xp.abs(S) > eps
+            Ur, S, Vh = Ur[:, mask], S[mask], Vh[mask, :]
 
-    # construct reduced order model
-    Ahat = Vh @ (xp.conj(Y).T @ (U / S))
+        # construct reduced order model
+        QTY = xp.conj(Q).T @ Y
+        Ahat = Vh @ (xp.conj(QTY).T @ (Ur / S))
+        U = Q @ Ur
+    else:
+        U, S, Vh = xp.linalg.svd(X, full_matrices=False)
+
+        if rank is not None:
+            U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
+
+        if eps is not None:
+            mask = xp.abs(S) > eps
+            U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
+
+        # construct reduced order model
+        # (r, dy) @ (dy, n) @ (n @ r): association avoids two large matrix multiplies
+        Ahat = Vh @ (xp.conj(Y).T @ (U / S))
+
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
 
