@@ -9,12 +9,11 @@ import os
 import pathlib
 import sys
 import time
-from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 import array_api_compat
 import numpy as np
@@ -292,27 +291,67 @@ class BlockTimer:
 
 
 @dataclass(frozen=True)
-class MemorySnapshot(ABC):
+class MemorySnapshot:
     lineno: int
     tag: str
+    rss_mb: float
+    delta_rss_mb: float
+    peak_rss_mb: float
 
-    @abstractmethod
     def as_row(self) -> tuple[str, ...]:
-        pass
+        return (
+            f"L{self.lineno}",
+            self.tag,
+            f"{self.rss_mb:.2f}",
+            f"{self.delta_rss_mb:+.2f}",
+            f"{self.peak_rss_mb:.2f}",
+        )
 
 
-class MemoryTracker(ABC):
+MemorySnapshotT = TypeVar("MemorySnapshotT", bound=MemorySnapshot)
+
+
+class MemoryTracker(Generic[MemorySnapshotT]):
     def __init__(self, device: Any = None) -> None:
         self.device: Any = device
-        self.snapshots: list[MemorySnapshot] = []
+        self.snapshots: list[MemorySnapshotT] = []
 
-    @abstractmethod
-    def record(self, tag: str) -> None:
-        pass
+    def add_record(self, tag: str) -> None:
+        self.snapshots.append(self.record(tag))
 
-    @abstractmethod
-    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:
-        pass
+    def record(self, tag: str) -> MemorySnapshotT:
+        import inspect
+
+        frame = inspect.currentframe()
+        lineno = frame.f_back.f_lineno if frame and frame.f_back else 0
+
+        import resource
+
+        rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        delta_rss_mb = 0.0
+        if self.snapshots:
+            delta_rss_mb = rss_mb - self.snapshots[-1].rss_mb
+
+        return cast(
+            "MemorySnapshotT",
+            MemorySnapshot(
+                lineno=lineno,
+                tag=tag,
+                rss_mb=rss_mb,
+                delta_rss_mb=delta_rss_mb,
+                peak_rss_mb=peak_rss_mb,
+            ),
+        )
+
+    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:  # ruff: ignore[no-self-use]
+        return (
+            ("Line", {"justify": "right"}),
+            ("Checkpoint", {}),
+            ("RSS (MiB)", {"justify": "right"}),
+            ("Δ RSS (MiB)", {"justify": "right"}),
+            ("Peak RSS (MiB)", {"justify": "right"}),
+        )
 
     def as_table(
         self,

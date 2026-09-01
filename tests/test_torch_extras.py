@@ -456,12 +456,11 @@ def test_device_check_mode() -> None:
 
 
 def test_memory_tracker() -> None:
-    from nneuroutil.torch_extras import CUDATorchSnapshot, TorchMemoryTracker
+    from nneuroutil.torch_extras import make_memory_tracker
 
     x = torch.randn(256, 256)
 
-    tracker = TorchMemoryTracker()
-    assert not tracker.is_cuda
+    tracker = make_memory_tracker()
 
     tracker.record("start")
     y = x @ x
@@ -470,10 +469,9 @@ def test_memory_tracker() -> None:
     assert len(tracker.snapshots) == 2
     assert tracker.snapshots[0].tag == "start"
     assert tracker.snapshots[0].lineno > 0
-    assert tracker.snapshots[1].delta_rss_mb == (  # ty: ignore[unresolved-attribute]
-        tracker.snapshots[1].rss_mb - tracker.snapshots[0].rss_mb  # ty: ignore[unresolved-attribute]
+    assert tracker.snapshots[1].delta_rss_mb == (
+        tracker.snapshots[1].rss_mb - tracker.snapshots[0].rss_mb
     )
-    assert not isinstance(tracker.snapshots[0], CUDATorchSnapshot)
 
     # check labels and table rendering
     labels = tracker.labels()
