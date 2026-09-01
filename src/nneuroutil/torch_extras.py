@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
@@ -15,7 +16,7 @@ from torch.utils._python_dispatch import (  # ruff:ignore[import-private-name]
     TorchDispatchMode,
 )
 
-from nneuroutil.helpers import module_logger
+from nneuroutil.helpers import MemorySnapshot, MemoryTracker, module_logger
 
 log = module_logger(__name__)
 
@@ -892,6 +893,125 @@ def get_default_device() -> torch.device:
     to `torch.get_default_device()`, but that does not seem to work across versions.
     """
     return torch.zeros(1).device
+
+
+# }}}
+
+
+# {{{ get_memory_usage
+
+
+def get_memory_usage(device: torch.device) -> str:
+    import resource
+
+    max_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    if device.type == "cuda":
+        cuda_mem_mb = torch.cuda.memory_allocated(device) / (1024.0**2)
+        cuda_max_mb = torch.cuda.max_memory_allocated(device) / (1024.0**2)
+        return (
+            f"Peak RSS: {max_rss_mb:.2f} MiB, "
+            f"CUDA: {cuda_mem_mb:.2f} MiB (Peak CUDA: {cuda_max_mb:.2f} MiB)"
+        )
+
+    return f"Peak RSS: {max_rss_mb:.2f} MiB"
+
+
+@dataclass(frozen=True)
+class CPUTorchSnapshot(MemorySnapshot):
+    rss_mb: float
+    delta_rss_mb: float
+    peak_rss_mb: float
+
+    def as_row(self) -> tuple[str, ...]:
+        return (
+            f"L{self.lineno}",
+            self.tag,
+            f"{self.rss_mb:.2f}",
+            f"{self.delta_rss_mb:+.2f}",
+            f"{self.peak_rss_mb:.2f}",
+        )
+
+
+@dataclass(frozen=True)
+class CUDATorchSnapshot(CPUTorchSnapshot):
+    cuda_mb: float
+    delta_cuda_mb: float
+    peak_cuda_mb: float
+
+    def as_row(self) -> tuple[str, ...]:
+        return (
+            *super().as_row(),
+            f"{self.cuda_mb:.2f}",
+            f"{self.delta_cuda_mb:+.2f}",
+            f"{self.peak_cuda_mb:.2f}",
+        )
+
+
+class TorchMemoryTracker(MemoryTracker):
+    @property
+    def is_cuda(self) -> bool:
+        return getattr(self.device, "type", "") == "cuda"
+
+    def record(self, tag: str) -> None:
+        import inspect
+
+        frame = inspect.currentframe()
+        lineno = frame.f_back.f_lineno if frame and frame.f_back else 0
+
+        import resource
+
+        rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        delta_rss_mb = 0.0
+        if self.snapshots:
+            delta_rss_mb = rss_mb - self.snapshots[-1].rss_mb  # ty: ignore[unresolved-attribute]
+
+        if self.is_cuda:
+            cuda_mb = torch.cuda.memory_allocated(self.device) / (1024.0**2)
+            peak_cuda_mb = torch.cuda.max_memory_allocated(self.device) / (1024.0**2)
+            delta_cuda_mb = 0.0
+            if self.snapshots:
+                delta_cuda_mb = cuda_mb - self.snapshots[-1].cuda_mb  # ty: ignore[unresolved-attribute]
+
+            snapshot = CUDATorchSnapshot(
+                lineno=lineno,
+                tag=tag,
+                rss_mb=rss_mb,
+                delta_rss_mb=delta_rss_mb,
+                peak_rss_mb=peak_rss_mb,
+                cuda_mb=cuda_mb,
+                delta_cuda_mb=delta_cuda_mb,
+                peak_cuda_mb=peak_cuda_mb,
+            )
+        else:
+            snapshot = CPUTorchSnapshot(
+                lineno=lineno,
+                tag=tag,
+                rss_mb=rss_mb,
+                delta_rss_mb=delta_rss_mb,
+                peak_rss_mb=peak_rss_mb,
+            )
+
+        self.snapshots.append(snapshot)
+
+    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:
+        labels = (
+            ("Line", {"justify": "right"}),
+            ("Checkpoint", {}),
+            ("RSS (MiB)", {"justify": "right"}),
+            ("Δ RSS (MiB)", {"justify": "right"}),
+            ("Peak RSS (MiB)", {"justify": "right"}),
+        )
+
+        if self.is_cuda:
+            labels = (
+                *labels,
+                ("CUDA (MiB)", {"justify": "right"}),
+                ("Δ CUDA (MiB)", {"justify": "right"}),
+                ("Peak CUDA (MiB)", {"justify": "right"}),
+            )
+
+        return labels
 
 
 # }}}

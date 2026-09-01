@@ -9,6 +9,7 @@ import os
 import pathlib
 import sys
 import time
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -287,6 +288,55 @@ class BlockTimer:
 # }}}
 
 
+# {{{
+
+
+@dataclass(frozen=True)
+class MemorySnapshot(ABC):
+    lineno: int
+    tag: str
+
+    @abstractmethod
+    def as_row(self) -> tuple[str, ...]:
+        pass
+
+
+class MemoryTracker(ABC):
+    def __init__(self, device: Any = None) -> None:
+        self.device: Any = device
+        self.snapshots: list[MemorySnapshot] = []
+
+    @abstractmethod
+    def record(self, tag: str) -> None:
+        pass
+
+    @abstractmethod
+    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:
+        pass
+
+    def as_table(
+        self,
+        title: str = "Memory",
+        header_style: str = "bold",
+    ) -> rich.table.Table:
+        from rich.table import Table
+
+        table = Table(title=title, header_style=header_style)
+        for label, style in self.labels():
+            table.add_column(label, **style)
+
+        for snapshot in self.snapshots:
+            table.add_row(*snapshot.as_row())
+
+        return table
+
+    def __str__(self) -> str:
+        return stringify_table(self.as_table())
+
+
+# }}}
+
+
 # {{{ slugify
 
 
@@ -411,6 +461,7 @@ def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT
 
 
 # }}}
+
 
 # {{{ match_spectrum
 
