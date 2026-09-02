@@ -126,12 +126,12 @@ class DMDcBase(ABC, Generic[ScalarTypeT]):
 # }}}
 
 
-# {{{ build_full_dmdc
+# {{{ build_exact_dmdc
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class FullDMDc(DMDcBase[ScalarTypeT]):
+class ExactDMDc(DMDcBase[ScalarTypeT]):
     """DMDc model for which the lifted space is the physical space itself.
 
     The encoding and decoding steps are both the identity and :attr:`A`
@@ -166,7 +166,7 @@ class FullDMDc(DMDcBase[ScalarTypeT]):
         return Ax + Bu
 
 
-def build_full_dmdc(
+def build_exact_dmdc(
     X: Array2D[ScalarTypeT],
     U: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
@@ -174,7 +174,7 @@ def build_full_dmdc(
     method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
-) -> FullDMDc[ScalarTypeT]:
+) -> ExactDMDc[ScalarTypeT]:
     r"""Fit a linear input-driven model :math:`Y = X A + U B` on snapshot pairs.
 
     :arg X: state snapshot matrix of shape ``(nsnapshots, dim_x)``.
@@ -267,18 +267,18 @@ def build_full_dmdc(
     A = W[:dx, :]
     B = W[dx:, :]
 
-    return FullDMDc(A=A, B=B)
+    return ExactDMDc(A=A, B=B)
 
 
 # }}}
 
 
-# {{{ build_full_extended_dmdc
+# {{{ build_exact_extended_dmdc
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class FullExtendedDMDc(DMDcBase[ScalarTypeT]):
+class ExactExtendedDMDc(DMDcBase[ScalarTypeT]):
     """DMDc model in the space of nonlinear observables with external control."""
 
     C: Array2D[ScalarTypeT]
@@ -319,7 +319,7 @@ class FullExtendedDMDc(DMDcBase[ScalarTypeT]):
         return Ax + Bu
 
 
-def build_full_extended_dmdc(
+def build_exact_extended_dmdc(
     observables: Sequence[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]]],
     X: Array2D[ScalarTypeT],
     U: Array2D[ScalarTypeT],
@@ -329,7 +329,7 @@ def build_full_extended_dmdc(
     first_observable_is_state: bool = False,
     eps: float | None = None,
     xp: Any = None,
-) -> FullExtendedDMDc[ScalarTypeT]:
+) -> ExactExtendedDMDc[ScalarTypeT]:
     r"""Construct an extended DMDc approximation in the space of *observables*.
 
     :arg observables: sequence of maps :math:`g(x)` lifting physical states.
@@ -382,14 +382,14 @@ def build_full_extended_dmdc(
     d_lift = X_lift.shape[1]
 
     if first_observable_is_state:
-        dmdc_model = build_full_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
+        dmdc_model = build_exact_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
         A = dmdc_model.A
         B = dmdc_model.B
         C = xp.eye(d_lift, X.shape[1], dtype=X.dtype, device=X.device)
     else:
         # Fit A, B, and decoder C in a single factorization pass
         Y_combo = xp.concat([Y_lift, X], axis=1)
-        dmdc_combo = build_full_dmdc(X_lift, U, Y_combo, method=method, eps=eps, xp=xp)
+        dmdc_combo = build_exact_dmdc(X_lift, U, Y_combo, method=method, eps=eps, xp=xp)
         W_A = dmdc_combo.A  # (d_lift, d_lift + d_x)
         W_B = dmdc_combo.B  # (d_u, d_lift + d_x)
 
@@ -397,7 +397,7 @@ def build_full_extended_dmdc(
         C = W_A[:, d_lift:]
         B = W_B[:, :d_lift]
 
-    return FullExtendedDMDc(A=A, B=B, C=C, observables=tuple(observables))
+    return ExactExtendedDMDc(A=A, B=B, C=C, observables=tuple(observables))
 
 
 # }}}

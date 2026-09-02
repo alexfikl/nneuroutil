@@ -169,11 +169,11 @@ def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
     assert error_fb < error_plain
 
 
-# {{{ test_build_full_dmd
+# {{{ test_build_exact_dmd
 
 
 @pytest.mark.parametrize("use_complex", [False, True])
-def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
+def test_build_exact_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     rng = np.random.default_rng(seed=42)
     n, d = 16, 5
     noise = 0.01
@@ -186,13 +186,13 @@ def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     A_true = rng.standard_normal((d, d))
     Y = X @ A_true + noise * rng.standard_normal((n, d))
 
-    from nneuroutil.dmd import build_full_dmd
+    from nneuroutil.dmd import build_exact_dmd
 
     X = xp.asarray(X)
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 0.1]:
-        A = build_full_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
+        A = build_exact_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
         A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
 
         error = xp.linalg.norm(A - xp.asarray(A_ref))
@@ -207,7 +207,7 @@ def test_build_full_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
 
 
 @pytest.mark.parametrize("use_complex", [False, True])
-def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
+def test_build_exact_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
     rng = np.random.default_rng(seed=42)
     n, d = 16, 5
     noise = 0.01
@@ -220,13 +220,13 @@ def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
     A_true = rng.standard_normal((d, d))
     Y = X @ A_true + noise * rng.standard_normal((n, d))
 
-    from nneuroutil.dmd import build_full_dmd
+    from nneuroutil.dmd import build_exact_dmd
 
     X = xp.asarray(X)
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 1.0e-4]:
-        A = build_full_dmd(X, Y, method="ridge", eps=eps, xp=xp).A
+        A = build_exact_dmd(X, Y, method="ridge", eps=eps, xp=xp).A
 
         X_ref = np.asarray(X)
         Y_ref = np.asarray(Y)
@@ -246,16 +246,16 @@ def test_build_full_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
-def test_build_full_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -> None:
+def test_build_exact_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -> None:
     rng = np.random.default_rng(seed=42)
     nsnapshots, ndim = 16, 5
 
     X = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
     Y = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
 
-    from nneuroutil.dmd import build_full_dmd
+    from nneuroutil.dmd import build_exact_dmd
 
-    A = build_full_dmd(X, Y, method=method, xp=xp).A
+    A = build_exact_dmd(X, Y, method=method, xp=xp).A
     A_ref = np.linalg.lstsq(np.asarray(X), np.asarray(Y), rcond=None)[0]
 
     error = xp.linalg.norm(A - xp.asarray(A_ref))
@@ -263,30 +263,30 @@ def test_build_full_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -
     assert error < 1.0e-12
 
 
-def test_build_full_dmd_errors(xp: Any) -> None:
-    from nneuroutil.dmd import build_full_dmd
+def test_build_exact_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_exact_dmd
 
     X = xp.asarray(np.random.default_rng(42).standard_normal((16, 5)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_full_dmd(X[..., None], X, xp=xp)
+        build_exact_dmd(X[..., None], X, xp=xp)
     with pytest.raises(ValueError, match="must be of shape"):
-        build_full_dmd(X, X[..., None], xp=xp)
+        build_exact_dmd(X, X[..., None], xp=xp)
     with pytest.raises(ValueError, match="different shapes"):
-        build_full_dmd(X, X[:-1], xp=xp)
+        build_exact_dmd(X, X[:-1], xp=xp)
     with pytest.raises(ValueError, match="unknown method"):
-        build_full_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
+        build_exact_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
 
 
 # }}}
 
 
-# {{{ test_build_full_extended_dmd
+# {{{ test_build_exact_extended_dmd
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
 @pytest.mark.parametrize("use_trajectory", [True, False])
-def test_build_full_extended_dmd(
+def test_build_exact_extended_dmd(
     xp: Any, method: Literal["pinv", "ridge"], *, use_trajectory: bool
 ) -> None:
     # NOTE: keep the trajectory short, as the x^2 grows too fast in this case
@@ -303,13 +303,13 @@ def test_build_full_extended_dmd(
     def square(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x**2
 
-    from nneuroutil.dmd import build_full_extended_dmd
+    from nneuroutil.dmd import build_exact_extended_dmd
 
     observables = [identity, square]
     if use_trajectory:
-        dmd = build_full_extended_dmd(observables, S, method=method, xp=xp)
+        dmd = build_exact_extended_dmd(observables, S, method=method, xp=xp)
     else:
-        dmd = build_full_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+        dmd = build_exact_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
 
     A = dmd.A
     C = dmd.C
@@ -340,17 +340,17 @@ def test_build_full_extended_dmd(
     assert error < 1.0e-10
 
 
-def test_build_full_extended_dmd_errors(xp: Any) -> None:
-    from nneuroutil.dmd import build_full_extended_dmd
+def test_build_exact_extended_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_exact_extended_dmd
 
     X = xp.asarray(np.random.default_rng(42).standard_normal((16, 3)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_full_extended_dmd([], X[..., None], xp=xp)
+        build_exact_extended_dmd([], X[..., None], xp=xp)
     with pytest.raises(ValueError, match="no 'observables'"):
-        build_full_extended_dmd([], X, xp=xp)
+        build_exact_extended_dmd([], X, xp=xp)
     with pytest.raises(ValueError, match="different shapes"):
-        build_full_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
+        build_exact_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
 
 
 # }}}
@@ -359,12 +359,12 @@ def test_build_full_extended_dmd_errors(xp: Any) -> None:
 # {{{ test_diagnostics
 
 
-@pytest.mark.parametrize("flavor", ["reduced", "full", "extended"])
+@pytest.mark.parametrize("flavor", ["reduced", "exact", "extended"])
 def test_relative_forecast_error(xp: Any, flavor: str) -> None:
     from nneuroutil.dmd import (
         build_dmd,
-        build_full_dmd,
-        build_full_extended_dmd,
+        build_exact_dmd,
+        build_exact_extended_dmd,
         relative_forecast_error,
     )
 
@@ -380,10 +380,10 @@ def test_relative_forecast_error(xp: Any, flavor: str) -> None:
 
     if flavor == "reduced":
         dmd = build_dmd(X[:-1], X[1:], xp=xp)
-    elif flavor == "full":
-        dmd = build_full_dmd(X[:-1], X[1:], xp=xp)
+    elif flavor == "exact":
+        dmd = build_exact_dmd(X[:-1], X[1:], xp=xp)
     elif flavor == "extended":
-        dmd = build_full_extended_dmd([lambda z: z], X, xp=xp)
+        dmd = build_exact_extended_dmd([lambda z: z], X, xp=xp)
     else:
         raise ValueError(f"unknown flavor: {flavor!r}")
 
@@ -478,12 +478,12 @@ def test_relative_forecast_error_errors(xp: Any) -> None:
         relative_forecast_error(dmd, X[:1])
 
 
-@pytest.mark.parametrize("flavor", ["reduced", "full", "extended"])
+@pytest.mark.parametrize("flavor", ["reduced", "exact", "extended"])
 def test_fit_residual(xp: Any, flavor: str) -> None:
     from nneuroutil.dmd import (
         build_dmd,
-        build_full_dmd,
-        build_full_extended_dmd,
+        build_exact_dmd,
+        build_exact_extended_dmd,
         fit_residual,
     )
 
@@ -500,10 +500,10 @@ def test_fit_residual(xp: Any, flavor: str) -> None:
     X1, X2 = X[:-1], X[1:]
     if flavor == "reduced":
         dmd = build_dmd(X1, X2, xp=xp)
-    elif flavor == "full":
-        dmd = build_full_dmd(X1, X2, xp=xp)
+    elif flavor == "exact":
+        dmd = build_exact_dmd(X1, X2, xp=xp)
     elif flavor == "extended":
-        dmd = build_full_extended_dmd([lambda z: z], X, xp=xp)
+        dmd = build_exact_extended_dmd([lambda z: z], X, xp=xp)
     else:
         raise ValueError(f"unknown flavor: {flavor!r}")
 

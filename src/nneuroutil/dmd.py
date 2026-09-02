@@ -234,12 +234,12 @@ def build_dmd(
 # }}}
 
 
-# {{{ build_full_dmd
+# {{{ build_exact_dmd
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class FullDMD(DMDBase[ScalarTypeT]):
+class ExactDMD(DMDBase[ScalarTypeT]):
     """DMD model for which the lifted space is the physical space itself.
 
     The encoding and decoding steps are both the identity and :attr:`A`
@@ -265,7 +265,7 @@ class FullDMD(DMDBase[ScalarTypeT]):
         return xp.einsum("...j,ji->...i", xhat, self.A)
 
 
-def build_full_dmd(
+def build_exact_dmd(
     X: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
     *,
@@ -274,7 +274,7 @@ def build_full_dmd(
     method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
-) -> FullDMD[ScalarTypeT]:
+) -> ExactDMD[ScalarTypeT]:
     r"""Fit a linear model :math:`Y = X A` on snapshot pairs.
 
     This is very inefficient for large systems, but can work for toy examples.
@@ -377,18 +377,18 @@ def build_full_dmd(
     else:
         raise ValueError(f"unknown method: {method!r}")
 
-    return FullDMD(A)
+    return ExactDMD(A)
 
 
 # }}}
 
 
-# {{{ build_full_extended_dmd
+# {{{ build_exact_extended_dmd
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class FullExtendedDMD(DMDBase[ScalarTypeT]):
+class ExactExtendedDMD(DMDBase[ScalarTypeT]):
     """DMD model in the space of nonlinear observables.
 
     The lifted state is obtained by concatenating the outputs of
@@ -426,7 +426,7 @@ class FullExtendedDMD(DMDBase[ScalarTypeT]):
         return xp.einsum("...j,ji->...i", xhat, self.A)
 
 
-def build_full_extended_dmd(
+def build_exact_extended_dmd(
     observables: Sequence[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]]],
     X: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
@@ -436,12 +436,12 @@ def build_full_extended_dmd(
     rank: int | None = None,
     eps: float | None = None,
     xp: Any = None,
-) -> FullExtendedDMD[ScalarTypeT]:
+) -> ExactExtendedDMD[ScalarTypeT]:
     r"""Construct a DMD approximation of the system in the space of the *observables*.
 
     Each observable :math:`g` is evaluated on the snapshots and its output is
     appended to the last axis, lifting the system into a space of shape
-    ``(nsnapshots, sum(d_g))``. The returned operator :attr:`FullExtendedDMD.A`
+    ``(nsnapshots, sum(d_g))``. The returned operator :attr:`ExactExtendedDMD.A`
     acts on this lifted space.
 
     Evolution of a state :math:`x` can be performed with
@@ -508,17 +508,17 @@ def build_full_extended_dmd(
         X_lift, Y_lift = total_least_squares(X_lift, Y_lift, rank=rank, eps=eps)
 
     if first_observable_is_state:
-        A = build_full_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
+        A = build_exact_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
         C = xp.eye(X_lift.shape[1], X.shape[1], dtype=X.dtype, device=X.device)
     else:
         # NOTE: this should avoid performing two SVDs on X_lift (for A and C)
         YX_lift = xp.concat([Y_lift, X], axis=1)
-        result = build_full_dmd(X_lift, YX_lift, method=method, eps=eps, xp=xp).A
+        result = build_exact_dmd(X_lift, YX_lift, method=method, eps=eps, xp=xp).A
 
         A = result[:, : Y_lift.shape[1]]
         C = result[:, Y_lift.shape[1] :]
 
-    return FullExtendedDMD(A=A, C=C, observables=tuple(observables))
+    return ExactExtendedDMD(A=A, C=C, observables=tuple(observables))
 
 
 # }}}
@@ -529,7 +529,7 @@ def build_full_extended_dmd(
 
 @register_dataclass
 @dataclass(frozen=True)
-class ForwardBackwardDMD(FullDMD[ScalarTypeT]):
+class ForwardBackwardDMD(ExactDMD[ScalarTypeT]):
     """DMD model with forward-backward debiasing of the fitted operator.
 
     The operator :attr:`A` is the geometric mean of a forward and a backward
@@ -565,7 +565,7 @@ def build_forward_backward_dmd(
 
     which cancels the first-order eigenvalue shrinkage that least-squares
     fits exhibit on noisy snapshot pairs. In such setups, it may work better than
-    :class:`FullDMD` or :class:`FullExtendedDMD`.
+    :class:`ExactDMD` or :class:`ExactExtendedDMD`.
 
     .. [Dawson2016] S. T. M. Dawson, M. S. Hemati, M. O. Williams, C. W. Rowley,
         *Characterizing and Correcting for the Effect of Sensor Noise in the
@@ -574,7 +574,7 @@ def build_forward_backward_dmd(
         `doi:10.1007/s00348-016-2127-7 <https://doi.org/10.1007/s00348-016-2127-7>`__.
 
     :arg method: regularized solver used for both fits.
-    :arg eps: tolerance for the regularized solver, see :func:`build_full_dmd`.
+    :arg eps: tolerance for the regularized solver, see :func:`build_exact_dmd`.
 
     :returns: a model whose operator is the debiased forward-backward mean.
     """
@@ -585,8 +585,8 @@ def build_forward_backward_dmd(
     if xp is None:
         xp = array_api_compat.array_namespace(X, Y)
 
-    A_f = build_full_dmd(X, Y, method=method, eps=eps, xp=xp).A
-    A_b = build_full_dmd(Y, X, method=method, eps=eps, xp=xp).A
+    A_f = build_exact_dmd(X, Y, method=method, eps=eps, xp=xp).A
+    A_b = build_exact_dmd(Y, X, method=method, eps=eps, xp=xp).A
 
     lambda_f, v_f = xp.linalg.eig(A_f)
     lambda_b, v_b = xp.linalg.eig(A_b)
