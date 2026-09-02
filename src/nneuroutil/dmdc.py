@@ -228,6 +228,7 @@ def build_exact_dmdc(
     if eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
+    # NOTE: see build_exact_dmd for math, design choices, etc.
     if method == "pinv":
         if n >= 2 * d_omega:
             Q, R = xp.linalg.qr(Omega, mode="reduced")
@@ -245,7 +246,6 @@ def build_exact_dmdc(
             VS = xp.conj(Vh).T * S
             W = VS @ UY
     elif method == "ridge":
-        # Two-stage QR to avoid large augmented matrix allocations and preserve kappa
         Q1, R1 = xp.linalg.qr(Omega, mode="reduced")
         B1 = xp.conj(Q1).T @ Y
         del Q1
@@ -381,6 +381,7 @@ def build_exact_extended_dmdc(
 
     d_lift = X_lift.shape[1]
 
+    # NOTE: see build_exact_extended_dmd for math, design choices, etc.
     if first_observable_is_state:
         dmdc_model = build_exact_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
         A = dmdc_model.A

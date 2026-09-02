@@ -359,6 +359,8 @@ def build_exact_dmd(
         #   1. X = Q1 R1,  B1 = Q1^* Y
         #   2. [R1; \sqrt{\epsilon} I] = Q2 R
         #   3. R A = Q2[:d]^* B1
+        # NOTE: do not be inclined to use an SVD here, even it could be faster for
+        # n < 2 d, because it ruins differentiability, which was the whole point.
 
         # Step 1: Orthogonal reduction of X -> preserves kappa(X)
         Q1, R1 = xp.linalg.qr(X, mode="reduced")
@@ -377,6 +379,8 @@ def build_exact_dmd(
         rhs = xp.conj(Q2[:dx]).T @ B1
         del Q2, B1
 
+        # FIXME: would be nice if the Array API would have a triangular solv
+        # for this, but it shouldn't be an issue (the two QRs above dominate)
         A = xp.linalg.solve(R, rhs)
     else:
         raise ValueError(f"unknown method: {method!r}")
