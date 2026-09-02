@@ -240,10 +240,14 @@ def build_dmd(
 @register_dataclass
 @dataclass(frozen=True)
 class ExactDMD(DMDBase[ScalarTypeT]):
-    """DMD model for which the lifted space is the physical space itself.
+    r"""DMD model for which the lifted space is the physical space itself.
 
     The encoding and decoding steps are both the identity and :attr:`A`
     acts directly on states of shape ``(..., d)``.
+
+    Note that this implementation fits the dense :math:`d \times d` operator
+    directly. Use :class:`ReducedDMD` to construct a low-rank approximation
+    instead.
     """
 
     @property
@@ -389,11 +393,14 @@ def build_exact_dmd(
 @register_dataclass
 @dataclass(frozen=True)
 class ExactExtendedDMD(DMDBase[ScalarTypeT]):
-    """DMD model in the space of nonlinear observables.
+    r"""DMD model in the space of nonlinear observables.
 
     The lifted state is obtained by concatenating the outputs of
     :attr:`observables` along the last axis and the physical state is
     recovered by applying the decoder :attr:`C`.
+
+    Note that this implementation fits the dense :math:`m \times m` lifted
+    operator directly.
     """
 
     C: Array2D[ScalarTypeT]
