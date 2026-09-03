@@ -40,7 +40,7 @@ flax==0.12.8 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml:jax)
 flax==0.12.9 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:jax)
-fonttools==4.63.0
+fonttools==4.64.0
     # via matplotlib
 fsspec==2026.7.0
     # via etils
@@ -48,7 +48,7 @@ humanize==4.16.0
     # via orbax-checkpoint
 idna==3.19
     # via requests
-imagesize==2.0.0
+imagesize==2.0.1
     # via sphinx
 iniconfig==2.3.0
     # via pytest
@@ -76,7 +76,7 @@ jinja2==3.1.6
     # via
     #   pydata-sphinx-theme
     #   sphinx
-kiwisolver==1.5.0
+kiwisolver==1.5.1
     # via matplotlib
 markdown-it-py==4.2.0
     # via rich
@@ -93,7 +93,7 @@ ml-dtypes==0.6.0
     #   jax
     #   jaxlib
     #   tensorstore
-msgpack==1.2.1
+msgpack==1.2.2
     # via
     #   flax
     #   orbax-checkpoint
@@ -156,7 +156,7 @@ pluggy==1.6.0
     # via pytest
 prometheus-client==0.26.0
     # via orbax-checkpoint
-protobuf==7.36.0
+protobuf==7.36.1
     # via orbax-checkpoint
 psutil==7.2.2
     # via orbax-checkpoint
@@ -193,7 +193,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.16.4
+ruff==0.16.5
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -211,7 +211,7 @@ scipy-stubs==1.17.1.5 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml:test)
 scipy-stubs==1.18.1.0 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:test)
-simplejson==4.1.1
+simplejson==4.1.2
     # via orbax-checkpoint
 six==1.17.0
     # via python-dateutil
@@ -249,7 +249,7 @@ tensorstore==0.1.85
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.74
+ty==0.0.78
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
