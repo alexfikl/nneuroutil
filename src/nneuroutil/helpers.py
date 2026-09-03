@@ -533,7 +533,7 @@ def register_dataclass(cls: type[DataclassInstanceT]) -> type[DataclassInstanceT
 # }}}
 
 
-# {{{ match_spectrum
+# {{{ spectrum_error
 
 
 def spectrum_error(
