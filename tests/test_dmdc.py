@@ -39,23 +39,23 @@ def simulate_linear_system(
     return xp.asarray(X), xp.asarray(U), xp.asarray(A), xp.asarray(B)
 
 
-# {{{ test_build_exact_dmdc
+# {{{ test_build_dense_dmdc
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
 @pytest.mark.parametrize("nsnapshots", [8, 32])
-def test_build_exact_dmdc(
+def test_build_dense_dmdc(
     xp: Any, nsnapshots: int, method: Literal["pinv", "ridge"]
 ) -> None:
     rng = np.random.default_rng(seed=42)
     ndim, udim = 5, 2
 
-    from nneuroutil.dmdc import build_exact_dmdc, fit_residual
+    from nneuroutil.dmdc import build_dense_dmdc, fit_residual
 
     # NOTE: the snapshot counts hit both the QR and SVD branches of "pinv"
     X, U, A_ref, B_ref = simulate_linear_system(nsnapshots, ndim, udim, xp=xp, rng=rng)
 
-    dmdc = build_exact_dmdc(X, U, method=method, xp=xp)
+    dmdc = build_dense_dmdc(X, U, method=method, xp=xp)
 
     assert dmdc.physical_dim == ndim
     assert dmdc.lifted_dim == ndim
@@ -67,7 +67,7 @@ def test_build_exact_dmdc(
     error_A = xp.linalg.norm(dmdc.A - A_ref) / xp.linalg.norm(A_ref)
     error_B = xp.linalg.norm(dmdc.B - B_ref) / xp.linalg.norm(B_ref)
     log.info(
-        "[%s] Exact DMDc operator errors: A %.3e B %.3e (method=%s nsnapshots=%d)",
+        "[%s] Dense DMDc operator errors: A %.3e B %.3e (method=%s nsnapshots=%d)",
         xp.__name__,
         error_A,
         error_B,
@@ -78,19 +78,19 @@ def test_build_exact_dmdc(
     assert error_B < 1.0e-10
 
     residual = fit_residual(dmdc, X[:-1], U[:-1], X[1:])
-    log.info("[%s] Exact DMDc fit residual: %.3e", xp.__name__, residual)
+    log.info("[%s] Dense DMDc fit residual: %.3e", xp.__name__, residual)
     assert residual < 1.0e-10  # ty: ignore[unsupported-operator]
 
 
-def test_build_exact_dmdc_predict(xp: Any) -> None:
+def test_build_dense_dmdc_predict(xp: Any) -> None:
     rng = np.random.default_rng(seed=42)
     ndim, udim = 5, 2
     nsnapshots, maxit = 16, 10
 
-    from nneuroutil.dmdc import build_exact_dmdc
+    from nneuroutil.dmdc import build_dense_dmdc
 
     X, U, A_ref, _ = simulate_linear_system(nsnapshots, ndim, udim, xp=xp, rng=rng)
-    dmdc = build_exact_dmdc(X, U, xp=xp)
+    dmdc = build_dense_dmdc(X, U, xp=xp)
 
     # time-varying control: one control input per time step
     Xpred = dmdc.predict(X[0], U[:maxit], maxit, full=True)
@@ -98,7 +98,7 @@ def test_build_exact_dmdc_predict(xp: Any) -> None:
 
     error = xp.linalg.norm(Xpred - X[: maxit + 1]) / xp.linalg.norm(X[: maxit + 1])
     log.info(
-        "[%s] Exact DMDc forecast error: %.3e (time-varying control)",
+        "[%s] Dense DMDc forecast error: %.3e (time-varying control)",
         xp.__name__,
         error,
     )
@@ -117,49 +117,49 @@ def test_build_exact_dmdc_predict(xp: Any) -> None:
 
     error = xp.linalg.norm(xpred - Xref[-1]) / xp.linalg.norm(Xref[-1])
     log.info(
-        "[%s] Exact DMDc forecast error: %.3e (static control)",
+        "[%s] Dense DMDc forecast error: %.3e (static control)",
         xp.__name__,
         error,
     )
     assert error < 1.0e-10
 
 
-def test_build_exact_dmdc_errors(xp: Any) -> None:
-    from nneuroutil.dmdc import build_exact_dmdc
+def test_build_dense_dmdc_errors(xp: Any) -> None:
+    from nneuroutil.dmdc import build_dense_dmdc
 
     rng = np.random.default_rng(seed=42)
     X = xp.asarray(rng.standard_normal((16, 5)))
     U = xp.asarray(rng.standard_normal((16, 2)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_dmdc(X[..., None], U, xp=xp)
+        build_dense_dmdc(X[..., None], U, xp=xp)
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_dmdc(X, U[..., None], xp=xp)
+        build_dense_dmdc(X, U[..., None], xp=xp)
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_dmdc(X, U, X[..., None], xp=xp)
+        build_dense_dmdc(X, U, X[..., None], xp=xp)
 
     with pytest.raises(ValueError, match="matching snapshot counts"):
-        build_exact_dmdc(X, U[:-1], X, xp=xp)
+        build_dense_dmdc(X, U[:-1], X, xp=xp)
 
     with pytest.raises(ValueError, match="'eps' must be positive"):
-        build_exact_dmdc(X, U, eps=-1.0, xp=xp)
+        build_dense_dmdc(X, U, eps=-1.0, xp=xp)
 
     with pytest.raises(ValueError, match="unknown method"):
-        build_exact_dmdc(X, U, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
+        build_dense_dmdc(X, U, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
 
 
 # }}}
 
 
-# {{{ test_build_exact_extended_dmdc
+# {{{ test_build_dense_extended_dmdc
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
 @pytest.mark.parametrize("first_observable_is_state", [False, True])
 @pytest.mark.parametrize("use_trajectory", [False, True])
-def test_build_exact_extended_dmdc(
+def test_build_dense_extended_dmdc(
     xp: Any,
     method: Literal["pinv", "ridge"],
     *,
@@ -188,11 +188,11 @@ def test_build_exact_extended_dmdc(
     def square_second(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x[..., 1:2] ** 2
 
-    from nneuroutil.dmdc import build_exact_extended_dmdc
+    from nneuroutil.dmdc import build_dense_extended_dmdc
 
     observables = [identity, square_second]
     if use_trajectory:
-        dmdc = build_exact_extended_dmdc(
+        dmdc = build_dense_extended_dmdc(
             observables,
             X,
             U,
@@ -201,7 +201,7 @@ def test_build_exact_extended_dmdc(
             xp=xp,
         )
     else:
-        dmdc = build_exact_extended_dmdc(
+        dmdc = build_dense_extended_dmdc(
             observables,
             X[:-1],
             U[:-1],
@@ -246,21 +246,21 @@ def test_build_exact_extended_dmdc(
     assert error < 1.0e-9
 
 
-def test_build_exact_extended_dmdc_errors(xp: Any) -> None:
-    from nneuroutil.dmdc import build_exact_extended_dmdc
+def test_build_dense_extended_dmdc_errors(xp: Any) -> None:
+    from nneuroutil.dmdc import build_dense_extended_dmdc
 
     rng = np.random.default_rng(seed=42)
     X = xp.asarray(rng.standard_normal((16, 2)))
     U = xp.asarray(rng.standard_normal((16, 1)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_extended_dmdc([lambda z: z], X[..., None], U, xp=xp)
+        build_dense_extended_dmdc([lambda z: z], X[..., None], U, xp=xp)
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_extended_dmdc([lambda z: z], X, U[..., None], xp=xp)
+        build_dense_extended_dmdc([lambda z: z], X, U[..., None], xp=xp)
 
     with pytest.raises(ValueError, match="no 'observables'"):
-        build_exact_extended_dmdc([], X, U, xp=xp)
+        build_dense_extended_dmdc([], X, U, xp=xp)
 
 
 # }}}
@@ -270,14 +270,14 @@ def test_build_exact_extended_dmdc_errors(xp: Any) -> None:
 
 
 def test_relative_forecast_error(xp: Any) -> None:
-    from nneuroutil.dmdc import build_exact_dmdc, relative_forecast_error
+    from nneuroutil.dmdc import build_dense_dmdc, relative_forecast_error
 
     rng = np.random.default_rng(seed=42)
     ndim, udim = 5, 2
     nsnapshots = 32
 
     X, U, _, _ = simulate_linear_system(nsnapshots, ndim, udim, xp=xp, rng=rng)
-    dmdc = build_exact_dmdc(xp.asarray(X), xp.asarray(U), xp=xp)
+    dmdc = build_dense_dmdc(xp.asarray(X), xp.asarray(U), xp=xp)
 
     # NOTE: the forecast uses one control input per time step
     Xa = xp.asarray(X)
@@ -286,7 +286,7 @@ def test_relative_forecast_error(xp: Any) -> None:
     err = relative_forecast_error(dmdc, Xa, Uc)
     assert err.shape == (nsnapshots,)
     log.info(
-        "[%s] Exact DMDc forecast error (max): %.3e",
+        "[%s] Dense DMDc forecast error (max): %.3e",
         xp.__name__,
         float(xp.max(err)),
     )

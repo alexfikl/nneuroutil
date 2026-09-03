@@ -97,9 +97,9 @@ X1, X2 = X_noisy[:-1], X_noisy[1:]
 # {{{ fit models
 
 models: dict[str, Any] = {}
-models["DMD"] = dmd.build_exact_dmd(X1, X2, method="ridge")
+models["DenseDMD"] = dmd.build_dense_dmd(X1, X2, method="ridge")
 models["fbDMD"] = dmd.build_forward_backward_dmd(X1, X2, method="ridge")
-models["EDMD"] = dmd.build_exact_extended_dmd(
+models["DenseEDMD"] = dmd.build_dense_extended_dmd(
     [g_identity, g_sqr, g_cubic],
     X1,
     X2,

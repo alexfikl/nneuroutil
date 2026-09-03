@@ -27,7 +27,7 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
     ndim = 8
     nsnapshots = 64
 
-    from nneuroutil.dmd import build_dmd, total_least_squares
+    from nneuroutil.dmd import build_reduced_dmd, total_least_squares
 
     # construct a random stable-ish linear map and evolve an initial condition
     A = xp.asarray(rng.standard_normal((ndim, ndim)) / ndim)
@@ -42,17 +42,17 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
     X2 = X[1:]
     if tls:
         X1, X2 = total_least_squares(X1, X2, xp=xp)
-    dmd = build_dmd(X1, X2, xp=xp)
+    dmd = build_reduced_dmd(X1, X2, xp=xp)
 
     # ensure the implementation can be compiled
     if array_api_compat.is_jax_namespace(xp):
         import jax
 
-        _ = jax.jit(build_dmd, static_argnames=("rank", "xp"))(X1, X2, xp=xp)
+        _ = jax.jit(build_reduced_dmd, static_argnames=("rank", "xp"))(X1, X2, xp=xp)
     elif array_api_compat.is_torch_namespace(xp):
         import torch  # ty: ignore[unresolved-import,unused-ignore-comment]
 
-        _ = torch.compile(build_dmd)(X1, X2, xp=xp)
+        _ = torch.compile(build_reduced_dmd)(X1, X2, xp=xp)
 
     # check DMD approximation on a random state
     x = xp.asarray(rng.standard_normal(ndim))
@@ -100,15 +100,15 @@ def test_dmd_tls(sigma: float) -> None:
     X += sigma * rng.standard_normal(X.shape)
 
     # solve
-    from nneuroutil.dmd import build_dmd, total_least_squares
+    from nneuroutil.dmd import build_reduced_dmd, total_least_squares
 
     rank = ndim - 2
     X1 = X[:-1]
     X2 = X[1:]
-    dmd_ref = build_dmd(X1, X2, rank=rank)
+    dmd_ref = build_reduced_dmd(X1, X2, rank=rank)
 
     X1, X2 = total_least_squares(X1, X2, rank=rank)
-    dmd_tls = build_dmd(X1, X2, rank=rank)
+    dmd_tls = build_reduced_dmd(X1, X2, rank=rank)
 
     # compare eigenvalues
     eig_ref = np.linalg.eigvals(A)
@@ -125,7 +125,7 @@ def test_dmd_tls(sigma: float) -> None:
 
 @pytest.mark.parametrize("sigma", [0.05, 0.5])
 def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
-    from nneuroutil.dmd import build_dmd, build_forward_backward_dmd
+    from nneuroutil.dmd import build_forward_backward_dmd, build_reduced_dmd
 
     rng = np.random.default_rng(seed=42)
     nsnapshots = 128
@@ -148,7 +148,7 @@ def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
     Xn = X + sigma * xp.asarray(rng.standard_normal(X.shape))
     X1, X2 = Xn[:-1], Xn[1:]
 
-    dmd = build_dmd(X1, X2, xp=xp)
+    dmd = build_reduced_dmd(X1, X2, xp=xp)
     fb_dmd = build_forward_backward_dmd(X1, X2, xp=xp)
 
     assert fb_dmd.A_forward.shape == (2, 2)
@@ -169,11 +169,11 @@ def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
     assert error_fb < error_plain
 
 
-# {{{ test_build_exact_dmd
+# {{{ test_build_dense_dmd
 
 
 @pytest.mark.parametrize("use_complex", [False, True])
-def test_build_exact_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
+def test_build_dense_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     rng = np.random.default_rng(seed=42)
     n, d = 16, 5
     noise = 0.01
@@ -186,13 +186,13 @@ def test_build_exact_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     A_true = rng.standard_normal((d, d))
     Y = X @ A_true + noise * rng.standard_normal((n, d))
 
-    from nneuroutil.dmd import build_exact_dmd
+    from nneuroutil.dmd import build_dense_dmd
 
     X = xp.asarray(X)
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 0.1]:
-        A = build_exact_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
+        A = build_dense_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
         A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
 
         error = xp.linalg.norm(A - xp.asarray(A_ref))
@@ -207,7 +207,7 @@ def test_build_exact_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
 
 
 @pytest.mark.parametrize("use_complex", [False, True])
-def test_build_exact_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
+def test_build_dense_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
     rng = np.random.default_rng(seed=42)
     n, d = 16, 5
     noise = 0.01
@@ -220,13 +220,13 @@ def test_build_exact_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
     A_true = rng.standard_normal((d, d))
     Y = X @ A_true + noise * rng.standard_normal((n, d))
 
-    from nneuroutil.dmd import build_exact_dmd
+    from nneuroutil.dmd import build_dense_dmd
 
     X = xp.asarray(X)
     Y = xp.asarray(Y)
 
     for eps in [1.0e-12, 1.0e-4]:
-        A = build_exact_dmd(X, Y, method="ridge", eps=eps, xp=xp).A
+        A = build_dense_dmd(X, Y, method="ridge", eps=eps, xp=xp).A
 
         X_ref = np.asarray(X)
         Y_ref = np.asarray(Y)
@@ -246,16 +246,16 @@ def test_build_exact_dmd_ridge(xp: Any, *, use_complex: bool) -> None:
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
-def test_build_exact_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -> None:
+def test_build_dense_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) -> None:
     rng = np.random.default_rng(seed=42)
     nsnapshots, ndim = 16, 5
 
     X = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
     Y = xp.asarray(rng.standard_normal((nsnapshots, ndim)))
 
-    from nneuroutil.dmd import build_exact_dmd
+    from nneuroutil.dmd import build_dense_dmd
 
-    A = build_exact_dmd(X, Y, method=method, xp=xp).A
+    A = build_dense_dmd(X, Y, method=method, xp=xp).A
     A_ref = np.linalg.lstsq(np.asarray(X), np.asarray(Y), rcond=None)[0]
 
     error = xp.linalg.norm(A - xp.asarray(A_ref))
@@ -263,30 +263,30 @@ def test_build_exact_dmd_default_eps(xp: Any, method: Literal["pinv", "ridge"]) 
     assert error < 1.0e-12
 
 
-def test_build_exact_dmd_errors(xp: Any) -> None:
-    from nneuroutil.dmd import build_exact_dmd
+def test_build_dense_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_dense_dmd
 
     X = xp.asarray(np.random.default_rng(42).standard_normal((16, 5)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_dmd(X[..., None], X, xp=xp)
+        build_dense_dmd(X[..., None], X, xp=xp)
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_dmd(X, X[..., None], xp=xp)
+        build_dense_dmd(X, X[..., None], xp=xp)
     with pytest.raises(ValueError, match="different shapes"):
-        build_exact_dmd(X, X[:-1], xp=xp)
+        build_dense_dmd(X, X[:-1], xp=xp)
     with pytest.raises(ValueError, match="unknown method"):
-        build_exact_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
+        build_dense_dmd(X, X, method="garbage", xp=xp)  # ty: ignore[invalid-argument-type]
 
 
 # }}}
 
 
-# {{{ test_build_exact_extended_dmd
+# {{{ test_build_dense_extended_dmd
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
 @pytest.mark.parametrize("use_trajectory", [True, False])
-def test_build_exact_extended_dmd(
+def test_build_dense_extended_dmd(
     xp: Any, method: Literal["pinv", "ridge"], *, use_trajectory: bool
 ) -> None:
     # NOTE: keep the trajectory short, as the x^2 grows too fast in this case
@@ -303,13 +303,13 @@ def test_build_exact_extended_dmd(
     def square(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x**2
 
-    from nneuroutil.dmd import build_exact_extended_dmd
+    from nneuroutil.dmd import build_dense_extended_dmd
 
     observables = [identity, square]
     if use_trajectory:
-        dmd = build_exact_extended_dmd(observables, S, method=method, xp=xp)
+        dmd = build_dense_extended_dmd(observables, S, method=method, xp=xp)
     else:
-        dmd = build_exact_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+        dmd = build_dense_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
 
     A = dmd.A
     C = dmd.C
@@ -340,17 +340,17 @@ def test_build_exact_extended_dmd(
     assert error < 1.0e-10
 
 
-def test_build_exact_extended_dmd_errors(xp: Any) -> None:
-    from nneuroutil.dmd import build_exact_extended_dmd
+def test_build_dense_extended_dmd_errors(xp: Any) -> None:
+    from nneuroutil.dmd import build_dense_extended_dmd
 
     X = xp.asarray(np.random.default_rng(42).standard_normal((16, 3)))
 
     with pytest.raises(ValueError, match="must be of shape"):
-        build_exact_extended_dmd([], X[..., None], xp=xp)
+        build_dense_extended_dmd([], X[..., None], xp=xp)
     with pytest.raises(ValueError, match="no 'observables'"):
-        build_exact_extended_dmd([], X, xp=xp)
+        build_dense_extended_dmd([], X, xp=xp)
     with pytest.raises(ValueError, match="different shapes"):
-        build_exact_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
+        build_dense_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
 
 
 # }}}
@@ -359,12 +359,12 @@ def test_build_exact_extended_dmd_errors(xp: Any) -> None:
 # {{{ test_diagnostics
 
 
-@pytest.mark.parametrize("flavor", ["reduced", "exact", "extended"])
+@pytest.mark.parametrize("flavor", ["reduced", "dense", "extended"])
 def test_relative_forecast_error(xp: Any, flavor: str) -> None:
     from nneuroutil.dmd import (
-        build_dmd,
-        build_exact_dmd,
-        build_exact_extended_dmd,
+        build_dense_dmd,
+        build_dense_extended_dmd,
+        build_reduced_dmd,
         relative_forecast_error,
     )
 
@@ -379,11 +379,11 @@ def test_relative_forecast_error(xp: Any, flavor: str) -> None:
     X = xp.stack(xs)
 
     if flavor == "reduced":
-        dmd = build_dmd(X[:-1], X[1:], xp=xp)
-    elif flavor == "exact":
-        dmd = build_exact_dmd(X[:-1], X[1:], xp=xp)
+        dmd = build_reduced_dmd(X[:-1], X[1:], xp=xp)
+    elif flavor == "dense":
+        dmd = build_dense_dmd(X[:-1], X[1:], xp=xp)
     elif flavor == "extended":
-        dmd = build_exact_extended_dmd([lambda z: z], X, xp=xp)
+        dmd = build_dense_extended_dmd([lambda z: z], X, xp=xp)
     else:
         raise ValueError(f"unknown flavor: {flavor!r}")
 
@@ -400,7 +400,7 @@ def test_relative_forecast_error(xp: Any, flavor: str) -> None:
 
 
 def test_relative_forecast_error_maxit(xp: Any) -> None:
-    from nneuroutil.dmd import build_dmd, relative_forecast_error
+    from nneuroutil.dmd import build_reduced_dmd, relative_forecast_error
 
     rng = np.random.default_rng(seed=42)
     ndim = 6
@@ -412,7 +412,7 @@ def test_relative_forecast_error_maxit(xp: Any) -> None:
         xs.append(A @ xs[-1])
     X = xp.stack(xs)
 
-    dmd = build_dmd(X[:-1], X[1:], xp=xp)
+    dmd = build_reduced_dmd(X[:-1], X[1:], xp=xp)
 
     maxit = 10
     err = relative_forecast_error(dmd, X, maxit=maxit)
@@ -444,7 +444,7 @@ def test_relative_forecast_error_maxit(xp: Any) -> None:
 
 
 def test_relative_forecast_error_errors(xp: Any) -> None:
-    from nneuroutil.dmd import build_dmd, relative_forecast_error
+    from nneuroutil.dmd import build_reduced_dmd, relative_forecast_error
 
     rng = np.random.default_rng(seed=42)
     ndim = 6
@@ -456,7 +456,7 @@ def test_relative_forecast_error_errors(xp: Any) -> None:
         xs.append(A @ xs[-1])
     X = xp.stack(xs)
 
-    dmd = build_dmd(X[:-1], X[1:], xp=xp)
+    dmd = build_reduced_dmd(X[:-1], X[1:], xp=xp)
 
     with pytest.raises(ValueError, match="'maxit' must be in"):
         relative_forecast_error(dmd, X, maxit=0)
@@ -478,12 +478,12 @@ def test_relative_forecast_error_errors(xp: Any) -> None:
         relative_forecast_error(dmd, X[:1])
 
 
-@pytest.mark.parametrize("flavor", ["reduced", "exact", "extended"])
+@pytest.mark.parametrize("flavor", ["reduced", "dense", "extended"])
 def test_fit_residual(xp: Any, flavor: str) -> None:
     from nneuroutil.dmd import (
-        build_dmd,
-        build_exact_dmd,
-        build_exact_extended_dmd,
+        build_dense_dmd,
+        build_dense_extended_dmd,
+        build_reduced_dmd,
         fit_residual,
     )
 
@@ -499,11 +499,11 @@ def test_fit_residual(xp: Any, flavor: str) -> None:
 
     X1, X2 = X[:-1], X[1:]
     if flavor == "reduced":
-        dmd = build_dmd(X1, X2, xp=xp)
-    elif flavor == "exact":
-        dmd = build_exact_dmd(X1, X2, xp=xp)
+        dmd = build_reduced_dmd(X1, X2, xp=xp)
+    elif flavor == "dense":
+        dmd = build_dense_dmd(X1, X2, xp=xp)
     elif flavor == "extended":
-        dmd = build_exact_extended_dmd([lambda z: z], X, xp=xp)
+        dmd = build_dense_extended_dmd([lambda z: z], X, xp=xp)
     else:
         raise ValueError(f"unknown flavor: {flavor!r}")
 
@@ -513,7 +513,7 @@ def test_fit_residual(xp: Any, flavor: str) -> None:
 
     # NOTE: a truncated model must explain the data worse
     if flavor == "reduced":
-        dmd = build_dmd(X1, X2, rank=1, xp=xp)
+        dmd = build_reduced_dmd(X1, X2, rank=1, xp=xp)
         resid_trunc = float(fit_residual(dmd, X1, X2))  # ty: ignore[invalid-argument-type]
         log.info("[%s] rank-1 fit residual: %.3e", xp.__name__, resid_trunc)
         assert resid_trunc > resid

@@ -127,12 +127,12 @@ class DMDcBase(ABC, Generic[ScalarTypeT]):
 # }}}
 
 
-# {{{ build_exact_dmdc
+# {{{ dense DMDc
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class ExactDMDc(DMDcBase[ScalarTypeT]):
+class DenseDMDc(DMDcBase[ScalarTypeT]):
     """DMDc model for which the lifted space is the physical space itself.
 
     The encoding and decoding steps are both the identity and
@@ -168,7 +168,7 @@ class ExactDMDc(DMDcBase[ScalarTypeT]):
         return Ax + Bu
 
 
-def build_exact_dmdc(
+def build_dense_dmdc(
     X: Array2D[ScalarTypeT],
     U: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
@@ -176,7 +176,7 @@ def build_exact_dmdc(
     method: Literal["pinv", "ridge"] = "ridge",
     eps: float | None = None,
     xp: Any = None,
-) -> ExactDMDc[ScalarTypeT]:
+) -> DenseDMDc[ScalarTypeT]:
     r"""Fit a linear input-driven model :math:`Y = X A + U B` on snapshot pairs.
 
     :arg X: state snapshot matrix of shape ``(nsnapshots, dim_x)``.
@@ -230,7 +230,7 @@ def build_exact_dmdc(
     if eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
-    # NOTE: see build_exact_dmd for math, design choices, etc.
+    # NOTE: see build_dense_dmd for math, design choices, etc.
     if method == "pinv":
         if n >= 2 * d_omega:
             Q, R = xp.linalg.qr(Omega, mode="reduced")
@@ -269,18 +269,18 @@ def build_exact_dmdc(
     A = W[:dx, :]
     B = W[dx:, :]
 
-    return ExactDMDc(A=A, B=B)
+    return DenseDMDc(A=A, B=B)
 
 
 # }}}
 
 
-# {{{ build_exact_extended_dmdc
+# {{{ dense extended DMDc
 
 
 @register_dataclass
 @dataclass(frozen=True)
-class ExactExtendedDMDc(DMDcBase[ScalarTypeT]):
+class DenseExtendedDMDc(DMDcBase[ScalarTypeT]):
     """DMDc model in the space of nonlinear observables with external control."""
 
     C: Array2D[ScalarTypeT]
@@ -321,7 +321,7 @@ class ExactExtendedDMDc(DMDcBase[ScalarTypeT]):
         return Ax + Bu
 
 
-def build_exact_extended_dmdc(
+def build_dense_extended_dmdc(
     observables: Sequence[Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]]],
     X: Array2D[ScalarTypeT],
     U: Array2D[ScalarTypeT],
@@ -331,7 +331,7 @@ def build_exact_extended_dmdc(
     first_observable_is_state: bool = False,
     eps: float | None = None,
     xp: Any = None,
-) -> ExactExtendedDMDc[ScalarTypeT]:
+) -> DenseExtendedDMDc[ScalarTypeT]:
     r"""Construct an extended DMDc approximation in the space of *observables*.
 
     :arg observables: sequence of maps :math:`g(x)` lifting physical states.
@@ -383,16 +383,16 @@ def build_exact_extended_dmdc(
 
     d_lift = X_lift.shape[1]
 
-    # NOTE: see build_exact_extended_dmd for math, design choices, etc.
+    # NOTE: see build_dense_extended_dmd for math, design choices, etc.
     if first_observable_is_state:
-        dmdc_model = build_exact_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
+        dmdc_model = build_dense_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
         A = dmdc_model.A
         B = dmdc_model.B
         C = xp.eye(d_lift, X.shape[1], dtype=X.dtype, device=X.device)
     else:
         # Fit A, B, and decoder C in a single factorization pass
         Y_combo = xp.concat([Y_lift, X], axis=1)
-        dmdc_combo = build_exact_dmdc(X_lift, U, Y_combo, method=method, eps=eps, xp=xp)
+        dmdc_combo = build_dense_dmdc(X_lift, U, Y_combo, method=method, eps=eps, xp=xp)
         W_A = dmdc_combo.A  # (d_lift, d_lift + d_x)
         W_B = dmdc_combo.B  # (d_u, d_lift + d_x)
 
@@ -400,7 +400,7 @@ def build_exact_extended_dmdc(
         C = W_A[:, d_lift:]
         B = W_B[:, :d_lift]
 
-    return ExactExtendedDMDc(A=A, B=B, C=C, observables=tuple(observables))
+    return DenseExtendedDMDc(A=A, B=B, C=C, observables=tuple(observables))
 
 
 # }}}
