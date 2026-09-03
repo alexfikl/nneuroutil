@@ -33,8 +33,9 @@ class DMDcBase(ABC, Generic[ScalarTypeT]):
 
         xhat_next = self.evolve(self.encode(x), u)
 
-    where :meth:`encode` maps the physical state into the lifted space, :attr:`A`
-    acts on the lifted state, and :attr:`B` injects the control input :math:`u`.
+    where :meth:`encode` maps the physical state into the lifted space,
+    :attr:`~nneuroutil.dmdc.DMDcBase.A` acts on the lifted state, and
+    :attr:`~nneuroutil.dmdc.DMDcBase.B` injects the control input :math:`u`.
     """
 
     A: Array2D[ScalarTypeT]
@@ -134,9 +135,10 @@ class DMDcBase(ABC, Generic[ScalarTypeT]):
 class ExactDMDc(DMDcBase[ScalarTypeT]):
     """DMDc model for which the lifted space is the physical space itself.
 
-    The encoding and decoding steps are both the identity and :attr:`A`
-    acts directly on states of shape ``(..., d)`` while :attr:`B` acts
-    on control inputs of shape ``(..., m)``.
+    The encoding and decoding steps are both the identity and
+    :attr:`~nneuroutil.dmdc.DMDcBase.A` acts directly on states of shape
+    ``(..., d)`` while :attr:`~nneuroutil.dmdc.DMDcBase.B` acts on control
+    inputs of shape ``(..., m)``.
     """
 
     @property
