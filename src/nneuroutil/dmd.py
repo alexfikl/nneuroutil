@@ -33,7 +33,7 @@ class DMDBase(ABC, Generic[ScalarTypeT]):
         xhat_next = self.evolve(self.encode(x))
 
     where :meth:`encode` maps the physical state into the lifted space and
-    :attr:`A` acts on its last dimension.
+    :attr:`~nneuroutil.dmd.DMDBase.A` acts on its last dimension.
     """
 
     A: Array2D[ScalarTypeT]
@@ -242,8 +242,8 @@ def build_dmd(
 class ExactDMD(DMDBase[ScalarTypeT]):
     r"""DMD model for which the lifted space is the physical space itself.
 
-    The encoding and decoding steps are both the identity and :attr:`A`
-    acts directly on states of shape ``(..., d)``.
+    The encoding and decoding steps are both the identity and
+    :attr:`~nneuroutil.dmd.DMDBase.A` acts directly on states of shape ``(..., d)``.
 
     Note that this implementation fits the dense :math:`d \times d` operator
     directly. Use :class:`ReducedDMD` to construct a low-rank approximation
@@ -452,8 +452,7 @@ def build_exact_extended_dmd(
 
     Each observable :math:`g` is evaluated on the snapshots and its output is
     appended to the last axis, lifting the system into a space of shape
-    ``(nsnapshots, sum(d_g))``. The returned operator :attr:`ExactExtendedDMD.A`
-    acts on this lifted space.
+    ``(nsnapshots, sum(d_g))``. The returned operator acts on this lifted space.
 
     Evolution of a state :math:`x` can be performed with
     :meth:`DMDBase.predict`, or manually as
@@ -543,9 +542,9 @@ def build_exact_extended_dmd(
 class ForwardBackwardDMD(ExactDMD[ScalarTypeT]):
     """DMD model with forward-backward debiasing of the fitted operator.
 
-    The operator :attr:`A` is the geometric mean of a forward and a backward
-    least-squares fit, whose systematic errors-in-variables biases have
-    opposite signs and cancel to first order.
+    The operator :attr:`~nneuroutil.dmd.DMDBase.A` is the geometric mean of a
+    forward and a backward least-squares fit, whose systematic
+    errors-in-variables biases have opposite signs and cancel to first order.
     """
 
     A_forward: Array2D[ScalarTypeT]

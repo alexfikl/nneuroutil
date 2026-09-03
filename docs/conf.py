@@ -219,7 +219,7 @@ nitpick_ignore_regex = [
 
 intersphinx_mapping = {
     "flax": ("https://flax.readthedocs.io/en/latest", None),
-    "jax": ("https://jax.readthedocs.io/en/latest", None),
+    "jax": ("https://docs.jax.dev/en/latest", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "python": ("https://docs.python.org/3", None),

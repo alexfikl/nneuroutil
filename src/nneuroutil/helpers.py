@@ -317,6 +317,7 @@ class MemorySnapshot:
 
 
 MemorySnapshotT = TypeVar("MemorySnapshotT", bound=MemorySnapshot)
+"""An invariant :class:`~typing.TypeVar` bound to :class:`MemorySnapshot`."""
 
 
 class MemoryTracker(Generic[MemorySnapshotT]):
@@ -374,7 +375,9 @@ class MemoryTracker(Generic[MemorySnapshotT]):
         )
 
     def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:  # ruff: ignore[no-self-use]
-        """Get the table column labels used by :meth:`as_table`."""
+        """Get the table column labels used by
+        :meth:`~nneuroutil.helpers.MemoryTracker.as_table`.
+        """
         return (
             ("Line", {"justify": "right"}),
             ("Checkpoint", {}),
