@@ -1,0 +1,4 @@
+Typing
+======
+
+.. automodule:: nneuroutil.typing

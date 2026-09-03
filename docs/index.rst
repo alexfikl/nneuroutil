@@ -4,9 +4,13 @@ nneuroutil: utilities for neuroscience
 .. toctree::
     :maxdepth: 2
     :hidden:
-    :caption: Contents
+    :caption: API Reference
 
-    api
+    api/dmd
+    api/torch_extras
+    api/flax_extras
+    api/helpers
+    api/typing
 
 .. warning::
 

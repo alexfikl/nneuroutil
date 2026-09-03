@@ -118,7 +118,7 @@ class ReducedDMD(DMDBase[ScalarTypeT]):
     """
 
     U: Array2D[ScalarTypeT]
-    """Left singular vectors as an array of shape :math:`(n - 1, r)`."""
+    """Left singular vectors as an array of shape :math:`(n, r)`."""
     S: Array1D[ScalarTypeT]
     """Singular values as an array of shape :math:`(r,)`."""
     Vh: Array2D[ScalarTypeT]
@@ -243,7 +243,7 @@ class ExactDMD(DMDBase[ScalarTypeT]):
     r"""DMD model for which the lifted space is the physical space itself.
 
     The encoding and decoding steps are both the identity and
-    :attr:`~nneuroutil.dmd.DMDBase.A` acts directly on states of shape ``(..., d)``.
+    :attr:`~nneuroutil.dmd.DMDBase.A` acts directly on the physical space.
 
     Note that this implementation fits the dense :math:`d \times d` operator
     directly. Use :class:`ReducedDMD` to construct a low-rank approximation
@@ -284,10 +284,10 @@ def build_exact_dmd(
     This is very inefficient for large systems, but can work for toy examples.
     The implemented methods are:
 
-    1. `pinv`: using the pseudo-inverse :math:`A^* = X^\dagger Y`. This is more
-        accurate and numerically stable for ill-conditioned :math:`X`.
-    2. `ridge`: using a ridge regression on the normal equations. This is more
-        efficient and differentiable.
+    1. ``pinv``: using the pseudo-inverse :math:`A^* = X^\dagger Y`. This is more
+       accurate and numerically stable for ill-conditioned :math:`X`.
+    2. ``ridge``: using a ridge regression on the normal equations. This is more
+       efficient and differentiable.
 
     :arg eps: tolerance used to regularize the pseudo-inverse. This has different
         meanings based on the method being used: (1) a relative tolerance on the
