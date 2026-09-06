@@ -18,7 +18,7 @@ TEST_DIRECTORY = TEST_FILENAME.parent
 
 log = module_logger(__name__)
 
-# {{{ test_dmd_classic
+# {{{ test_dmd_classic_linear
 
 
 @pytest.mark.parametrize("tls", [True, False])
@@ -40,6 +40,19 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
     # build DMD approximation
     X1 = X[:-1]
     X2 = X[1:]
+
+    # check that the default trajectory split works as expected
+    from dataclasses import fields
+
+    dmd_ref = build_reduced_dmd(X, xp=xp)
+    dmd_pairs = build_reduced_dmd(X1, X2, xp=xp)
+    for f in fields(dmd_ref):
+        error = xp.linalg.norm(getattr(dmd_ref, f.name) - getattr(dmd_pairs, f.name))
+        log.info(
+            "[%s] reduced default vs pairs %s error: %.8e", xp.__name__, f.name, error
+        )
+        assert error < 1.0e-12
+
     if tls:
         X1, X2 = total_least_squares(X1, X2, xp=xp)
     dmd = build_reduced_dmd(X1, X2, xp=xp)
@@ -75,6 +88,9 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
 
 
 # }}}
+
+
+# {{{ test_dmd_tls
 
 
 @pytest.mark.parametrize("sigma", [0.1, 1.0])
@@ -123,50 +139,7 @@ def test_dmd_tls(sigma: float) -> None:
     assert error_tls < error_dmd
 
 
-@pytest.mark.parametrize("sigma", [0.05, 0.5])
-def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
-    from nneuroutil.dmd import build_forward_backward_dmd, build_reduced_dmd
-
-    rng = np.random.default_rng(seed=42)
-    nsnapshots = 128
-
-    # stable planar rotation; its eigenvalues sit close to the unit circle,
-    # so the forward-backward correction is well-conditioned and decisive
-    r, theta = 0.995, 0.7
-    A = r * np.array([
-        [np.cos(theta), -np.sin(theta)],
-        [np.sin(theta), np.cos(theta)],
-    ])
-
-    A = xp.asarray(A)
-    xs = [xp.asarray(rng.standard_normal(2))]
-    for _ in range(nsnapshots - 1):
-        xs.append(A @ xs[-1])
-    X = xp.stack(xs)
-
-    sigma = sigma * xp.linalg.norm(X) / np.sqrt(np.prod(X.shape))
-    Xn = X + sigma * xp.asarray(rng.standard_normal(X.shape))
-    X1, X2 = Xn[:-1], Xn[1:]
-
-    dmd = build_reduced_dmd(X1, X2, xp=xp)
-    fb_dmd = build_forward_backward_dmd(X1, X2, xp=xp)
-
-    assert fb_dmd.A_forward.shape == (2, 2)
-    assert fb_dmd.A_backward.shape == (2, 2)
-
-    eig_ref = xp.asarray(np.linalg.eigvals(A))
-    lambda_dmd = xp.linalg.eigvals(dmd.A)
-    lambda_fb_dmd = xp.linalg.eigvals(fb_dmd.A)
-
-    error_plain = spectrum_error(lambda_dmd, eig_ref)
-    error_fb = spectrum_error(lambda_fb_dmd, eig_ref)
-    log.info(
-        "Noise %.3f Error DMD %.5e fbDMD %.5e",
-        sigma,
-        error_plain,
-        error_fb,
-    )
-    assert error_fb < error_plain
+# }}}
 
 
 # {{{ test_build_dense_dmd
@@ -176,26 +149,34 @@ def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
 def test_build_dense_dmd_pinv(xp: Any, *, use_complex: bool) -> None:
     rng = np.random.default_rng(seed=42)
     n, d = 16, 5
-    noise = 0.01
 
     if use_complex:
-        X = rng.standard_normal((n, d)) + 1j * rng.standard_normal((n, d))
+        X = rng.standard_normal((n + 1, d)) + 1j * rng.standard_normal((n + 1, d))
     else:
-        X = rng.standard_normal((n, d))
-
-    A_true = rng.standard_normal((d, d))
-    Y = X @ A_true + noise * rng.standard_normal((n, d))
+        X = rng.standard_normal((n + 1, d))
+    X = xp.asarray(X)
 
     from nneuroutil.dmd import build_dense_dmd
 
-    X = xp.asarray(X)
-    Y = xp.asarray(Y)
-
+    X1, X2 = X[:-1], X[1:]
     for eps in [1.0e-12, 0.1]:
-        A = build_dense_dmd(X, Y, method="pinv", eps=eps, xp=xp).A
-        A_ref = np.linalg.pinv(np.asarray(X), rcond=eps) @ np.asarray(Y)
+        A = build_dense_dmd(X1, X2, method="pinv", eps=eps, xp=xp).A
+        A_default = build_dense_dmd(X, method="pinv", eps=eps, xp=xp).A
+        A_ref = xp.linalg.pinv(X1) @ X2
 
-        error = xp.linalg.norm(A - xp.asarray(A_ref))
+        # Y=None default must agree with the explicit pairs
+        error = xp.linalg.norm(A_default - A)
+        log.info(
+            "[%s] pinv default vs pairs error: %.3e (complex=%s eps=%.1e)",
+            xp.__name__,
+            error,
+            use_complex,
+            eps,
+        )
+        assert error < 1.0e-12
+
+        # must also agree with A_ref
+        error = xp.linalg.norm(A - A_ref)
         log.info(
             "[%s] pinv error: %.3e (complex=%s eps=%.1e)",
             xp.__name__,
@@ -285,18 +266,7 @@ def test_build_dense_dmd_errors(xp: Any) -> None:
 
 
 @pytest.mark.parametrize("method", ["pinv", "ridge"])
-@pytest.mark.parametrize("use_trajectory", [True, False])
-def test_build_dense_extended_dmd(
-    xp: Any, method: Literal["pinv", "ridge"], *, use_trajectory: bool
-) -> None:
-    # NOTE: keep the trajectory short, as the x^2 grows too fast in this case
-    x0 = 0.7
-    xs = [x0]
-
-    for _ in range(12):
-        xs.append(2.0 * xs[-1])
-    S = xp.asarray(xs, dtype=xp.float64)[:, None]
-
+def test_build_dense_extended_dmd(xp: Any, method: Literal["pinv", "ridge"]) -> None:
     def identity(x: ArrayND[np.floating[Any]]) -> ArrayND[np.floating[Any]]:
         return x
 
@@ -305,11 +275,35 @@ def test_build_dense_extended_dmd(
 
     from nneuroutil.dmd import build_dense_extended_dmd
 
+    # NOTE: keep the trajectory short, as the x^2 grows too fast in this case
+    x0 = 0.7
+    xs = [x0]
+    for _ in range(12):
+        xs.append(2.0 * xs[-1])
+    S = xp.asarray(xs, dtype=xp.float64)[:, None]
+
     observables = [identity, square]
-    if use_trajectory:
-        dmd = build_dense_extended_dmd(observables, S, method=method, xp=xp)
-    else:
-        dmd = build_dense_extended_dmd(observables, S[:-1], S[1:], method=method, xp=xp)
+
+    # check that the default trajectory split works as expected
+    from dataclasses import fields
+
+    dmd = build_dense_extended_dmd(observables, S, method=method, xp=xp)
+    dmd_pairs = build_dense_extended_dmd(
+        observables, S[:-1], S[1:], method=method, xp=xp
+    )
+    for f in fields(dmd):
+        if f.name == "observables":
+            continue
+
+        error = xp.linalg.norm(getattr(dmd, f.name) - getattr(dmd_pairs, f.name))
+        log.info(
+            "[%s] extended default vs pairs %s error: %.3e (method=%s)",
+            xp.__name__,
+            f.name,
+            error,
+            method,
+        )
+        assert error < 1.0e-12
 
     A = dmd.A
     C = dmd.C
@@ -331,11 +325,10 @@ def test_build_dense_extended_dmd(
 
     error = abs(x_pred - x_ref)
     log.info(
-        "[%s] extended DMD 10-step error: %.3e (method=%s, use_trajectory=%s)",
+        "[%s] extended DMD 10-step error: %.3e (method=%s)",
         xp.__name__,
         error,
         method,
-        use_trajectory,
     )
     assert error < 1.0e-10
 
@@ -351,6 +344,67 @@ def test_build_dense_extended_dmd_errors(xp: Any) -> None:
         build_dense_extended_dmd([], X, xp=xp)
     with pytest.raises(ValueError, match="different shapes"):
         build_dense_extended_dmd([lambda z: z], X, X[:-1], xp=xp)
+
+
+# }}}
+
+
+# {{{ test_build_forward_backward_dmd
+
+
+@pytest.mark.parametrize("sigma", [0.05, 0.5])
+def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
+    from nneuroutil.dmd import build_forward_backward_dmd, build_reduced_dmd
+
+    rng = np.random.default_rng(seed=42)
+    nsnapshots = 128
+
+    # stable planar rotation; its eigenvalues sit close to the unit circle,
+    # so the forward-backward correction is well-conditioned and decisive
+    r, theta = 0.995, 0.7
+    A = r * np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)],
+    ])
+
+    A = xp.asarray(A)
+    xs = [xp.asarray(rng.standard_normal(2))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    sigma = sigma * xp.linalg.norm(X) / np.sqrt(np.prod(X.shape))
+    Xn = X + sigma * xp.asarray(rng.standard_normal(X.shape))
+    X1, X2 = Xn[:-1], Xn[1:]
+
+    dmd = build_reduced_dmd(X1, X2, xp=xp)
+    fb_dmd = build_forward_backward_dmd(X1, X2, xp=xp)
+    fb_dmd_ref = build_forward_backward_dmd(Xn, xp=xp)
+
+    assert fb_dmd.A_forward.shape == (2, 2)
+    assert fb_dmd.A_backward.shape == (2, 2)
+
+    # check that the default trajectory split works as expected
+    from dataclasses import fields
+
+    for f in fields(fb_dmd):
+        error = xp.linalg.norm(getattr(fb_dmd_ref, f.name) - getattr(fb_dmd, f.name))
+        log.info("[%s] fbDMD ref vs pairs %s error: %.3e", xp.__name__, f.name, error)
+        assert error < 1.0e-12
+
+    eig_ref = xp.asarray(np.linalg.eigvals(A))
+    lambda_dmd = xp.linalg.eigvals(dmd.A)
+    lambda_fb_dmd = xp.linalg.eigvals(fb_dmd.A)
+
+    error_plain = spectrum_error(lambda_dmd, eig_ref)
+    error_fb = spectrum_error(lambda_fb_dmd, eig_ref)
+    log.info(
+        "Noise %.3f Error DMD %.5e fbDMD %.5e",
+        sigma,
+        error_plain,
+        error_fb,
+    )
+    assert error_fb < error_plain
 
 
 # }}}
