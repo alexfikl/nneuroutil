@@ -606,16 +606,15 @@ def build_forward_backward_dmd(
     A_f = build_dense_dmd(X, Y, method=method, eps=eps, xp=xp).A
     A_b = build_dense_dmd(Y, X, method=method, eps=eps, xp=xp).A
 
-    # NOTE: A_b approximates A_f^{-1}, so (A_f A_b^{-1})^{1/2} recovers A_f with
-    # the first-order attenuation bias of the two least-squares fits cancelled
-    # (Eq. (15) of [Dawson2016]_). We solve A_b^T P^T = A_f^T directly instead of
-    # forming A_b^{-1} explicitly, for better numerical conditioning.
-    P = xp.linalg.solve(A_b.T, A_f.T).T
+    # NOTE: according to Algorithm 3 in [Dawson2016], we need to
+    # 1. Compute P = A_f @ A_b^{-1}
+    #   - We do this by a solve for numerical stability.
+    # 2. Compute A_fb = sqrt{P}.
+    #   - The square root is not unique here because of branch cuts, so we pick
+    #     the value closest to eigenvalues of A_f (recommended in the paper).
+    #   - picking is done by computing the Reyleigh quotient and comparing
 
-    # NOTE: the matrix square root is not unique: for each eigenvalue of P both
-    # sqrt(mu) and -sqrt(mu) are admissible roots. Following [Dawson2016]_, we
-    # select the branch closest to the corresponding eigenvalue of A_f, identified
-    # by a Rayleigh quotient along the eigenvector of P.
+    P = xp.linalg.solve(A_b.T, A_f.T).T  # ty: ignore[unresolved-attribute]
     mu, v = xp.linalg.eig(P)
     s = xp.sqrt(mu)
 
