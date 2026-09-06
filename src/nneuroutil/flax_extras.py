@@ -37,7 +37,7 @@ class BlendedQuadratic(nnx.Module):
         f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
     """
 
-    def __init__(self, alpha: float = 0.1) -> None:
+    def __init__(self, alpha: float = 0.5) -> None:
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
@@ -277,6 +277,26 @@ class ComplexLinear(nnx.Module):
 # {{{ init
 
 
+def calculate_scale(nonlinearity: str, **kwargs: float) -> float:
+    if nonlinearity == "quadratic":
+        scale = 1.0 / math.sqrt(3)
+    elif nonlinearity == "blended_quadratic":
+        alpha = kwargs.get("alpha", 0.5)
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
+
+        if abs(alpha - 1.0) < 1.0e-8:
+            scale = 1.0
+        else:
+            a = 3 * (1 - alpha) ** 2
+            b = alpha**2
+            scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
+    else:
+        raise ValueError(f"unknown nonlinearity: {nonlinearity}")
+
+    return scale
+
+
 def quadratic_uniform(
     in_axis: int | tuple[int, ...] = -2,
     out_axis: int | tuple[int, ...] = -1,
@@ -294,7 +314,7 @@ def quadratic_uniform(
     # That's it! This matches what the Kaiming inits do for ReLU.
 
     return nnx.initializers.variance_scaling(
-        scale=1 / math.sqrt(3),
+        scale=calculate_scale("quadratic"),
         mode="fan_in",
         distribution="uniform",
         in_axis=in_axis,
@@ -312,7 +332,7 @@ def quadratic_normal(
 ) -> Initializer:
     """A normal init that preserves variance through :func:`quadratic`."""
     return nnx.initializers.variance_scaling(
-        scale=1 / math.sqrt(3),
+        scale=calculate_scale("quadratic"),
         mode="fan_in",
         distribution="truncated_normal",
         in_axis=in_axis,
@@ -323,7 +343,7 @@ def quadratic_normal(
 
 
 def blended_quadratic_uniform(
-    alpha: float = 1.0,
+    alpha: float = 0.5,
     in_axis: int | tuple[int, ...] = -2,
     out_axis: int | tuple[int, ...] = -1,
     batch_axis: int | tuple[int, ...] = (),
@@ -341,15 +361,8 @@ def blended_quadratic_uniform(
     #   3 (1 - alpha)^2 s^2 + alpha^2 s - 1 = 0
     # of which we take the positive root.
 
-    if abs(alpha - 1.0) < 1.0e-8:
-        scale = 1.0
-    else:
-        a = 3 * (1 - alpha) ** 2
-        b = alpha**2
-        scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
-
     return nnx.initializers.variance_scaling(
-        scale=scale,
+        scale=calculate_scale("blended_quadratic", alpha=alpha),
         mode="fan_in",
         distribution="uniform",
         in_axis=in_axis,
@@ -367,15 +380,8 @@ def blended_quadratic_normal(
     dtype: Any = None,
 ) -> Initializer:
     """A normal init that preserves variance through :func:`blended_quadratic`."""
-    if abs(alpha - 1.0) < 1.0e-8:
-        scale = 1.0
-    else:
-        a = 3 * (1 - alpha) ** 2
-        b = alpha**2
-        scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
-
     return nnx.initializers.variance_scaling(
-        scale=scale,
+        scale=calculate_scale("blended_quadratic", alpha=alpha),
         mode="fan_in",
         distribution="truncated_normal",
         in_axis=in_axis,
