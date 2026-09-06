@@ -171,8 +171,8 @@ def build_reduced_dmd(
         )
 
     if Y is None:
-        Y = X[:-1, :]
-        X = X[1:, :]
+        Y = X[1:, :]
+        X = X[:-1, :]
 
     if Y.ndim != 2:
         raise ValueError(
@@ -302,8 +302,8 @@ def build_dense_dmd(
         )
 
     if Y is None:
-        Y = X[:-1, :]
-        X = X[1:, :]
+        Y = X[1:, :]
+        X = X[:-1, :]
 
     if Y.ndim != 2:
         raise ValueError(
@@ -640,8 +640,8 @@ def total_least_squares(
         )
 
     if Y is None:
-        Y = X[:-1, :]
-        X = X[1:, :]
+        Y = X[1:, :]
+        X = X[:-1, :]
 
     if Y.ndim != 2:
         raise ValueError(
