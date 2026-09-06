@@ -407,6 +407,48 @@ def test_build_forward_backward_dmd(xp: Any, sigma: float) -> None:
     assert error_fb < error_plain
 
 
+def test_build_forward_backward_dmd_branch(xp: Any) -> None:
+    """Check that fbDMD selects the correct branch of the matrix square root.
+
+    The matrix square root in :math:`(A_f A_b^{-1})^{1/2}` is not unique, and a
+    plain principal root flips any eigenvalue with ``|arg(lambda)| > pi/2`` to
+    ``-lambda``. The rotation in :func:`test_build_forward_backward_dmd` has its
+    eigenvalues well inside the right half-plane, so it cannot detect such a
+    flip. Here the dynamics is a rotation by ``theta = 0.85 pi``, whose
+    eigenvalues sit in the left half-plane: a branch-free implementation would
+    fail the error bound below by orders of magnitude.
+    """
+    from nneuroutil.dmd import build_forward_backward_dmd
+
+    rng = np.random.default_rng(seed=42)
+    nsnapshots = 128
+
+    # stable rotation with eigenvalues r exp(+-i theta), theta in (pi/2, pi)
+    r, theta = 0.9, 0.85 * np.pi
+    A = r * np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)],
+    ])
+
+    A = xp.asarray(A)
+    xs = [xp.asarray(rng.standard_normal(2))]
+    for _ in range(nsnapshots - 1):
+        xs.append(A @ xs[-1])
+    X = xp.stack(xs)
+
+    sigma = 0.05 * xp.linalg.norm(X) / np.sqrt(np.prod(X.shape))
+    Xn = X + sigma * xp.asarray(rng.standard_normal(X.shape))
+    X1, X2 = Xn[:-1], Xn[1:]
+
+    fb_dmd = build_forward_backward_dmd(X1, X2, xp=xp)
+
+    eig_ref = xp.asarray(np.linalg.eigvals(A))
+    eig_fb = xp.linalg.eigvals(fb_dmd.A)
+    error = spectrum_error(eig_fb, eig_ref)
+    log.info("[%s] fbDMD left-half-plane error: %.5e", xp.__name__, error)
+    assert error < 1.0e-2
+
+
 # }}}
 
 
