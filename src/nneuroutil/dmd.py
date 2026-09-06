@@ -607,7 +607,7 @@ def build_forward_backward_dmd(
 
     # NOTE: the principal square root of a real matrix is real, but the
     # eigendecomposition based construction may leave a small imaginary part
-    if xp.isdtype(X.dtype, "complex floating"):
+    if xp.isdtype(X.dtype, "real floating"):
         A_fb = xp.real(A_fb)
 
     return ForwardBackwardDMD(A=A_fb, A_forward=A_f, A_backward=A_b)
