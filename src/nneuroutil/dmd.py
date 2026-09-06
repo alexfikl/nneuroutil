@@ -566,16 +566,24 @@ def build_forward_backward_dmd(
 
     This is implemented in Algorithm 3 from [Dawson2016]_. The algorithm fits
     the forward operator :math:`A_f` on the pairs ``(X, Y)`` and the backward
-    operator :math:`A_b` on the pairs ``(Y, X)``. It then combines them into the
-    geometric mean
+    operator :math:`A_b` on the pairs ``(Y, X)``. Since :math:`A_b` approximates
+    :math:`A_f^{-1}`, the two least-squares fits bracket the true dynamics: both
+    are attenuated by the same first-order errors-in-variables bias, so their
+    geometric combination (Eq. (15) of [Dawson2016]_)
 
     .. math::
 
-        A = A_f^{1/2} A_b^{-1/2}
+        A = (A_f A_b^{-1})^{1/2}
 
-    which cancels the first-order eigenvalue shrinkage that least-squares
-    fits exhibit on noisy snapshot pairs. In such setups, it may work better than
-    :class:`DenseDMD` or :class:`DenseExtendedDMD`.
+    cancels it. The square root is non-unique, so following [Dawson2016]_ we
+    pick, for each eigenmode, the branch closest to the corresponding eigenvalue
+    of :math:`A_f`.
+
+    Note that this requires the (dense) backward fit :math:`A_b` to be a
+    well-conditioned estimate of the inverse dynamics, which in turn requires the
+    snapshot data to resolve all state directions (see :func:`build_dense_dmd`).
+    In such setups, it may work better than :class:`DenseDMD` or
+    :class:`DenseExtendedDMD`.
 
     .. [Dawson2016] S. T. M. Dawson, M. S. Hemati, M. O. Williams, C. W. Rowley,
         *Characterizing and Correcting for the Effect of Sensor Noise in the
@@ -598,15 +606,28 @@ def build_forward_backward_dmd(
     A_f = build_dense_dmd(X, Y, method=method, eps=eps, xp=xp).A
     A_b = build_dense_dmd(Y, X, method=method, eps=eps, xp=xp).A
 
-    lambda_f, v_f = xp.linalg.eig(A_f)
-    lambda_b, v_b = xp.linalg.eig(A_b)
+    # NOTE: A_b approximates A_f^{-1}, so (A_f A_b^{-1})^{1/2} recovers A_f with
+    # the first-order attenuation bias of the two least-squares fits cancelled
+    # (Eq. (15) of [Dawson2016]_). We solve A_b^T P^T = A_f^T directly instead of
+    # forming A_b^{-1} explicitly, for better numerical conditioning.
+    P = xp.linalg.solve(A_b.T, A_f.T).T
 
-    A_f_sqrt = (v_f * xp.sqrt(lambda_f)) @ xp.linalg.inv(v_f)
-    A_b_sqrt = (v_b * (1.0 / xp.sqrt(lambda_b))) @ xp.linalg.inv(v_b)
-    A_fb = A_f_sqrt @ A_b_sqrt
+    # NOTE: the matrix square root is not unique: for each eigenvalue of P both
+    # sqrt(mu) and -sqrt(mu) are admissible roots. Following [Dawson2016]_, we
+    # select the branch closest to the corresponding eigenvalue of A_f, identified
+    # by a Rayleigh quotient along the eigenvector of P.
+    mu, v = xp.linalg.eig(P)
+    s = xp.sqrt(mu)
 
-    # NOTE: the principal square root of a real matrix is real, but the
-    # eigendecomposition based construction may leave a small imaginary part
+    A_fc = xp.astype(A_f, v.dtype)
+    a_f = xp.sum(xp.conj(v) * (A_fc @ v), axis=0) / xp.sum(xp.conj(v) * v, axis=0)
+    s = xp.where(xp.abs(-s - a_f) < xp.abs(s - a_f), -s, s)
+
+    # NOTE: reconstruct (v * s) v^{-1} via a linear solve as well
+    A_fb = xp.linalg.solve(v.T, (v * s).T).T
+
+    # NOTE: for real inputs A_fb is real up to the numerical residue left by the
+    # complex eigendecomposition, so we project it back
     if xp.isdtype(X.dtype, "real floating"):
         A_fb = xp.real(A_fb)
 
