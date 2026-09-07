@@ -623,31 +623,6 @@ NONLINEARITY_TYPE_NAME = {
 NONLINEARITY_TYPE = {name: cls for cls, name in NONLINEARITY_TYPE_NAME.items()}
 
 
-def bisect(
-    f: Callable[[float], float],
-    a: float,
-    b: float,
-    *,
-    atol: float = 1.0e-6,
-) -> float:
-    fa = f(a)
-    fb = f(b)
-    if fa * fb > 0:
-        raise ValueError(f"f(a) and f(b) must have opposite signs: {fa} and {fb}")
-
-    while 0.5 * (b - a) > atol:
-        m = (a + b) / 2.0
-        fm = f(m)
-        if fa * fm <= 0:
-            b = m
-            fb = fm
-        else:
-            a = m
-            fa = fm
-
-    return (a + b) / 2.0
-
-
 def complex_kaiming_uniform_(
     x: torch.Tensor,
     *,
