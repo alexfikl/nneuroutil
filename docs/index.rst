@@ -12,6 +12,13 @@ nneuroutil: utilities for neuroscience
     api/helpers
     api/typing
 
+.. toctree::
+    :maxdepth: 2
+    :hidden:
+    :caption: Notes
+
+    notes/initializers.rst
+
 .. warning::
 
    This package is currently in development and very experimental (the API

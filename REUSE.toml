@@ -29,6 +29,7 @@ path = [
     ".readthedocs.yml",
     "docs/*.rst",
     "docs/api/*.rst",
+    "docs/notes/*.rst",
     "docs/justfile",
 ]
 precedence = "aggregate"
