@@ -77,7 +77,7 @@ So, given :math:`\operatorname{Var}(y_l)`, we have that
 
 Knowing the mean and variance of :math:`W_l`, we can sample from any distribution
 of interest. Usually, packages use the uniform distribution or the normal
-distribution (sometimes truncated). For the uniform, distribution, we hava that
+distribution (sometimes truncated). For the uniform, distribution, we have that
 the variance is given by
 
 .. math::

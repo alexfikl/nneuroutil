@@ -279,18 +279,41 @@ class ComplexLinear(nnx.Module):
 
 def calculate_scale(nonlinearity: str, **kwargs: float) -> float:
     if nonlinearity == "quadratic":
-        scale = 1.0 / math.sqrt(3)
+        scale = 1.0 / 3.0
     elif nonlinearity == "blended_quadratic":
         alpha = kwargs.get("alpha", 0.5)
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
 
-        if abs(alpha - 1.0) < 1.0e-8:
-            scale = 1.0
+        scale = 1.0 / (alpha**2 + 3.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "cquadratic":
+        scale = 1.0 / 2.0
+    elif nonlinearity == "cblended_quadratic":
+        alpha = kwargs.get("alpha", 0.5)
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
+
+        scale = 1.0 / (alpha**2 + 2.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "modrelu":
+        b = kwargs.get("b", 0.0)
+
+        if b >= 0:
+            scale = 1.0 / (1.0 + b * math.sqrt(math.pi) + b**2)
         else:
-            a = 3 * (1 - alpha) ** 2
-            b = alpha**2
-            scale = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a)
+            scale = 1.0 / (math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b))
+    elif nonlinearity == "leaky_modrelu":
+        b = kwargs.get("b", 0.0)
+        alpha = kwargs.get("alpha", 0.1)
+
+        if b >= 0:
+            scale = 1.0 / (1 + b * math.sqrt(math.pi) + b**2)
+        else:
+            scale0 = math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b)
+            scale = 1.0 / (alpha**2 * (1 - (b**2 + 1) * math.exp(-(b**2))) + scale0)
+    elif nonlinearity == "ccardioid":
+        scale = 8.0 / 3.0
+    elif nonlinearity == "zrelu":
+        scale = 4.0
     else:
         raise ValueError(f"unknown nonlinearity: {nonlinearity}")
 
@@ -304,14 +327,6 @@ def quadratic_uniform(
     dtype: Any = None,
 ) -> Initializer:
     """A uniform init that preserves variance through :func:`quadratic`."""
-
-    # NOTE just a small math derivation for that scale=1/sqrt(3).
-    # 1. We assume that we have a zero-mean Gaussian pre-activation.
-    # 2. Then, we have that
-    #   E[y^2] = E[x^4] = 3 Var[x]^2
-    # 3. We want to impose a unit second moment, so
-    #   E[y^2] = 3 Var[x]^2 = 1      =>  scale = Var[x] = 1 / sqrt(3)
-    # That's it! This matches what the Kaiming inits do for ReLU.
 
     return nnx.initializers.variance_scaling(
         scale=calculate_scale("quadratic"),
@@ -350,16 +365,6 @@ def blended_quadratic_uniform(
     dtype: Any = None,
 ) -> Initializer:
     """A uniform init that preserves variance through :func:`blended_quadratic`."""
-
-    # NOTE: blended_quadratic has a nonzero mean for alpha != 1, so we use the
-    # second-moment convention (like He/Kaiming for ReLU) to keep the next
-    # layer's pre-activation at unit variance.
-    # 1. In the alpha = 1 case, we have a simple linear => scale = 1.0
-    # 2. Otherwise, with scale = Var(z) and y = alpha z + (1 - alpha) z^2,
-    #   E[y^2] = alpha^2 v + 3 (1 - alpha)^2 v^2
-    # 3. E[y^2] = 1 gives a quadratic in s = scale:
-    #   3 (1 - alpha)^2 s^2 + alpha^2 s - 1 = 0
-    # of which we take the positive root.
 
     return nnx.initializers.variance_scaling(
         scale=calculate_scale("blended_quadratic", alpha=alpha),
