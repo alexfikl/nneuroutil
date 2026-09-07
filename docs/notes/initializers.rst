@@ -171,7 +171,7 @@ under the assumption that :math:`y` is Gaussian with unit variance. Then, we hav
 
 .. math::
 
-    \sigma_w^2 = \frac{1}{\alpha^2 + 3 (1 - \alpha)^2 n}.
+    \sigma_w^2 = \frac{1}{(\alpha^2 + 3 (1 - \alpha)^2) n}.
 
 Complex Blended Quadratic Activation
 --------------------------------------
@@ -181,14 +181,14 @@ We follow the same derivation here to obtain
 .. math::
 
     \mathbb{E}[\|x_l\|^2]
-        = \mathbb{E}[\|\alpha y_{l - 1} + (1 - \alpha) y_{l - 1}^2)\|^2]
-        = \alpha \sigma_{y_{l - 1}}^2 + 2 (1 - \alpha)^2 \sigma_{y_{l - 1}}^4,
+        = \mathbb{E}[\|\alpha y_{l - 1} + (1 - \alpha) y_{l - 1}^2\|^2]
+        = \alpha^2 \sigma_{y_{l - 1}}^2 + 2 (1 - \alpha)^2 \sigma_{y_{l - 1}}^4,
 
 so we have that
 
 .. math::
 
-    \sigma_w^2 = \frac{1}{\alpha^2 + 2 (1 - \alpha)^2 n}.
+    \sigma_w^2 = \frac{1}{(\alpha^2 + 2 (1 - \alpha)^2) n}.
 
 ModReLU Activation
 ------------------
@@ -212,8 +212,10 @@ and
 
 For :math:`y` complex with normally distributed real and imaginary parts, we
 know that :math:`r = \|y\|` is `Rayleigh distributed
-<https://en.wikipedia.org/wiki/Rayleigh_distribution>`__ with :math:`\sigma_r =
-\sigma_y / \sqrt{2}`. Therefore, we have that
+<https://en.wikipedia.org/wiki/Rayleigh_distribution>`__ with scale
+:math:`\sigma_r = \sigma_y / \sqrt{2}`, i.e. :math:`p(r) = \frac{2 r}{\sigma_y^2}
+\exp(-r^2 / \sigma_y^2)` and :math:`\mathbb{E}[r] = \sqrt{\pi \sigma_y^2} / 2`.
+Therefore, we have that
 
 .. math::
 
@@ -227,8 +229,8 @@ We have that
 .. math::
 
     \mathbb{E}[\|x_l\|^2] = \mathbb{E}[\operatorname{ReLU}(r + b)^2]
-        = \int_{-b}^\infty (r + b)^2 \frac{2 r}{\sigma_r^2}
-            \exp\left(-\frac{r^2}{\sigma_r^2}\right) \,\mathrm{d} r.
+         = \int_{-b}^\infty (r + b)^2 \frac{2 r}{\sigma_y^2}
+             \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r.
 
 Without going into details, we get that
 
@@ -264,9 +266,9 @@ directly. We have that
 
    \mathbb{E}[\|x_l\|^2] = \mathbb{E}[\operatorname{LeakyModReLU}(y_{l - 1})^2]
     = \int_{0}^{-b} (\alpha r)^2
-        \frac{2}{3}{\sigma_y} \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r
+        \frac{2 r}{\sigma_y^2} \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r
     + \int_{-b}^\infty (r + b)^2
-        \frac{2}{3}{\sigma_y} \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r.
+        \frac{2 r}{\sigma_y^2} \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r.
 
 The second integral is the same as in the previous case, so we just compute the
 first integral. This gives

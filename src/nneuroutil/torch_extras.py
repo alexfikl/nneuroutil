@@ -640,14 +640,14 @@ def complex_kaiming_uniform_(
     fan = fan_in if mode == "fan_in" else fan_out
 
     if nonlinearity == "cquadratic":
-        scale = 1.0 / 4.0
+        scale = 1.0 / 2.0
         bound = math.sqrt(3 * scale / fan)
     elif nonlinearity == "cblended_quadratic":
         # NOTE: if not given, use the default from BlendedQuadratic
         if param is None:
             param = 0.5
 
-        scale = 1.0 / (param**2 + 4 * (1 - param) ** 2)
+        scale = 1.0 / (param**2 + 2 * (1 - param) ** 2)
         bound = math.sqrt(3 * scale / fan)
     elif nonlinearity == "modrelu":
         if param is None:
@@ -981,7 +981,7 @@ class LayerStatistics(NamedTuple):
 
 def rayleigh(
     *shape: int,
-    sigma: float = 1.0,
+    sigma: float = 1.0 / math.sqrt(2),
     device: str | torch.device | None = None,
     dtype: Any = None,
 ) -> torch.Tensor:

@@ -23,12 +23,14 @@ import nneuroutil.torch_extras as nnx
 
 # {{{ activation
 
-activation_cls = nnx.LeakyModReLU
+activation_cls = nnx.ComplexQuadratic
 activation_id = nnx.NONLINEARITY_TYPE_NAME[activation_cls]
 
-param = -0.5
-kwargs = {"bias": param, "alpha": 0.1}
-# kwargs = {}
+# param = -0.5
+# kwargs = {"bias": param, "alpha": 0.1}
+# kwargs = {"bias": param}
+param = None
+kwargs = {}
 
 # }}}
 
@@ -42,9 +44,14 @@ def make_mlp(
     depth: int = 10,
 ) -> nn.Module:
     layers = []
-    for _ in range(depth):
+    for i in range(depth):
         layer = copy.deepcopy(template)
-        init_fn(layer.weight)
+        if i == 0:
+            # NOTE: first layer doesn't have any activation before it, so we
+            # just initialize it with a linear "activation"
+            nn.init.kaiming_uniform_(layer.weight, nonlinearity="linear")
+        else:
+            init_fn(layer.weight)
         layers.append(layer)
 
         layers.append(activation_cls(**kwargs))  # ty: ignore[invalid-argument-type]
@@ -53,8 +60,12 @@ def make_mlp(
 
 
 n = 256
-layer = nnx.ComplexLinear(n, n, interleaved=True, bias=False)
-# layer = nn.Linear(2 * n, 2 * n, bias=False)
+dtype = torch.complex64
+layer = nnx.ComplexLinear(n, n, interleaved=True, bias=False, dtype=dtype.to_real())
+
+# n = n if dtype.is_floating_point else 2 * n
+# layer = nn.Linear(n, n, bias=False, dtype=dtype.to_real())
+
 default_model = make_mlp(
     layer,
     lambda w: None,
@@ -68,12 +79,8 @@ activated_model = make_mlp(
 
 # {{{ gather statistics
 
-default_stats = nnx.gather_model_signal_statistics(
-    default_model, (n,), dtype=torch.complex64
-)
-activated_stats = nnx.gather_model_signal_statistics(
-    activated_model, (n,), dtype=torch.complex64
-)
+default_stats = nnx.gather_model_signal_statistics(default_model, (n,), dtype=dtype)
+activated_stats = nnx.gather_model_signal_statistics(activated_model, (n,), dtype=dtype)
 
 table = Table("depth", "mean", "var", "msq")
 for name, stats in default_stats.items():
