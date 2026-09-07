@@ -59,8 +59,8 @@ pre-activation variance is
 
 i.e. it factorizes into a term that we control (the weight variance times the
 fan-in or fan-out) and a term that is fixed by the activation function (the
-*second moment* of its output). The convention used throughout this package (and
-``jax``, ``pytorch``, etc.) is to impose a *unit second moment*
+*second moment* of its output). The convention used throughout this package
+(and ``jax``, ``pytorch``, etc.) is to impose a *unit second moment*
 
 .. math::
     :label: init_unit_variance
@@ -75,10 +75,10 @@ So, given :math:`\operatorname{Var}(y_l)`, we have that
 
    \sigma_{w_l}^2 = \frac{1}{n \mathbb{E}\bigl[f_{l - 1}(y_{l - 1})^2\bigr]}.
 
-Knowing the mean and variance of :math:`W_l`, we can sample from any distribution
-of interest. Usually, packages use the uniform distribution or the normal
-distribution (sometimes truncated). For the uniform, distribution, we have that
-the variance is given by
+Knowing the mean and variance of :math:`W_l`, we can sample from any
+distribution of interest. Usually, packages use the uniform distribution or the
+normal distribution (sometimes truncated). For the uniform, distribution, we
+have that the variance is given by
 
 .. math::
     :label: uniform_variance
@@ -91,8 +91,8 @@ Therefore, for each activation function, we just need to compute
 Quadratic Activation
 ---------------------
 
-We first look at the simplest added nonlinearity: a quadratic activation function
-:math:`f(y) = y^2`. Then, we have that
+We first look at the simplest added nonlinearity: a quadratic activation
+function :math:`f(y) = y^2`. Then, we have that
 
 .. math::
 
@@ -110,15 +110,21 @@ when using using ``nonlinearity="quadratic"``.
 .. note::
 
     For ``flax`` we use :func:`~flax.nnx.initializers.variance_scaling` to
-    generate the appropriate initializer function. There, the convention is that
+    generate the appropriate initializer function. There, the convention is
+    that
 
     .. math::
 
         \sigma_w^2 = \frac{\text{scale}}{n},
 
-    where ``scale`` is the value that is being passed in. The function then takes
-    care of scaling it by :math:`n` and computing the appropriate parameter for
-    the chosen distribution (e.g. :math:`b` for uniform).
+    where ``scale`` is the value that is being passed in. The function then
+    takes care of scaling it by :math:`n` and computing the appropriate
+    parameter for the chosen distribution (e.g. :math:`b` for uniform).
+
+.. warning::
+
+    This activation is not depth-stable: deviations from the unit variance
+    fixed point are amplified by a factor of :math:`2` per layer.
 
 Complex Quadratic Activation
 -----------------------------
@@ -148,12 +154,17 @@ and
 
    \sigma_w^2 = \frac{1}{2 n}.
 
+.. warning::
+
+    This activation is not depth-stable: deviations from the unit second
+    moment fixed point are amplified by a factor of :math:`2` per layer.
+
 Blended Quadratic Activation
 -----------------------------
 
 The blended quadratic function is given by :math:`f(y) = \alpha y + (1 -
-\alpha) y^2`. In the case of :math:`\alpha = 1`, this degenerates to essentially
-having no activation function. Then, we have that
+\alpha) y^2`. In the case of :math:`\alpha = 1`, this degenerates to
+essentially having no activation function. Then, we have that
 
 .. math::
 
@@ -167,11 +178,18 @@ The more interesting case is :math:`\alpha \in [0, 1)`. There, we have that
         = \alpha^2 \sigma_{y_{l - 1}}^2 + 3 (1 - \alpha)^2 \sigma_{y_{l - 1}}^4
         = \alpha^2 + 3 (1 - \alpha)^2,
 
-under the assumption that :math:`y` is Gaussian with unit variance. Then, we have that
+under the assumption that :math:`y` is Gaussian with unit variance. Then, we
+have that
 
 .. math::
 
     \sigma_w^2 = \frac{1}{(\alpha^2 + 3 (1 - \alpha)^2) n}.
+
+.. warning::
+
+    For :math:`\alpha < 1`, this activation is not depth-stable: deviations
+    from the unit variance fixed point are amplified by a factor between
+    :math:`1` and :math:`2` per layer, decreasing with :math:`\alpha`.
 
 Complex Blended Quadratic Activation
 --------------------------------------
@@ -189,6 +207,12 @@ so we have that
 .. math::
 
     \sigma_w^2 = \frac{1}{(\alpha^2 + 2 (1 - \alpha)^2) n}.
+
+.. warning::
+
+    For :math:`\alpha < 1`, this activation is not depth-stable: deviations
+    from the unit second moment fixed point are amplified by a factor between
+    :math:`1` and :math:`2` per layer, decreasing with :math:`\alpha`.
 
 ModReLU Activation
 ------------------
@@ -213,18 +237,18 @@ and
 For :math:`y` complex with normally distributed real and imaginary parts, we
 know that :math:`r = \|y\|` is `Rayleigh distributed
 <https://en.wikipedia.org/wiki/Rayleigh_distribution>`__ with scale
-:math:`\sigma_r = \sigma_y / \sqrt{2}`, i.e. :math:`p(r) = \frac{2 r}{\sigma_y^2}
-\exp(-r^2 / \sigma_y^2)` and :math:`\mathbb{E}[r] = \sqrt{\pi \sigma_y^2} / 2`.
-Therefore, we have that
+:math:`\sigma_r = \sigma_y / \sqrt{2}`, i.e. :math:`p(r) = \frac{2
+r}{\sigma_y^2} \exp(-r^2 / \sigma_y^2)` and :math:`\mathbb{E}[r] = \sqrt{\pi
+\sigma_y^2} / 2`. Therefore, we have that
 
 .. math::
 
    \mathbb{E}[\|x_l\|^2] = 1 + b \sqrt{\pi} + b^2.
 
 
-On the other hand, if :math:`b < 0`, the ReLU part does not simplify away directly.
-We actually have to compute the integral here, since the result is not known.
-We have that
+On the other hand, if :math:`b < 0`, the ReLU part does not simplify away
+directly. We actually have to compute the integral here, since the result is
+not known. We have that
 
 .. math::
 
@@ -237,6 +261,13 @@ Without going into details, we get that
 .. math::
 
     \mathbb{E}[\|x_l\|^2] = e^{-b^2} + b \sqrt{\pi} \operatorname{erfc}(-b).
+
+.. warning::
+
+    For :math:`b < 0`, this activation is not depth-stable: deviations from
+    the unit second moment fixed point are amplified by a factor of
+    :math:`\approx 1.6` per layer for :math:`b = -0.5` (:math:`\approx 2.6`
+    for :math:`b = -1`), worsening as :math:`b` decreases.
 
 Leaky ModReLU Activation
 -------------------------
@@ -251,8 +282,8 @@ We consider the following leaky ``modReLU`` activation function:
     \alpha \|y\|, & \quad \text{otherwise}.
     \end{cases}
 
-In the case :math:`b \ge 0`, the second branch never triggers, so this is equivalent
-to the modReLU result above:
+In the case :math:`b \ge 0`, the second branch never triggers, so this is
+equivalent to the modReLU result above:
 
 .. math::
 
@@ -279,6 +310,12 @@ first integral. This gives
         \alpha^2 \left[1 - (b^2 + 1) e^{-b^2}\right]
         + e^{-b^2} + b \sqrt{\pi} \operatorname{erfc}(-b).
 
+.. warning::
+
+    For :math:`b < 0`, this activation is not depth-stable: deviations grow by
+    roughly the same factor as the ``modReLU`` above, since the leak only
+    enters the statistics at :math:`O(\alpha^2)`.
+
 Cardioid Activation
 --------------------
 
@@ -289,9 +326,9 @@ The complex cardioid activation from [Virtue2017]_ is given by
     f(y) = \frac{1}{2} (1 + \cos \theta(y)) y,
 
 where :math:`\theta(y) = \operatorname{arg} y` is the phase of the input.
-Assuming that :math:`y` is normally distributed and circularly symmetric as before,
-we have that :math:`r` is Rayleigh distributed and :math:`\theta` is uniformly
-distributed in :math:`[0, 2 \pi]`.
+Assuming that :math:`y` is normally distributed and circularly symmetric as
+before, we have that :math:`r` is Rayleigh distributed and :math:`\theta` is
+uniformly distributed in :math:`[0, 2 \pi]`.
 
 Therefore, we have that
 

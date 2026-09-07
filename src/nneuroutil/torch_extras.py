@@ -207,10 +207,12 @@ class ModReLU(nn.Module):
     :math:`f(z) = z + b \operatorname{sgn}(z)`.
 
     Note that for :math:`b < 0`, this activation function is not "depth-stable",
-    meaning that in a deep network it will eventually explode the variance. The
-    growth per layer is small (2% or so for :math:`b \sim -1`), but it compounds
-    with depth and can still cause problems. This is not an issue for
-    :math:`b \ge 0`.
+    meaning that in a deep network it will eventually explode the variance. At
+    the unit second moment operating point (see :ref:`notes-initializers`),
+    deviations from it are amplified by a factor of :math:`\approx 1.6` per
+    layer for :math:`b = -0.5` and :math:`\approx 2.6` for :math:`b = -1`,
+    worsening as :math:`b` decreases, so the variance quickly compounds with
+    depth. This is not an issue for :math:`b \ge 0`.
 
     .. [Arjovsky2015] M. Arjovsky, A. Shah, Y. Bengio,
         *Unitary Evolution Recurrent Neural Networks*,
@@ -266,9 +268,12 @@ class LeakyModReLU(nn.Module):
     function is identical to :class:`ModReLU`.
 
     Note that for :math:`b < 0`, this activation function is not "depth-stable",
-    meaning that in a deep network it will eventually explode the variance. The
-    leak only enters the signal statistics at :math:`O(\alpha^2)`, so it does
-    not fix this instability. This is not an issue for :math:`b \ge 0`.
+    meaning that in a deep network it will eventually explode the variance. At
+    the unit second moment operating point (see :ref:`notes-initializers`),
+    deviations grow by roughly the same factor as for :class:`ModReLU`
+    (:math:`\approx 1.6` per layer for :math:`b = -0.5`), because the leak
+    only enters the signal statistics at :math:`O(\alpha^2)`. This is not an
+    issue for :math:`b \ge 0`.
     """
 
     bias: float
