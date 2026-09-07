@@ -1002,6 +1002,13 @@ def gather_model_signal_statistics(
     r"""Gather statistics over the whole *model* starting from a randomly
     distributed input in :math:`\mathcal{N}(0, 1)`.
 
+    For complex dtypes, the input is a circularly-symmetric complex normal
+    distribution with :math:`\mathbb{E}[\|z\|^2] = 1` and all tensors are
+    assumed to store complex values interleaved (see :func:`view_as_complex`).
+    The statistics are computed per complex entry: the mean is the modulus of
+    the complex mean, while the variance and second moment are computed from
+    :math:`\|z\|^2`.
+
     :returns: a dictionary with statistics for each module in the *model*. The
         names of the modules are expected to be unique, see
         :meth:`torch.nn.Module.named_modules`.
@@ -1014,11 +1021,19 @@ def gather_model_signal_statistics(
     def hook(name: str) -> Callable[[nn.Module, torch.Tensor, torch.Tensor], None]:
         def fn(module: nn.Module, inp: torch.Tensor, out: torch.Tensor) -> None:
             o = out.detach()
-            stats[name] = LayerStatistics(
-                mean=torch.mean(o).item(),
-                var=torch.var(o, correction=1).item(),
-                msq=torch.mean(torch.pow(o, 2)).item(),
-            )
+            if o.is_complex() or dtype.is_complex:
+                z = o if o.is_complex() else view_as_complex(o)
+                stats[name] = LayerStatistics(
+                    mean=torch.abs(torch.mean(z)).item(),
+                    var=torch.var(z, correction=1).item(),
+                    msq=torch.mean(torch.pow(torch.abs(z), 2)).item(),
+                )
+            else:
+                stats[name] = LayerStatistics(
+                    mean=torch.mean(o).item(),
+                    var=torch.var(o, correction=1).item(),
+                    msq=torch.mean(torch.pow(o, 2)).item(),
+                )
 
         return fn
 
