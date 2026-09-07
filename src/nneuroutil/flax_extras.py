@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -14,7 +13,7 @@ from flax import nnx
 from jax.nn.initializers import Initializer
 
 from nneuroutil.array_api_extras import deinterleave, interleave
-from nneuroutil.helpers import module_logger, to_real
+from nneuroutil.helpers import calculate_gain, module_logger, to_real
 
 log = module_logger(__name__)
 
@@ -277,49 +276,6 @@ class ComplexLinear(nnx.Module):
 # {{{ init
 
 
-def calculate_scale(nonlinearity: str, **kwargs: float) -> float:
-    if nonlinearity == "quadratic":
-        scale = 1.0 / 3.0
-    elif nonlinearity == "blended_quadratic":
-        alpha = kwargs.get("alpha", 0.5)
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
-
-        scale = 1.0 / (alpha**2 + 3.0 * (1.0 - alpha) ** 2)
-    elif nonlinearity == "cquadratic":
-        scale = 1.0 / 2.0
-    elif nonlinearity == "cblended_quadratic":
-        alpha = kwargs.get("alpha", 0.5)
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
-
-        scale = 1.0 / (alpha**2 + 2.0 * (1.0 - alpha) ** 2)
-    elif nonlinearity == "modrelu":
-        b = kwargs.get("b", 0.0)
-
-        if b >= 0:
-            scale = 1.0 / (1.0 + b * math.sqrt(math.pi) + b**2)
-        else:
-            scale = 1.0 / (math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b))
-    elif nonlinearity == "leaky_modrelu":
-        b = kwargs.get("b", 0.0)
-        alpha = kwargs.get("alpha", 0.1)
-
-        if b >= 0:
-            scale = 1.0 / (1 + b * math.sqrt(math.pi) + b**2)
-        else:
-            scale0 = math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b)
-            scale = 1.0 / (alpha**2 * (1 - (b**2 + 1) * math.exp(-(b**2))) + scale0)
-    elif nonlinearity == "ccardioid":
-        scale = 8.0 / 3.0
-    elif nonlinearity == "zrelu":
-        scale = 4.0
-    else:
-        raise ValueError(f"unknown nonlinearity: {nonlinearity}")
-
-    return scale
-
-
 def quadratic_uniform(
     in_axis: int | tuple[int, ...] = -2,
     out_axis: int | tuple[int, ...] = -1,
@@ -329,7 +285,7 @@ def quadratic_uniform(
     """A uniform init that preserves variance through :func:`quadratic`."""
 
     return nnx.initializers.variance_scaling(
-        scale=calculate_scale("quadratic"),
+        scale=calculate_gain("quadratic"),
         mode="fan_in",
         distribution="uniform",
         in_axis=in_axis,
@@ -347,7 +303,7 @@ def quadratic_normal(
 ) -> Initializer:
     """A normal init that preserves variance through :func:`quadratic`."""
     return nnx.initializers.variance_scaling(
-        scale=calculate_scale("quadratic"),
+        scale=calculate_gain("quadratic"),
         mode="fan_in",
         distribution="truncated_normal",
         in_axis=in_axis,
@@ -367,7 +323,7 @@ def blended_quadratic_uniform(
     """A uniform init that preserves variance through :func:`blended_quadratic`."""
 
     return nnx.initializers.variance_scaling(
-        scale=calculate_scale("blended_quadratic", alpha=alpha),
+        scale=calculate_gain("blended_quadratic", alpha=alpha),
         mode="fan_in",
         distribution="uniform",
         in_axis=in_axis,
@@ -386,7 +342,7 @@ def blended_quadratic_normal(
 ) -> Initializer:
     """A normal init that preserves variance through :func:`blended_quadratic`."""
     return nnx.initializers.variance_scaling(
-        scale=calculate_scale("blended_quadratic", alpha=alpha),
+        scale=calculate_gain("blended_quadratic", alpha=alpha),
         mode="fan_in",
         distribution="truncated_normal",
         in_axis=in_axis,

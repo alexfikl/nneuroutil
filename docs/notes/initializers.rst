@@ -31,7 +31,7 @@ activation functions of the form
 
     f_n(\cdots f_3(W_3 f_2(W_2 f_1(W_1 x + b_1) + b_2) + b_3) \cdots)
 
-For some notation, let :math:`y_l = W_l x_l + b_1` be the pre-activation value
+For some notation, let :math:`y_l = W_l x_l + b_l` be the pre-activation value
 at layer :math:`l` and :math:`x_{l + 1} = f_l(y_l)`, with :math:`x_0 = x`, be
 the post-activation that feeds into the next layer. We will assume that
 :math:`b_j = 0` and that :math:`x` is a Gaussian with zero mean and unit
@@ -77,7 +77,7 @@ So, given :math:`\operatorname{Var}(y_l)`, we have that
 
 Knowing the mean and variance of :math:`W_l`, we can sample from any
 distribution of interest. Usually, packages use the uniform distribution or the
-normal distribution (sometimes truncated). For the uniform, distribution, we
+normal distribution (sometimes truncated). For the uniform distribution, we
 have that the variance is given by
 
 .. math::
@@ -105,7 +105,7 @@ assuming :math:`\sigma_{y_l}^2 = 1`, so
     \sigma_w^2 = \frac{1}{3 n},
 
 which is exactly the value computed in :func:`~nneuroutil.torch_extras.kaiming_uniform_`
-when using using ``nonlinearity="quadratic"``.
+when using ``nonlinearity="quadratic"``.
 
 .. note::
 
@@ -136,7 +136,7 @@ satisfy
 
     \operatorname{Var}(\Re y_l) = \operatorname{Var}(\Im y_l) = \frac{\sigma_{y_l}^2}{2}
     \implies
-    \operatorname{Var}(\|y_l\|^2) = \sigma_{y_l}^2.
+    \operatorname{Var}(\|y_l\|) = \sigma_{y_l}^2.
 
 Then,
 
@@ -146,7 +146,7 @@ Then,
         = \mathbb{E}[(\Re y_{l - 1})^4]
           + 2 \mathbb{E}[(\Re y_{l - 1})^2 (\Im y_{l - 1})^2]
           + \mathbb{E}[(\Im y_{l - 1})^4]
-        = 2 \sigma_{y_l}^4 = 2
+        = 2 \sigma_{y_{l - 1}}^4 = 2
 
 and
 
@@ -220,7 +220,7 @@ ModReLU Activation
 The ``modReLU`` activation function is given by :math:`f(y) =
 \operatorname{ReLU}(\|y\| + b) \operatorname{sgn}(y)` for a complex :math:`y`
 (see [Arjovsky2015]_). We have two cases of interest here, when :math:`b \ge 0`
-and when it is negative. If :math:`b` is positive, then we have that
+and when it is negative. If :math:`b` is non-negative, then we have that
 
 .. math::
 
@@ -295,7 +295,7 @@ directly. We have that
 
 .. math::
 
-   \mathbb{E}[\|x_l\|^2] = \mathbb{E}[\operatorname{LeakyModReLU}(y_{l - 1})^2]
+   \mathbb{E}[\|x_l\|^2] = \mathbb{E}[\|\operatorname{LeakyModReLU}(y_{l - 1})\|^2]
     = \int_{0}^{-b} (\alpha r)^2
         \frac{2 r}{\sigma_y^2} \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r
     + \int_{-b}^\infty (r + b)^2

@@ -628,112 +628,41 @@ NONLINEARITY_TYPE_NAME = {
 NONLINEARITY_TYPE = {name: cls for cls, name in NONLINEARITY_TYPE_NAME.items()}
 
 
-def complex_kaiming_uniform_(
-    x: torch.Tensor,
-    *,
-    nonlinearity: str = "modrelu",
-    param: float | None = None,
-    paramb: float | None = None,
-    mode: Literal["fan_in", "fan_out"] = "fan_in",
-    generator: torch.Generator | None = None,
-) -> torch.Tensor:
-    """A uniform initializer that preserves the second moment through our
-    complex activation functions. See :ref:`notes-initializers` for details.
-    """
-
-    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(x)
-    fan = fan_in if mode == "fan_in" else fan_out
-
-    if nonlinearity == "cquadratic":
-        scale = 1.0 / 2.0
-        bound = math.sqrt(3 * scale / fan)
-    elif nonlinearity == "cblended_quadratic":
-        # NOTE: if not given, use the default from BlendedQuadratic
-        if param is None:
-            param = 0.5
-
-        scale = 1.0 / (param**2 + 2 * (1 - param) ** 2)
-        bound = math.sqrt(3 * scale / fan)
-    elif nonlinearity == "modrelu":
-        if param is None:
-            param = 0.0
-
-        b = param
-
-        if b >= 0:
-            scale = 1.0 / (1 + b * math.sqrt(math.pi) + b**2)
-        else:
-            scale = 1.0 / (math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b))
-
-        bound = math.sqrt(3 * scale / fan)
-    elif nonlinearity == "leaky_modrelu":
-        if param is None:
-            param = 0.0
-
-        if paramb is None:
-            paramb = 0.1
-
-        b = param
-        alpha = paramb
-
-        if b >= 0:
-            scale = 1.0 / (1 + b * math.sqrt(math.pi) + b**2)
-        else:
-            scale0 = math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b)
-            scale = 1.0 / (alpha**2 * (1 - (b**2 + 1) * math.exp(-(b**2))) + scale0)
-
-        bound = math.sqrt(3 * scale / fan)
-    elif nonlinearity == "ccardioid":
-        scale = 8.0 / 3.0
-        bound = math.sqrt(3 * scale / fan)
-    elif nonlinearity == "zrelu":
-        scale = 4.0
-        bound = math.sqrt(3 * scale / fan)
-    else:
-        raise ValueError(f"unknown nonlinearity: {nonlinearity!r}")
-
-    return nn.init.uniform_(x, -bound, bound, generator=generator)
-
-
 def kaiming_uniform_(
     x: torch.Tensor,
     *,
     nonlinearity: str = "relu",
     param: float | None = None,
+    paramb: float | None = None,
     mode: Literal["fan_in", "fan_out"] = "fan_in",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """A wrapper around :func:`torch.nn.init.kaiming_uniform_` that supports
     our activation functions.
     """
+    from nneuroutil.helpers import calculate_gain
 
-    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(x)
-    fan = fan_in if mode == "fan_in" else fan_out
+    # FIXME: this is pretty horrible, need a better api or something
+    kwargs = {}
+    if nonlinearity in {"blended_quadratic", "cblended_quadratic", "leaky_relu"}:
+        if param is not None:
+            kwargs["alpha"] = param
+    elif nonlinearity in {"modrelu"}:
+        if param is not None:
+            kwargs["b"] = param
+    elif nonlinearity in {"leaky_modrelu"}:
+        if param is not None:
+            kwargs["b"] = param
 
-    if nonlinearity == "quadratic":
-        scale = 1.0 / 3.0
-        bound = math.sqrt(3 * scale / fan)
+        if paramb is not None:
+            kwargs["alpha"] = paramb
+
+    fan = nn.init._calculate_correct_fan(x, mode)
+    gain = calculate_gain(nonlinearity, **kwargs)
+
+    with torch.no_grad():
+        bound = math.sqrt(3.0 * gain / fan)
         return nn.init.uniform_(x, -bound, bound, generator=generator)
-    elif nonlinearity == "blended_quadratic":
-        # NOTE: if not given, use the default from BlendedQuadratic
-        if param is None:
-            param = 0.5
-
-        scale = 1.0 / (param**2 + 3 * (1 - param) ** 2)
-        bound = math.sqrt(3 * scale / fan)
-        return nn.init.uniform_(x, -bound, bound, generator=generator)
-    else:
-        # NOTE: this is the default for kaiming_uniform_
-        if param is None:
-            param = 0.0
-
-        return nn.init.kaiming_uniform_(
-            x,
-            a=param,
-            mode=mode,
-            nonlinearity=nonlinearity,
-            generator=generator,
-        )
 
 
 def kaiming_normal_(
@@ -741,44 +670,36 @@ def kaiming_normal_(
     *,
     nonlinearity: str = "quadratic",
     param: float | None = None,
+    paramb: float | None = None,
     mode: Literal["fan_in", "fan_out"] = "fan_in",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
     """A wrapper around :func:`torch.nn.init.kaiming_normal_` that supports
     our activation functions.
     """
+    from nneuroutil.helpers import calculate_gain
 
-    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(x)
-    fan = fan_in if mode == "fan_in" else fan_out
+    # FIXME: this is pretty horrible, need a better api or something
+    kwargs = {}
+    if nonlinearity in {"blended_quadratic", "cblended_quadratic", "leaky_relu"}:
+        if param is not None:
+            kwargs["alpha"] = param
+    elif nonlinearity in {"modrelu"}:
+        if param is not None:
+            kwargs["b"] = param
+    elif nonlinearity in {"leaky_modrelu"}:
+        if param is not None:
+            kwargs["b"] = param
 
-    if nonlinearity == "quadratic":
-        std = 1.0 / math.sqrt(math.sqrt(3) * fan)
+        if paramb is not None:
+            kwargs["alpha"] = paramb
+
+    fan = nn.init._calculate_correct_fan(x, mode)
+    gain = calculate_gain(nonlinearity, **kwargs)
+
+    with torch.no_grad():
+        std = math.sqrt(gain / fan)
         return nn.init.normal_(x, 0.0, std, generator=generator)
-    elif nonlinearity == "blended_quadratic":
-        # NOTE: if not given, use the default from BlendedQuadratic
-        if param is None:
-            param = 0.5
-
-        if abs(param - 1.0) < 1.0e-8:
-            var_x = 1.0 / fan
-        else:
-            b = param**2
-            a = 3 * (1 - param) ** 2
-            var_x = (-b + math.sqrt(b**2 + 4 * a)) / (2 * a * fan)
-
-        return nn.init.normal_(x, 0.0, math.sqrt(var_x), generator=generator)
-    else:
-        # NOTE: this is the default for kaiming_normal_
-        if param is None:
-            param = 0.0
-
-        return nn.init.kaiming_normal_(
-            x,
-            a=param,
-            mode=mode,
-            nonlinearity=nonlinearity,
-            generator=generator,
-        )
 
 
 # }}}

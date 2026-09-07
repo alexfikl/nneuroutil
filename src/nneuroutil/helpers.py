@@ -593,3 +593,78 @@ def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
 
 
 # }}}
+
+
+# {{{ calculate_gain
+
+# NOTE: function name matches torch.nn.init.calculate_gain
+
+
+def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
+    """Calculate the recommended gain for the given nonlinearity function.
+
+    See :ref:`notes-initializers` for the values of the gain for custom
+    functions. This also supports all the activations mentioned in
+    :func:`torch.nn.init.calculate_gain` for completeness.
+    """
+    import math
+
+    if nonlinearity == "quadratic":
+        scale = 1.0 / 3.0
+    elif nonlinearity == "blended_quadratic":
+        alpha = kwargs.get("alpha", 0.5)
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
+
+        scale = 1.0 / (alpha**2 + 3.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "cquadratic":
+        scale = 1.0 / 2.0
+    elif nonlinearity == "cblended_quadratic":
+        alpha = kwargs.get("alpha", 0.5)
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
+
+        scale = 1.0 / (alpha**2 + 2.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "modrelu":
+        b = kwargs.get("b", 0.0)
+
+        if b >= 0:
+            scale = 1.0 / (1.0 + b * math.sqrt(math.pi) + b**2)
+        else:
+            scale = 1.0 / (math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b))
+    elif nonlinearity == "leaky_modrelu":
+        b = kwargs.get("b", 0.0)
+        alpha = kwargs.get("alpha", 0.1)
+
+        if b >= 0:
+            scale = 1.0 / (1 + b * math.sqrt(math.pi) + b**2)
+        else:
+            scale0 = math.exp(-(b**2)) + b * math.sqrt(math.pi) * math.erfc(-b)
+            scale = 1.0 / (alpha**2 * (1 - (b**2 + 1) * math.exp(-(b**2))) + scale0)
+    elif nonlinearity == "ccardioid":
+        scale = 8.0 / 3.0
+    elif nonlinearity == "zrelu":
+        scale = 4.0
+    else:  # ruff: ignore[collapsible-else-if]
+        # NOTE: https://docs.pytorch.org/docs/2.12/nn.init.html
+        if nonlinearity in {"linear", "identity"}:  # ruff: ignore[if-with-same-arms]
+            scale = 1.0
+        elif nonlinearity in {"conv1d", "conv2d", "conv3d"}:  # ruff: ignore[if-with-same-arms]
+            scale = 1.0
+        elif nonlinearity == "sigmoid":
+            scale = 1.0
+        elif nonlinearity == "relu":
+            scale = math.sqrt(2)
+        elif nonlinearity == "leaky_relu":
+            # NOTE: this uses the default value from torch and flax
+            alpha = kwargs.get("alpha", 0.01)
+            scale = math.sqrt(2.0 / (1.0 + alpha**2))
+        elif nonlinearity == "selu":
+            scale = 3.0 / 4.0
+        else:
+            raise ValueError(f"unknown nonlinearity: {nonlinearity}")
+
+    return scale
+
+
+# }}}

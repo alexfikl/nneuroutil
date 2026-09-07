@@ -23,14 +23,15 @@ import nneuroutil.torch_extras as nnx
 
 # {{{ activation
 
-activation_cls = nnx.ComplexQuadratic
+activation_cls = nnx.LeakyModReLU
 activation_id = nnx.NONLINEARITY_TYPE_NAME[activation_cls]
 
-# param = -0.5
-# kwargs = {"bias": param, "alpha": 0.1}
-# kwargs = {"bias": param}
-param = None
-kwargs = {}
+param = -0.5
+paramb = 0.1
+
+# kwargs = {"interleaved": True}
+kwargs = {"interleaved": True, "bias": param, "alpha": paramb}
+# kwargs = {"interleaved": True, "bias": param}
 
 # }}}
 
@@ -72,7 +73,9 @@ default_model = make_mlp(
 )
 activated_model = make_mlp(
     layer,
-    lambda w: nnx.complex_kaiming_uniform_(w, nonlinearity=activation_id, param=param),
+    lambda w: nnx.kaiming_uniform_(
+        w, nonlinearity=activation_id, param=param, paramb=paramb
+    ),
 )
 
 # }}}
