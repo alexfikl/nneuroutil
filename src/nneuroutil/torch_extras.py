@@ -637,8 +637,14 @@ def kaiming_uniform_(
     mode: Literal["fan_in", "fan_out"] = "fan_in",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
-    """A wrapper around :func:`torch.nn.init.kaiming_uniform_` that supports
-    our activation functions.
+    """Fill the input tensor *x* using a Kaiming uniform distribution.
+
+    This does not use :func:`torch.nn.init.kaiming_uniform_`, but works the same
+    and supports the custom activation functions defined here.
+
+    :arg param: parameter used in activations functions that require it, such as
+        "blended_quadratic", "leaky_relu", etc.
+    :arg paramb: additional parameter for "leaky_modrelu".
     """
     from nneuroutil.helpers import calculate_gain
 
@@ -674,8 +680,14 @@ def kaiming_normal_(
     mode: Literal["fan_in", "fan_out"] = "fan_in",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
-    """A wrapper around :func:`torch.nn.init.kaiming_normal_` that supports
-    our activation functions.
+    """Fill the input tensor *x* using a Kaiming normal distribution.
+
+    This does not use :func:`torch.nn.init.kaiming_uniform_`, but works the same
+    and supports the custom activation functions defined here.
+
+    :arg param: parameter used in activations functions that require it, such as
+        "blended_quadratic", "leaky_relu", etc.
+    :arg paramb: additional parameter for "leaky_modrelu".
     """
     from nneuroutil.helpers import calculate_gain
 
