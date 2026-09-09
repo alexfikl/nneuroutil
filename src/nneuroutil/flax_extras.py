@@ -458,8 +458,8 @@ class TorchMemoryTracker(MemoryTracker):
 
             mem.memory.update({
                 "GPU": bytes_in_use,
-                "Peak GPU": stats["peak_bytes_in_use"],
                 "Delta GPU": bytes_in_use - prev_bytes_in_use,
+                "Peak GPU": stats["peak_bytes_in_use"],
             })
 
         return mem

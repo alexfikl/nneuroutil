@@ -360,7 +360,7 @@ class MemoryTracker:
         return MemorySnapshot(
             lineno=lineno,
             tag=tag,
-            memory={"RSS": rss, "Peak RSS": peak_rss, "Δ RSS": delta_rss},
+            memory={"RSS": rss, "Delta RSS": delta_rss, "Peak RSS": peak_rss},
         )
 
     def as_table(

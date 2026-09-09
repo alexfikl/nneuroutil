@@ -802,8 +802,8 @@ class TorchMemoryTracker(MemoryTracker):
 
         mem.memory.update({
             "CUDA": bytes_in_use,
-            "Peak CUDA": peak_bytes_in_use,
             "Delta CUDA": bytes_in_use - prev_bytes_in_use,
+            "Peak CUDA": peak_bytes_in_use,
         })
 
         return mem
