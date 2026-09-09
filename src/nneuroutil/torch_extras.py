@@ -786,7 +786,7 @@ def get_default_device() -> torch.device:
 # }}}
 
 
-# {{{ get_memory_usage
+# {{{ TorchMemoryTracker
 
 
 class TorchMemoryTracker(MemoryTracker):
@@ -802,16 +802,16 @@ class TorchMemoryTracker(MemoryTracker):
         if getattr(self.device, "type", "") != "cuda":
             return mem
 
-        cuda = torch.cuda.memory_allocated(self.device)
-        peak_cuda = torch.cuda.max_memory_allocated(self.device)
-        delta_cuda = 0.0
-        if self.snapshots:
-            delta_cuda = cuda - self.snapshots[-1].memory["CUDA"]
+        bytes_in_use = torch.cuda.memory_allocated(self.device)
+        peak_bytes_in_use = torch.cuda.max_memory_allocated(self.device)
+        prev_bytes_in_use = (
+            self.snapshots[-1].memory["CUDA"] if self.snapshots else bytes_in_use
+        )
 
         mem.memory.update({
-            "CUDA": cuda,
-            "Peak CUDA": peak_cuda,
-            "Δ CUDA": delta_cuda,
+            "CUDA": bytes_in_use,
+            "Peak CUDA": peak_bytes_in_use,
+            "Delta CUDA": bytes_in_use - prev_bytes_in_use,
         })
 
         return mem

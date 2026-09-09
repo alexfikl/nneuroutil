@@ -13,7 +13,13 @@ from flax import nnx
 from jax.nn.initializers import Initializer
 
 from nneuroutil.array_api_extras import deinterleave, interleave
-from nneuroutil.helpers import calculate_gain, module_logger, to_real
+from nneuroutil.helpers import (
+    MemorySnapshot,
+    MemoryTracker,
+    calculate_gain,
+    module_logger,
+    to_real,
+)
 
 log = module_logger(__name__)
 
@@ -426,6 +432,37 @@ def set_jax_config(
     jax.config.update("jax_enable_x64", val=True)
     while _PENDING_JAX_REGISTER_DATACLASS:
         jax.tree_util.register_dataclass(_PENDING_JAX_REGISTER_DATACLASS.pop())
+
+
+# }}}
+
+
+# {{{ JaxMemoryTracker
+
+
+class TorchMemoryTracker(MemoryTracker):
+    """A :class:`~nneuroutil.helpers.MemoryTracker` that also records the CUDA
+    memory usage of *device*.
+    """
+
+    def __init__(self, device: Any = None) -> None:
+        super().__init__(device)
+
+    def make_record(self, tag: str, *, stacklevel: int = 2) -> MemorySnapshot:
+        mem = super().make_record(tag, stacklevel=stacklevel + 1)
+        if self.device and (stats := self.device.memory_stats()) is not None:
+            bytes_in_use = stats["bytes_in_use"]
+            prev_bytes_in_use = (
+                self.snapshots[-1].memory["GPU"] if self.snapshots else bytes_in_use
+            )
+
+            mem.memory.update({
+                "GPU": bytes_in_use,
+                "Peak GPU": stats["peak_bytes_in_use"],
+                "Delta GPU": bytes_in_use - prev_bytes_in_use,
+            })
+
+        return mem
 
 
 # }}}
