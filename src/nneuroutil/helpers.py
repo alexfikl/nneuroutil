@@ -339,8 +339,14 @@ class MemorySnapshot:
 class MemoryTracker:
     """Track the host memory usage of the current process.
 
+    By default, this only tracks CPU memory usage. It is up to subclasses to
+    implement GPU or TPU memory usage. For accurate memory usage, we use the
+    ``psutil`` library. If this is not available, we fall back to the
+    :mod:`resource` module with its own restrictions (e.g. Unix only).
+
     Use :meth:`add_record` to take a tagged snapshot and :meth:`as_table` (or
     ``str(tracker)``) to render all the snapshots as a table.
+
     """
 
     device: Any
