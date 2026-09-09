@@ -6,7 +6,6 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
@@ -790,77 +789,32 @@ def get_default_device() -> torch.device:
 # {{{ get_memory_usage
 
 
-@dataclass(frozen=True)
-class CUDASnapshot(MemorySnapshot):
-    """A :class:`~nneuroutil.helpers.MemorySnapshot` with additional CUDA
-    memory usage.
-    """
-
-    cuda_mb: float
-    """The currently allocated CUDA memory, in MiB."""
-    delta_cuda_mb: float
-    """The change in allocated CUDA memory since the previous snapshot, in MiB."""
-    peak_cuda_mb: float
-    """The peak allocated CUDA memory observed so far, in MiB."""
-
-    def as_row(self) -> tuple[str, ...]:
-        return (
-            *super().as_row(),
-            f"{self.cuda_mb:.2f}",
-            f"{self.delta_cuda_mb:+.2f}",
-            f"{self.peak_cuda_mb:.2f}",
-        )
-
-
-class CUDAMemoryTracker(MemoryTracker[CUDASnapshot]):
+class TorchMemoryTracker(MemoryTracker):
     """A :class:`~nneuroutil.helpers.MemoryTracker` that also records the CUDA
     memory usage of *device*.
     """
 
     def __init__(self, device: Any = None) -> None:
-        if not getattr(device, "type", "") == "cuda":
-            raise ValueError(f"{type(self).__name__} does not support device: {device}")
-
         super().__init__(device)
 
-    def make_record(self, tag: str, *, stacklevel: int = 2) -> CUDASnapshot:
+    def make_record(self, tag: str, *, stacklevel: int = 2) -> MemorySnapshot:
         mem = super().make_record(tag, stacklevel=stacklevel + 1)
+        if getattr(self.device, "type", "") != "cuda":
+            return mem
 
-        cuda_mb = torch.cuda.memory_allocated(self.device) / (1024.0**2)
-        peak_cuda_mb = torch.cuda.max_memory_allocated(self.device) / (1024.0**2)
-        delta_cuda_mb = 0.0
+        cuda = torch.cuda.memory_allocated(self.device)
+        peak_cuda = torch.cuda.max_memory_allocated(self.device)
+        delta_cuda = 0.0
         if self.snapshots:
-            delta_cuda_mb = cuda_mb - self.snapshots[-1].cuda_mb
+            delta_cuda = cuda - self.snapshots[-1].memory["CUDA"]
 
-        snapshot = CUDASnapshot(
-            lineno=mem.lineno,
-            tag=tag,
-            rss_mb=mem.rss_mb,
-            delta_rss_mb=mem.delta_rss_mb,
-            peak_rss_mb=mem.peak_rss_mb,
-            cuda_mb=cuda_mb,
-            delta_cuda_mb=delta_cuda_mb,
-            peak_cuda_mb=peak_cuda_mb,
-        )
+        mem.memory.update({
+            "CUDA": cuda,
+            "Peak CUDA": peak_cuda,
+            "Δ CUDA": delta_cuda,
+        })
 
-        return snapshot
-
-    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:
-        labels = (
-            *super().labels(),
-            ("CUDA (MiB)", {"justify": "right"}),
-            ("Δ CUDA (MiB)", {"justify": "right"}),
-            ("Peak CUDA (MiB)", {"justify": "right"}),
-        )
-
-        return labels
-
-
-def make_memory_tracker(device: torch.device | None = None) -> MemoryTracker:
-    if getattr(device, "type", "") == "cuda":
-        return CUDAMemoryTracker(device)
-    else:
-        return MemoryTracker(device)
+        return mem
 
 
 # }}}

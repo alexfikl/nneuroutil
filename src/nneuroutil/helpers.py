@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any
 
 import array_api_compat
 import numpy as np
@@ -298,29 +298,13 @@ class MemorySnapshot:
     """The line number where the snapshot was taken."""
     tag: str
     """An identifier for the snapshot."""
-    rss_mb: float
-    """The resident set size (RSS), in MiB."""
-    delta_rss_mb: float
-    """The change in RSS since the previous snapshot, in MiB."""
-    peak_rss_mb: float
-    """The peak RSS observed so far, in MiB."""
-
-    def as_row(self) -> tuple[str, ...]:
-        """Format the snapshot as a table row."""
-        return (
-            f"L{self.lineno}",
-            self.tag,
-            f"{self.rss_mb:.2f}",
-            f"{self.delta_rss_mb:+.2f}",
-            f"{self.peak_rss_mb:.2f}",
-        )
+    memory: dict[str, float]
+    """A dictionary of ``label: value`` for memory usage. All values should be
+    in bytes and will be transformed into human readable format on printing.
+    """
 
 
-MemorySnapshotT = TypeVar("MemorySnapshotT", bound=MemorySnapshot)
-"""An invariant :class:`~typing.TypeVar` bound to :class:`MemorySnapshot`."""
-
-
-class MemoryTracker(Generic[MemorySnapshotT]):
+class MemoryTracker:
     """Track the host memory usage of the current process.
 
     Use :meth:`add_record` to take a tagged snapshot and :meth:`as_table` (or
@@ -329,19 +313,29 @@ class MemoryTracker(Generic[MemorySnapshotT]):
 
     device: Any
     """The device on which to track memory (unused for host memory)."""
-    snapshots: list[MemorySnapshotT]
+    snapshots: list[MemorySnapshot]
     """The list of recorded snapshots."""
 
     def __init__(self, device: Any = None) -> None:
-        self.device: Any = device
-        self.snapshots: list[MemorySnapshotT] = []
+        self.device = device
+        self.snapshots = []
 
     def add_record(self, tag: str, *, stacklevel: int = 1) -> None:
         """Record a snapshot with the given *tag*."""
         self.snapshots.append(self.make_record(tag, stacklevel=stacklevel + 1))
 
-    def make_record(self, tag: str, *, stacklevel: int = 1) -> MemorySnapshotT:
-        """Take a memory snapshot with the given *tag*."""
+    def make_record(self, tag: str, *, stacklevel: int = 1) -> MemorySnapshot:
+        """Take a memory snapshot with the given *tag*.
+
+        By default, this method adds CPU memory usage to the snapshot. Subclasses
+        can add additional GPU memory usage and other metrics that are relevant.
+        The current implementation adds:
+
+        * ``RSS`` (Resident Set Size): current memory usage on the CPU side
+          (requires ``psutil`` for accurate values).
+        * ``Peak RSS``: maximum memory usage on the CPU.
+        * ``Delta RSS``: memory added since the last snapshot.
+        """
         import resource
 
         try:
@@ -354,36 +348,19 @@ class MemoryTracker(Generic[MemorySnapshotT]):
         try:
             import psutil
 
-            rss_mb = psutil.Process().memory_info().rss / (1024.0**2)
+            rss = psutil.Process().memory_info().rss
         except Exception:
-            rss_mb = 0.0
+            rss = 0.0
 
-        peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
-        delta_rss_mb = 0.0
+        peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        delta_rss = 0.0
         if self.snapshots:
-            delta_rss_mb = rss_mb - self.snapshots[-1].rss_mb
+            delta_rss = rss - self.snapshots[-1].memory["RSS"]
 
-        return cast(
-            "MemorySnapshotT",
-            MemorySnapshot(
-                lineno=lineno,
-                tag=tag,
-                rss_mb=rss_mb,
-                delta_rss_mb=delta_rss_mb,
-                peak_rss_mb=peak_rss_mb,
-            ),
-        )
-
-    def labels(self) -> tuple[tuple[str, dict[str, Any]], ...]:  # ruff: ignore[no-self-use]
-        """Get the table column labels used by
-        :meth:`~nneuroutil.helpers.MemoryTracker.as_table`.
-        """
-        return (
-            ("Line", {"justify": "right"}),
-            ("Checkpoint", {}),
-            ("RSS (MiB)", {"justify": "right"}),
-            ("Δ RSS (MiB)", {"justify": "right"}),
-            ("Peak RSS (MiB)", {"justify": "right"}),
+        return MemorySnapshot(
+            lineno=lineno,
+            tag=tag,
+            memory={"RSS": rss, "Peak RSS": peak_rss, "Δ RSS": delta_rss},
         )
 
     def as_table(
@@ -395,11 +372,20 @@ class MemoryTracker(Generic[MemorySnapshotT]):
         from rich.table import Table
 
         table = Table(title=title, header_style=header_style)
-        for label, style in self.labels():
-            table.add_column(label, **style)
+        if not self.snapshots:
+            return table
+
+        table.add_column("Line", justify="left")
+        table.add_column("Checkpoint")
+        for label in self.snapshots[0].memory:
+            table.add_column(f"{label} (MiB)", justify="right")
 
         for snapshot in self.snapshots:
-            table.add_row(*snapshot.as_row())
+            table.add_row(
+                f"L{snapshot.lineno}",
+                snapshot.tag,
+                *(f"{value / 1024.0**2:.2f}" for value in snapshot.memory.values()),
+            )
 
         return table
 

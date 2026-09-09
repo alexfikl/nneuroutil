@@ -456,28 +456,24 @@ def test_device_check_mode() -> None:
 
 
 def test_memory_tracker() -> None:
-    from nneuroutil.torch_extras import make_memory_tracker
+    from nneuroutil.torch_extras import TorchMemoryTracker
 
     x = torch.randn(256, 256)
 
-    tracker = make_memory_tracker()
+    tracker = TorchMemoryTracker()
 
     tracker.add_record("start")
     y = x @ x
     tracker.add_record("after-matmul")
-
     assert len(tracker.snapshots) == 2
-    assert tracker.snapshots[0].tag == "start"
-    assert tracker.snapshots[0].lineno > 0
-    assert tracker.snapshots[1].delta_rss_mb == (
-        tracker.snapshots[1].rss_mb - tracker.snapshots[0].rss_mb
-    )
+
+    s0 = tracker.snapshots[0]
+    s1 = tracker.snapshots[1]
+    assert s0.tag == "start"
+    assert s0.lineno > 0
+    assert s1.memory["Δ RSS"] == s1.memory["RSS"] - s0.memory["RSS"]
 
     # check labels and table rendering
-    labels = tracker.labels()
-    assert len(labels) == 5
-    assert labels[0][0] == "Line"
-
     table = str(tracker)
     assert "start" in table
     assert "after-matmul" in table
