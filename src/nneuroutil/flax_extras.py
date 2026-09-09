@@ -440,8 +440,8 @@ def set_jax_config(
 # {{{ JaxMemoryTracker
 
 
-class TorchMemoryTracker(MemoryTracker):
-    """A :class:`~nneuroutil.helpers.MemoryTracker` that also records the CUDA
+class JaxMemoryTracker(MemoryTracker):
+    """A :class:`~nneuroutil.helpers.MemoryTracker` that also records the GPU
     memory usage of *device*.
     """
 
