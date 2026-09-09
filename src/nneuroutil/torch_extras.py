@@ -526,7 +526,7 @@ class ComplexLinear(nn.Module):
 
     def reset_parameters(self) -> None:
         # kaiming uniform (same as nn.Linear default) as a safe fallback
-        nn.init.kaiming_uniform_(self.weight, math.sqrt(5))
+        kaiming_uniform_(self.weight)
         if self.bias_re is not None:
             nn.init.zeros_(self.bias_re)
         if self.bias_im is not None:
@@ -579,7 +579,7 @@ class SymmetricLinear(nn.Module):
         self.in_features = features
         self.out_features = features
 
-        self._weight = nn.Parameter(
+        self.weight = nn.Parameter(
             torch.empty(features, features, device=device, dtype=dtype)
         )
 
@@ -588,23 +588,15 @@ class SymmetricLinear(nn.Module):
         else:
             self.bias = None
 
-    @property
-    def weight(self) -> torch.Tensor:
-        """The learnable weights of the module of shape ``(out_features, in_features)``.
-        The values are initialized using :func:`kaiming_uniform_`.
-        """
-        return self._weight.triu() + self._weight.triu().transpose(-1, -2)
-
     def reset_parameters(self) -> None:
-        # NOTE: this is the same init as nn.Linear. Turns out that symmetrizing
-        # it doesn't change the row-wise variances, so the same init works here
-        nn.init.kaiming_uniform_(self._weight, math.sqrt(5))
+        kaiming_uniform_(self.weight)
         if self.bias is not None:
             nn.init.zeros_(self.zeros)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return nn.functional.linear(x, self.weight, self.bias)
+        weight = self.weight.triu() + self.weight.triu().transpose(-1, -2)
+        return nn.functional.linear(x, weight, self.bias)
 
 
 # }}}
