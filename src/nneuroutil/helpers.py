@@ -290,6 +290,38 @@ class BlockTimer:
 # {{{
 
 
+def _get_memory_usage() -> tuple[float, float]:
+    try:
+        import psutil
+    except ImportError:
+        return _get_memory_usage_from_resource()
+
+    info = psutil.Process().memory_info()
+    rss = info.rss
+
+    # NOTE: psutil does not have a peak_rss on Unit apparently?
+    peak_rss = getattr(info, "peak_wset", None)
+    if peak_rss is None:
+        _, peak_rss = _get_memory_usage_from_resource()
+
+    return rss, peak_rss
+
+
+def _get_memory_usage_from_resource() -> tuple[float, float]:
+    try:
+        # NOTE: this is only available on Unix systems
+        import resource
+    except ImportError:
+        return 0.0, 0.0
+
+    rss = 0.0
+    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform == "linux":
+        peak_rss *= 1024.0
+
+    return rss, peak_rss
+
+
 @dataclass(frozen=True)
 class MemorySnapshot:
     """A snapshot of the host memory usage at a given point in time."""
@@ -336,23 +368,12 @@ class MemoryTracker:
         * ``Peak RSS``: maximum memory usage on the CPU.
         * ``Delta RSS``: memory added since the last snapshot.
         """
-        import resource
-
         try:
             lineno = sys._getframe(stacklevel).f_lineno
         except (AttributeError, ValueError):
             lineno = 0
 
-        # NOTE: we need psutil to get the actual memory usage. `resource` doesn't
-        # do that, just gets the "current peak usage" or whatnot.
-        try:
-            import psutil
-
-            rss = psutil.Process().memory_info().rss
-        except Exception:
-            rss = 0.0
-
-        peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        rss, peak_rss = _get_memory_usage()
         delta_rss = 0.0
         if self.snapshots:
             delta_rss = rss - self.snapshots[-1].memory["RSS"]
