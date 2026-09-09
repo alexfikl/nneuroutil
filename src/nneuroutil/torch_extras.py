@@ -637,10 +637,18 @@ def kaiming_uniform_(
     mode: Literal["fan_in", "fan_out"] = "fan_in",
     generator: torch.Generator | None = None,
 ) -> torch.Tensor:
-    """Fill the input tensor *x* using a Kaiming uniform distribution.
+    r"""Fill the input tensor *x* using a Kaiming uniform distribution.
 
-    This does not use :func:`torch.nn.init.kaiming_uniform_`, but works the same
-    and supports the custom activation functions defined here.
+    This does not use :func:`torch.nn.init.kaiming_uniform_`, but works the
+    same and supports the custom activation functions defined here. See
+    :ref:`notes-initializers` for a derivation and other aspects of
+    initialization. We assume that the inputs to each layer are
+
+    * for real inputs: Gaussian with zero mean and unit variance.
+    * for complex inputs :math:`z = r e^{\mathrm{i} \theta}`: :math:`r` is
+      Rayleigh with scale :math:`1/\sqrt{2}` and :math:`\theta` is uniform on
+      :math:`[0, 2 \pi]`. This means that :math:`\mathbb{E}[z \bar{z}] = 1` and
+      **not** :math:`\mathbb{E}[z z] = 1`!
 
     :arg param: parameter used in activations functions that require it, such as
         "blended_quadratic", "leaky_relu", etc.
@@ -682,8 +690,9 @@ def kaiming_normal_(
 ) -> torch.Tensor:
     """Fill the input tensor *x* using a Kaiming normal distribution.
 
-    This does not use :func:`torch.nn.init.kaiming_uniform_`, but works the same
-    and supports the custom activation functions defined here.
+    This does not use :func:`torch.nn.init.kaiming_normal_`, but works the
+    same and supports the custom activation functions defined here. The input
+    assumptions match those in :func:`kaiming_uniform_`.
 
     :arg param: parameter used in activations functions that require it, such as
         "blended_quadratic", "leaky_relu", etc.
