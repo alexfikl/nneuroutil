@@ -180,28 +180,26 @@ class SupportVectorMachineSolver(Protocol):
 
 
 def _svm_estimate_lipschitz_constant(
-    func: SupportVectorMachineFunction,
-    x0: Array2D[np.floating[Any]],
+    A: Array2D[np.floating[Any]],
     *,
     niters: int = 8,
     xp: Any = None,
 ) -> Array0D[np.floating[Any]]:
     if xp is None:
-        xp = array_api_compat.array_namespace(x0)
+        xp = array_api_compat.array_namespace(A)
 
-    _, g0 = func(xp.zeros_like(x0))
-
-    v = xp.ones_like(x0)
+    device = array_api_compat.device(A)
+    v = xp.ones((A.shape[1], 1), dtype=A.dtype, device=device)
     v = v / xp.sqrt(xp.sum(v * v))
 
     for _ in range(niters):
-        _, gv = func(v)
-        Mv = gv - g0
-        norm = xp.sqrt(xp.sum(Mv * Mv))
-        v = xp.where(norm > 0, Mv / norm, v)
+        v = A.T @ (A @ v)  # ty: ignore[unresolved-attribute]
+        norm = xp.sqrt(xp.sum(v * v))
+        v = xp.where(norm > 0, v / norm, v)
 
-    _, gv = func(v)
-    return xp.maximum(xp.sum(v * (gv - g0)), 1.0e-8)
+    Av = A @ v
+    eps = xp.asarray(1.0e-8, dtype=A.dtype, device=device)
+    return xp.maximum(xp.sum(Av * Av), eps)
 
 
 def solve_svm_jax(
@@ -215,15 +213,15 @@ def solve_svm_jax(
     atol: float = 1.0e-3,
     L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
+    if L0 is None:
+        raise ValueError("Lipschitz constant 'L0' must be provided to 'solve_svm_jax'")
+
     import jax
     import jax.numpy as jnp
 
     @jax.jit
     def _solve_fista(x0: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
-        if L0 is None:
-            L = _svm_estimate_lipschitz_constant(func, x0)
-        else:
-            L = jnp.asarray(L0, dtype=x0.dtype, device=x0.device)
+        L = jnp.asarray(L0, dtype=x0.dtype)
 
         def cond(val: tuple[Any, ...]) -> Any:
             _, _, _, it, d_norm = val
@@ -325,13 +323,15 @@ def solve_svm_fista(
     atol: float = 1.0e-3,
     L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
+    if L0 is None:
+        raise ValueError(
+            "Lipschitz constant 'L0' must be provided to 'solve_svm_fista'"
+        )
+
     xp = array_api_compat.array_namespace(x0)
     device = array_api_compat.device(x0)
 
-    if L0 is None:
-        L = _svm_estimate_lipschitz_constant(func, x0, xp=xp)
-    else:
-        L = xp.asarray(L0, dtype=x0.dtype, device=device)
+    L = xp.asarray(L0, dtype=x0.dtype, device=device)
 
     x, z, t = x0, x0, 1.0
     for _ in range(maxit):
@@ -422,16 +422,6 @@ def classify_support_vector_machine(
     if xp is None:
         xp = array_api_compat.array_namespace(*features)
 
-    if solver is None:
-        if array_api_compat.is_jax_array(features[0]):
-            solver = solve_svm_jax
-        elif array_api_compat.is_torch_array(features[0]):
-            solver = solve_svm_torch
-        elif array_api_compat.is_numpy_array(features[0]):
-            solver = solve_svm_numpy
-        else:
-            solver = solve_svm_fista
-
     # construct the full feature array
     A = xp.concat(features, axis=0)
     mu = xp.mean(A, axis=0)
@@ -474,6 +464,22 @@ def classify_support_vector_machine(
             0.5 * xp.sum(Sx * F) - xp.sum(x),
             S * F - 1,
         )
+
+    if solver is None:
+        from functools import partial
+
+        if array_api_compat.is_jax_array(features[0]):
+            solver = partial(
+                solve_svm_jax, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
+            )
+        elif array_api_compat.is_torch_array(features[0]):
+            solver = solve_svm_torch
+        elif array_api_compat.is_numpy_array(features[0]):
+            solver = solve_svm_numpy
+        else:
+            solver = partial(
+                solve_svm_fista, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
+            )
 
     alpha0 = xp.zeros(S.shape, dtype=A.dtype, device=device)
     alpha = solver(dual, alpha0, 0.0, C)
