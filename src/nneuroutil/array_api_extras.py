@@ -305,7 +305,7 @@ def histogram(
     counts = xp.diff(pad)
 
     if density:
-        counts = counts / (xp.sum(counts) * (edges[1] - edges[0]))  # ruff: ignore[non-augmented-assignment]
+        counts = counts / (xp.sum(counts) * (edges[1] - edges[0]))
 
     return counts, edges
 

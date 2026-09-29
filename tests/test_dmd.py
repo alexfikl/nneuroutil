@@ -319,7 +319,7 @@ def test_build_dense_extended_dmd(xp: Any, method: Literal["pinv", "ridge"]) -> 
     # predict: lift -> evolve -> decode
     z = xp.asarray([[x0, x0**2]], dtype=A.dtype)
     for _ in range(10):
-        z = z @ A  # ruff: ignore[non-augmented-assignment]
+        z = z @ A
     x_pred = (z @ C)[0, 0]
     x_ref = 2.0**10 * x0
 
