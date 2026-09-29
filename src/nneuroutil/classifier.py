@@ -179,6 +179,31 @@ class SupportVectorMachineSolver(Protocol):
         pass
 
 
+def _svm_estimate_lipschitz_constant(
+    func: SupportVectorMachineFunction,
+    x0: Array2D[np.floating[Any]],
+    *,
+    niters: int = 8,
+    xp: Any = None,
+) -> Array0D[np.floating[Any]]:
+    if xp is None:
+        xp = array_api_compat.array_namespace(x0)
+
+    _, g0 = func(xp.zeros_like(x0))
+
+    v = xp.ones_like(x0)
+    v = v / xp.sqrt(xp.sum(v * v))
+
+    for _ in range(niters):
+        _, gv = func(v)
+        Mv = gv - g0
+        norm = xp.sqrt(xp.sum(Mv * Mv))
+        v = xp.where(norm > 0, Mv / norm, v)
+
+    _, gv = func(v)
+    return xp.maximum(xp.sum(v * (gv - g0)), 1.0e-8)
+
+
 def solve_svm_jax(
     func: SupportVectorMachineFunction,
     x0: Array2D[np.floating[Any]],
@@ -187,34 +212,40 @@ def solve_svm_jax(
     /,
     *,
     maxiter: int = 500,
+    atol: float = 1.0e-3,
+    L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
     import jax
-    import jax.scipy.optimize
-
-    xp = array_api_compat.array_namespace(x0)
-
-    scale = upper - lower
-
-    def f(u: Array1D[np.floating[Any]]) -> Array0D[np.floating[Any]]:
-        x = lower + scale * jax.nn.sigmoid(xp.reshape(u, x0.shape))
-        val, _ = func(x)
-        return val
-
-    u0 = xp.zeros(x0.shape, dtype=x0.dtype)
+    import jax.numpy as jnp
 
     @jax.jit
-    def _solve(u0: Array1D[np.floating[Any]]) -> Array1D[np.floating[Any]]:
-        res = jax.scipy.optimize.minimize(
-            f,
-            u0,
-            method="BFGS",
-            options={"maxiter": maxiter},
-        )
-        return res.x
+    def _solve_fista(x0: Array2D[np.floating[Any]]) -> Array2D[np.floating[Any]]:
+        if L0 is None:
+            L = _svm_estimate_lipschitz_constant(func, x0)
+        else:
+            L = jnp.asarray(L0, dtype=x0.dtype, device=x0.device)
 
-    res_x = _solve(xp.ravel(u0))
+        def cond(val: tuple[Any, ...]) -> Any:
+            _, _, _, it, d_norm = val
+            return (it < maxiter) & (L * d_norm >= atol)
 
-    return lower + scale * jax.nn.sigmoid(xp.reshape(res_x, x0.shape))
+        def body(val: tuple[Any, ...]) -> tuple[Any, ...]:
+            x, z, t, it, _ = val
+            _, gz = func(z)
+
+            znew = jnp.clip(z - gz / L, lower, upper)
+            d = znew - z
+
+            t1 = (1.0 + (1.0 + 4.0 * t * t) ** 0.5) / 2.0
+            z_next = znew + ((t - 1.0) / t1) * (znew - x)
+
+            return (znew, z_next, t1, it + 1, jnp.max(jnp.abs(d)))
+
+        val0 = (x0, x0, 1.0, 0, 1.0)
+        final_val = jax.lax.while_loop(cond, body, val0)
+        return final_val[0]
+
+    return _solve_fista(x0)
 
 
 def solve_svm_torch(
@@ -265,62 +296,54 @@ def solve_svm_numpy(
 ) -> Array2D[np.floating[Any]]:
     from scipy.optimize import Bounds, minimize
 
-    xp = array_api_compat.array_namespace(x0)
-
     def f(
         v: Array1D[np.floating[Any]],
     ) -> tuple[Array0D[np.floating[Any]], Array1D[np.floating[Any]]]:
-        val, g = func(xp.reshape(v, x0.shape))
-        return val, xp.ravel(g)
+        val, g = func(np.reshape(v, x0.shape))
+        return val, np.ravel(g)
 
     res = minimize(  # ty: ignore[no-matching-overload]
         f,
-        xp.ravel(x0),
+        np.ravel(x0),
         jac=True,
         method="L-BFGS-B",
         bounds=Bounds(lower, upper),
         options={"maxiter": maxiter},
     )
 
-    return xp.reshape(res.x, x0.shape)
+    return np.reshape(res.x, x0.shape)
 
 
 def solve_svm_fista(
     func: SupportVectorMachineFunction,
-    x0: Array1D[np.floating[Any]],
+    x0: Array2D[np.floating[Any]],
     lower: float,
     upper: float,
     /,
     *,
     maxit: int = 1000,
     atol: float = 1.0e-3,
-    eps: float | None = None,
-    L0: float = 1.0,
-    eta: float = 2.0,
+    L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
     xp = array_api_compat.array_namespace(x0)
+    device = array_api_compat.device(x0)
 
-    if eps is None:
-        eps = 1.0e3 * xp.finfo(x0.dtype).eps
+    if L0 is None:
+        L = _svm_estimate_lipschitz_constant(func, x0, xp=xp)
+    else:
+        L = xp.asarray(L0, dtype=x0.dtype, device=device)
 
-    x, z, t, L = x0, x0, 1.0, L0
+    x, z, t = x0, x0, 1.0
     for _ in range(maxit):
-        fz, gz = func(z)
-        while True:
-            znew = xp.clip(z - gz / L, lower, upper)
-            d = znew - z
-            fznew, _ = func(znew)
-            bound = fz + xp.sum(gz * d) + 0.5 * L * xp.sum(d * d)
-            if fznew <= bound + eps * xp.abs(fz):
-                break
-
-            L *= eta
+        _, gz = func(z)
+        znew = xp.clip(z - gz / L, lower, upper)
+        d = znew - z
 
         if L * xp.max(xp.abs(d)) < atol:
             return znew
 
-        t1 = (1 + (1 + 4 * t * t) ** 0.5) / 2.0
-        z = znew + ((t - 1) / t1) * (znew - x)
+        t1 = (1.0 + (1.0 + 4.0 * t * t) ** 0.5) / 2.0
+        z = znew + ((t - 1.0) / t1) * (znew - x)
         x, t = znew, t1
 
     return x
