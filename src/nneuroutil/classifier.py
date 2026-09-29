@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import array_api_compat
 import numpy as np
@@ -18,7 +18,7 @@ log = module_logger(__name__)
 
 
 @dataclass(frozen=True)
-class LDAEstimator:
+class LinearDiscriminandAnalysisClassifier:
     """Estimator obtained from :func:`classify_linear_discriminant_analysis`."""
 
     G: Array2D[np.floating[Any]]
@@ -34,22 +34,40 @@ class LDAEstimator:
         self,
         x: Array1D[np.floating[Any]] | Array2D[np.floating[Any]],
         *,
+        metric: Literal["l2", "cos"] = "l2",
         xp: Any = None,
     ) -> Array1D[np.floating[Any]]:
-        """Predict class labels for given sample(s) *x*."""
+        """Predict class labels for given sample(s) *x*.
+
+        :arg metric: classification metric used in the reduced subspace:
+            * ``"l2"``: assigns to the centroid with minimum Euclidean distance.
+            * ``"cos"``: assigns to the centroid with maximum cosine similarity.
+        """
         if x.ndim == 1:
             return self.predict(x[None, :], xp=xp)[0]
 
         if xp is None:
             xp = array_api_compat.array_namespace(x, self.G)
 
-        c = self.centroids
+        # NOTE: this largely implements Algorithm 3 from [Howland2004]_
+        cm = self.centroids
         cz = self.proj_centroids
+        Z = (x - cm) @ self.G
 
-        Z = (x - c) @ self.G
-        d = xp.sum(Z**2, axis=1)[:, None] - 2 * Z @ cz.T + xp.sum(cz**2, axis=1)[None]  # ty: ignore[unresolved-attribute]
+        if metric == "l2":
+            d = (
+                xp.sum(Z**2, axis=1)[:, None]
+                - 2 * Z @ cz.T  # ty: ignore[unresolved-attribute]
+                + xp.sum(cz**2, axis=1)[None]
+            )
 
-        return self.labels[xp.argmin(d, axis=1)]
+            return self.labels[xp.argmin(d, axis=1)]
+        elif metric == "cos":
+            Zn = Z / xp.linalg.norm(Z, axis=1, keepdims=True)
+            Cn = cz / xp.linalg.norm(cz, axis=1, keepdims=True)
+            return self.labels[xp.argmax(Zn @ Cn.T, axis=1)]
+        else:
+            raise ValueError(f"unknown metric: {metric!r}")
 
 
 def classify_linear_discriminant_analysis(
@@ -58,7 +76,7 @@ def classify_linear_discriminant_analysis(
     *,
     eps: float | None = None,
     xp: Any = None,
-) -> LDAEstimator:
+) -> LinearDiscriminandAnalysisClassifier:
     """Classify the given dataset using standard LDA (mainly based on
     Algorithm 1 from [Howland2004]_).
 
@@ -128,7 +146,7 @@ def classify_linear_discriminant_analysis(
     _, _, Wt = xp.linalg.svd(P[:k], full_matrices=False)
     G = Qh.T @ (Wt.T[:, : k - 1] / S[:, None])
 
-    return LDAEstimator(
+    return LinearDiscriminandAnalysisClassifier(
         G=G,
         centroids=c_m,
         proj_centroids=(cs - c_m) @ G,
