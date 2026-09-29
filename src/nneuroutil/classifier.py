@@ -19,11 +19,16 @@ log = module_logger(__name__)
 
 @dataclass(frozen=True)
 class LDAEstimator:
-    G: Array2D[np.floating[Any]]
+    """Estimator obtained from :func:`classify_linear_discriminant_analysis`."""
 
+    G: Array2D[np.floating[Any]]
+    """Projection matrix to the reduced :math:`k - 1` dimensional subspace."""
     centroids: Array1D[np.floating[Any]]
+    """Global centroid of shape :math:`(nfeatures,)`."""
     proj_centroids: Array2D[np.floating[Any]]
+    """Projected class centroids of shape :math:`(k, k - 1)`."""
     labels: Array1D[np.floating[Any]]
+    """Array of class labels of shape :math:`(k,)`."""
 
     def predict(
         self,
@@ -31,6 +36,7 @@ class LDAEstimator:
         *,
         xp: Any = None,
     ) -> Array1D[np.floating[Any]]:
+        """Predict class labels for given sample(s) *x*."""
         if x.ndim == 1:
             return self.predict(x[None, :], xp=xp)[0]
 
@@ -62,6 +68,13 @@ def classify_linear_discriminant_analysis(
         IEEE Transactions on Pattern Analysis and Machine Intelligence, Vol. 26,
         pp. 995--1006, 2004,
         `doi:10.1109/tpami.2004.46 <https://doi.org/10.1109/tpami.2004.46>`__.
+
+    :arg features: sequence of 2D arrays containing sample features for each
+        class, each of shape ``(n_samples_i, nfeatures)``.
+    :arg labels: sequence of labels corresponding to each class in *features*.
+    :arg eps: tolerance used for rank determination in the SVD truncation.
+    :returns: an :class:`LDAEstimator` trained on the dataset.
+
     """
     if len(features) != len(labels):
         raise ValueError(
