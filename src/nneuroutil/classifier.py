@@ -162,12 +162,20 @@ def classify_linear_discriminant_analysis(
 
 
 class SupportVectorMachineFunction(Protocol):
+    """Protocol for the dual objective function returning ``(value, gradient)``."""
+
     def __call__(
         self, x: Array2D[np.floating[Any]], /
     ) -> tuple[Array0D[np.floating[Any]], Array2D[np.floating[Any]]]: ...
 
 
 class SupportVectorMachineSolver(Protocol):
+    """Protocol for box-constrained solvers minimizing *fun* in ``[lower,
+    upper]`` starting from *x0*.
+
+    The problem for SVM is a quadratic, so special solvers could be used.
+    """
+
     def __call__(
         self,
         fun: SupportVectorMachineFunction,
@@ -185,6 +193,10 @@ def _svm_estimate_lipschitz_constant(
     niters: int = 8,
     xp: Any = None,
 ) -> Array0D[np.floating[Any]]:
+    """Estimate the Lipschitz constant of the dual gradient using power iteration.
+
+    The constant is given by the eigenvalue of the Gram matrix :math:`K = A A^T`.
+    """
     if xp is None:
         xp = array_api_compat.array_namespace(A)
 
@@ -202,7 +214,7 @@ def _svm_estimate_lipschitz_constant(
     return xp.maximum(xp.sum(Av * Av), eps)
 
 
-def solve_svm_jax(
+def _solve_svm_jax(
     func: SupportVectorMachineFunction,
     x0: Array2D[np.floating[Any]],
     lower: float,
@@ -213,6 +225,16 @@ def solve_svm_jax(
     atol: float = 1.0e-3,
     L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
+    """Solve the box-constrained dual problem using JIT-compiled FISTA in JAX."""
+
+    # NOTE: on performance:
+    # 1. jax.scipy.optimize.mimize.BFGS seems to be a lot slower. Also, because
+    #    it is not the low-storage L-BFGS variant, it uses a lot of memory.
+    # 2. Jitting inside this function makes everything a lot faster. The user can
+    #    still jit classify_support_vector_machine without an issue.
+    # 3. This implements the same algorithm as _solve_svm_fista, but using jax
+    #    constructs to get better performance.
+
     if L0 is None:
         raise ValueError("Lipschitz constant 'L0' must be provided to 'solve_svm_jax'")
 
@@ -246,7 +268,7 @@ def solve_svm_jax(
     return _solve_fista(x0)
 
 
-def solve_svm_torch(
+def _solve_svm_torch(
     func: SupportVectorMachineFunction,
     x0: Array2D[np.floating[Any]],
     lower: float,
@@ -255,7 +277,16 @@ def solve_svm_torch(
     *,
     maxiter: int = 500,
 ) -> Array2D[np.floating[Any]]:
+    """Solve the box-constrained dual problem using L-BFGS with sigmoid
+    reparameterization in PyTorch.
+    """
     import torch
+
+    # NOTE: pytorch does not seem to have a constrained optimizer that would work
+    # here. We reparameterize using a sigmoid, but that has problems
+    # 1. A value of zero/one means u -> ±infty
+    # 2. The optimization is slower than it needs to be due to it trying hard to
+    #    find these zero/one solutions.
 
     device = x0.device
     dtype = x0.dtype
@@ -283,7 +314,7 @@ def solve_svm_torch(
         return lower + scale * torch.sigmoid(u)
 
 
-def solve_svm_numpy(
+def _solve_svm_numpy(
     func: SupportVectorMachineFunction,
     x0: Array1D[np.floating[Any]],
     lower: float,
@@ -292,6 +323,7 @@ def solve_svm_numpy(
     *,
     maxiter: int = 500,
 ) -> Array2D[np.floating[Any]]:
+    """Solve the box-constrained dual problem using SciPy's L-BFGS-B."""
     from scipy.optimize import Bounds, minimize
 
     def f(
@@ -312,7 +344,7 @@ def solve_svm_numpy(
     return np.reshape(res.x, x0.shape)
 
 
-def solve_svm_fista(
+def _solve_svm_fista(
     func: SupportVectorMachineFunction,
     x0: Array2D[np.floating[Any]],
     lower: float,
@@ -323,6 +355,12 @@ def solve_svm_fista(
     atol: float = 1.0e-3,
     L0: float | Array0D[np.floating[Any]] | None = None,
 ) -> Array2D[np.floating[Any]]:
+    """Solve the box-constrained dual problem using FISTA across array backends."""
+
+    # NOTE: we require the user give the Lipschitz constant here because it can
+    # be accurately computed with _svm_estimate_lipschitz_constant. It's a
+    # parameter so that a bit of slack can maybe be added too, if necessary.
+
     if L0 is None:
         raise ValueError(
             "Lipschitz constant 'L0' must be provided to 'solve_svm_fista'"
@@ -352,10 +390,20 @@ def solve_svm_fista(
 @register_dataclass
 @dataclass(frozen=True)
 class SupportVectorMachine:
+    """Trained linear Support Vector Machine classifier."""
+
     W: Array2D[np.floating[Any]]
+    """Weight matrix of shape :math:`(nfeatures + 1, nclasses)` containing
+    primal weights and bias coefficients for each class.
+    """
     mu: Array1D[np.floating[Any]]
+    """Mean feature vector of shape :math:`(nfeatures,)` subtracted before
+    scoring.
+    """
     bias: float
+    """Bias scaling constant appended to centered features."""
     labels: Array1D[np.floating[Any]]
+    """Array of class labels of shape :math:`(nclasses,)`."""
 
     def predict(
         self,
@@ -363,6 +411,16 @@ class SupportVectorMachine:
         *,
         xp: Any = None,
     ) -> Array1D[np.floating[Any]]:
+        r"""Predict class labels for given sample(s) *x*.
+
+        For a sample :math:`x`, decision scores are computed for each class
+        as :math:`(x - \mu) W_{:-1} + \text{bias} \cdot W_{-1}`, and the
+        label with the highest score is returned.
+
+        :arg x: 1D array of a single sample of shape ``(nfeatures,)`` or 2D array
+            of samples of shape ``(nsamples, nfeatures)``.
+        :returns: predicted class label(s).
+        """
         if x.ndim == 1:
             return self.predict(x[None, :], xp=xp)[0]
 
@@ -384,16 +442,39 @@ def classify_support_vector_machine(
     solver: SupportVectorMachineSolver | None = None,
     xp: Any = None,
 ) -> SupportVectorMachine:
-    """Implement a SVM classifier (mainly based on Chapter 12 in [Hastie2013]_).
+    r"""Train a linear Support Vector Machine (SVM) classifier for multi-class data
+    (mainly based on Chapter 12 in [Hastie2013]_).
 
-    The SVM classifier solves a one-to-rest problem with an included bias. The
-    given *solver* is expected to solve a simple quadratic optimization problem
-    with box constraints only.
+    Multi-class classification is handled using a **one-vs-rest** (OvR) scheme:
+    for :math:`K` classes, :math:`K` binary linear SVMs are trained
+    simultaneously. Each model separates one class from all other classes.
+
+    The primal problem incorporates an explicit bias by augmenting the centered
+    feature matrix with a constant column :math:`[\mathbf{x} - \mu,
+    \text{bias}]`. This absorbs the intercept into the weight vector and
+    regularizes it along with the feature weights, which removes the dual
+    equality constraint :math:`\sum_i y_i \alpha_i = 0`. The dual optimization
+    then reduces to a simpler quadratic program with standard box constraints
+    :math:`0 \le \alpha_i \le C`.
 
     .. [Hastie2013] T. Hastie, R. Tibshirani, J. Friedman,
         *Elements of Statistical Learning - Data Mining, Inference, and Prediction*,
         Springer London, Limited, 2013.
+
+    :arg features: sequence of 2D arrays containing sample features for each
+        class, each of shape ``(n_samples_i, nfeatures)``.
+    :arg labels: sequence of labels corresponding to each class in *features*.
+    :arg C: soft-margin regularization parameter (:math:`C > 0`). Controls the
+        trade-off between maximizing the margin and minimizing classification
+        errors. Larger values penalize margin violations heavily (harder margin),
+        while smaller values allow more violations (softer margin, more regularization).
+    :arg bias: positive constant appended as an extra feature dimension to include
+        an intercept term.
+    :arg solver: custom box-constrained quadratic solver matching
+        :class:`SupportVectorMachineSolver`. If ``None``, a backend-appropriate
+        solver is chosen automatically.
     """
+
     if len(features) != len(labels):
         raise ValueError(
             f"'features' and 'labels' do not match: {len(features)} and {len(labels)}"
@@ -470,15 +551,15 @@ def classify_support_vector_machine(
 
         if array_api_compat.is_jax_array(features[0]):
             solver = partial(
-                solve_svm_jax, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
+                _solve_svm_jax, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
             )
         elif array_api_compat.is_torch_array(features[0]):
-            solver = solve_svm_torch
+            solver = _solve_svm_torch
         elif array_api_compat.is_numpy_array(features[0]):
-            solver = solve_svm_numpy
+            solver = _solve_svm_numpy
         else:
             solver = partial(
-                solve_svm_fista, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
+                _solve_svm_fista, L0=_svm_estimate_lipschitz_constant(A, xp=xp)
             )
 
     alpha0 = xp.zeros(S.shape, dtype=A.dtype, device=device)

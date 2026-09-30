@@ -11,12 +11,12 @@ import numpy as np
 import pytest
 
 from nneuroutil.classifier import (
+    _solve_svm_fista,  # ruff: ignore[import-private-name]
+    _solve_svm_jax,  # ruff: ignore[import-private-name]
+    _solve_svm_numpy,  # ruff: ignore[import-private-name]
+    _solve_svm_torch,  # ruff: ignore[import-private-name]
     classify_linear_discriminant_analysis,
     classify_support_vector_machine,
-    solve_svm_fista,
-    solve_svm_jax,
-    solve_svm_numpy,
-    solve_svm_torch,
 )
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array2D
@@ -234,26 +234,26 @@ def test_classify_support_vector_machine(xp: Any) -> None:
     A_binary = xp.concat([b0, b1], axis=0)
     L0_est = _svm_estimate_lipschitz_constant(A_binary, xp=xp)
     clf_fista = classify_support_vector_machine(
-        (b0, b1), (10, 20), solver=partial(solve_svm_fista, L0=L0_est), xp=xp
+        (b0, b1), (10, 20), solver=partial(_solve_svm_fista, L0=L0_est), xp=xp
     )
     assert bool(xp.all(clf_fista.predict(b0) == 10))
     assert bool(xp.all(clf_fista.predict(b1) == 20))
 
     if array_api_compat.is_numpy_array(b0):
         clf_np = classify_support_vector_machine(
-            (b0, b1), (10, 20), solver=solve_svm_numpy, xp=xp
+            (b0, b1), (10, 20), solver=_solve_svm_numpy, xp=xp
         )
         assert bool(xp.all(clf_np.predict(b0) == 10))
         assert bool(xp.all(clf_np.predict(b1) == 20))
     elif array_api_compat.is_torch_array(b0):
         clf_torch = classify_support_vector_machine(
-            (b0, b1), (10, 20), solver=solve_svm_torch, xp=xp
+            (b0, b1), (10, 20), solver=_solve_svm_torch, xp=xp
         )
         assert bool(xp.all(clf_torch.predict(b0) == 10))
         assert bool(xp.all(clf_torch.predict(b1) == 20))
     elif array_api_compat.is_jax_array(b0):
         clf_jax = classify_support_vector_machine(
-            (b0, b1), (10, 20), solver=partial(solve_svm_jax, L0=L0_est), xp=xp
+            (b0, b1), (10, 20), solver=partial(_solve_svm_jax, L0=L0_est), xp=xp
         )
         assert bool(xp.all(clf_jax.predict(b0) == 10))
         assert bool(xp.all(clf_jax.predict(b1) == 20))
@@ -308,7 +308,7 @@ def test_classify_support_vector_machine(xp: Any) -> None:
 
     dummy_x0 = xp.zeros((2, 2), dtype=dtype, device=device)
     with pytest.raises(ValueError, match="Lipschitz constant 'L0' must be provided"):
-        solve_svm_fista(dummy_func, dummy_x0, 0.0, 1.0)
+        _solve_svm_fista(dummy_func, dummy_x0, 0.0, 1.0)
 
     # }}}
 
