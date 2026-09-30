@@ -92,9 +92,8 @@ def classify_linear_discriminant_analysis(
         class, each of shape ``(n_samples_i, nfeatures)``.
     :arg labels: sequence of labels corresponding to each class in *features*.
     :arg eps: tolerance used for rank determination in the SVD truncation.
-    :returns: an :class:`LDAEstimator` trained on the dataset.
-
     """
+
     if len(features) != len(labels):
         raise ValueError(
             f"'features' and 'labels' do not match: {len(features)} and {len(labels)}"

@@ -6,9 +6,10 @@ nneuroutil: utilities for neuroscience
     :hidden:
     :caption: API Reference
 
+    api/classifier
     api/dmd
-    api/torch_extras
     api/flax_extras
+    api/torch_extras
     api/helpers
     api/typing
 
