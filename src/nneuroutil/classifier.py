@@ -79,10 +79,11 @@ def classify_linear_discriminant_analysis(
     labels: Sequence[Any],
     *,
     eps: float | None = None,
+    shrinkage: float = 1.0,
     xp: Any = None,
 ) -> LinearDiscriminandAnalysisClassifier:
-    """Classify the given dataset using standard LDA (mainly based on
-    Algorithm 1 from [Howland2004]_).
+    """Classify the given dataset GSVD-based LDA (mainly based on Algorithm 1
+    from [Howland2004]_).
 
     .. [Howland2004] P. Howland, H. Park,
         *Generalizing Discriminant Analysis Using the Generalized Singular Value
@@ -95,6 +96,11 @@ def classify_linear_discriminant_analysis(
         class, each of shape ``(n_samples_i, nfeatures)``.
     :arg labels: sequence of labels corresponding to each class in *features*.
     :arg eps: tolerance used for rank determination in the SVD truncation.
+    :arg shrinkage: a float in :math:`(0, 1]` that regularizes the projection
+        matrix such that :math:`G^T ((1 - s) S_W + s S_M) G = I`. If this is 1,
+        it matches Algorithm 1 from [Howland2004]_. If it is 0, :math:`G` is
+        rescaled to match the classic LDA algorithm (where the matches are
+        determined using the Mahalanobis distance).
     """
 
     if len(features) != len(labels):
@@ -125,6 +131,9 @@ def classify_linear_discriminant_analysis(
     if eps <= 0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
+    if not 0.0 < shrinkage <= 1.0:
+        raise ValueError(f"'shrinkage' must be in (0, 1]: {shrinkage}")
+
     # compute class sizes: Equation (1) in [Howland2004]_
     ns = xp.asarray([len(x) for x in features], dtype=dtype, device=device)
     n = xp.sum(ns)
@@ -148,6 +157,15 @@ def classify_linear_discriminant_analysis(
 
     _, _, Wt = xp.linalg.svd(P[:k], full_matrices=False)
     G = Qh.T @ (Wt.T[:, : k - 1] / S[:, None])
+
+    # NOTE: [Howland2004]_ determines G only up to a nonsingular right-multiply;
+    # setting shrinkage ~ 0 will recover classic LDA and match scikit-learn
+    if shrinkage != 1:
+        H_WG = P[k:] @ Wt.T[:, : k - 1]
+        w, V = xp.linalg.eigh(H_WG.T @ H_WG)
+
+        scale = 1.0 / xp.sqrt((1.0 - shrinkage) * w + shrinkage)
+        G = G @ (V * scale) @ V.T
 
     return LinearDiscriminandAnalysisClassifier(
         G=G,
