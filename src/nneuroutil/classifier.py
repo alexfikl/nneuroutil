@@ -4,13 +4,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import array_api_compat
 import numpy as np
 
 from nneuroutil.helpers import module_logger, register_dataclass
 from nneuroutil.typing import Array0D, Array1D, Array2D
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 log = module_logger(__name__)
 
@@ -72,8 +75,8 @@ class LinearDiscriminandAnalysisClassifier:
 
 
 def classify_linear_discriminant_analysis(
-    features: tuple[Array2D[np.floating[Any]], ...],
-    labels: tuple[Any, ...],
+    features: Sequence[Array2D[np.floating[Any]]],
+    labels: Sequence[Any],
     *,
     eps: float | None = None,
     xp: Any = None,
@@ -433,8 +436,8 @@ class SupportVectorMachine:
 
 
 def classify_support_vector_machine(
-    features: tuple[Array2D[np.floating[Any]], ...],
-    labels: tuple[Any, ...],
+    features: Sequence[Array2D[np.floating[Any]]],
+    labels: Sequence[Any],
     *,
     C: float = 1.0,
     bias: float = 1.0,
