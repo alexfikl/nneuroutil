@@ -141,6 +141,46 @@ def test_classify_linear_discriminant_analysis(xp: Any) -> None:
 # }}}
 
 
+# {{{ test_classify_linear_discriminant_analysis_sklearn
+
+
+def test_classify_linear_discriminant_analysis_sklearn() -> None:
+    """Cross-check against scikit-learn's standard LDA."""
+    skda = pytest.importorskip("sklearn.discriminant_analysis")
+
+    rng = np.random.default_rng(seed=42)
+
+    sizes = (15, 40, 8)
+    centers = np.array([
+        [0.0, 0.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 1.5, 0.5, 0.0],
+    ])
+    features = tuple(
+        rng.standard_normal((n, centers.shape[1])) * 0.9 + c
+        for n, c in zip(sizes, centers, strict=True)
+    )
+    labels = (0, 1, 2)
+
+    X = np.concatenate(features, axis=0)
+    y = np.concatenate([
+        np.full(n, label, dtype=int) for n, label in zip(sizes, labels, strict=True)
+    ])
+
+    # NOTE: setting shrinkage~0 allows matching sklearn's LDA
+    clf = classify_linear_discriminant_analysis(features, labels, shrinkage=1e-8, xp=np)
+
+    # NOTE: we do not implement non-uniform priors, so need to set them for sklearn
+    ref = skda.LinearDiscriminantAnalysis(
+        solver="svd", priors=np.full(len(labels), 1.0 / len(labels))
+    ).fit(X, y)
+
+    assert np.array_equal(clf.predict(X), ref.predict(X))
+
+
+# }}}
+
+
 # {{{ test_classify_support_vector_machine
 
 
@@ -311,6 +351,58 @@ def test_classify_support_vector_machine(xp: Any) -> None:
         _solve_svm_fista(dummy_func, dummy_x0, 0.0, 1.0)
 
     # }}}
+
+
+# }}}
+
+
+# {{{ test_classify_support_vector_machine_sklearn
+
+
+def test_classify_support_vector_machine_sklearn() -> None:
+    """Cross-check against scikit-learn's linear SVM (NumPy-only, optional)."""
+    sksvm = pytest.importorskip("sklearn.svm")
+
+    rng = np.random.default_rng(seed=42)
+
+    sizes = (20, 25, 30)
+    centers = np.array([
+        [10.0, 0.0, 0.0, 0.0],
+        [0.0, 10.0, 0.0, 0.0],
+        [0.0, 0.0, 10.0, 0.0],
+    ])
+    features = tuple(
+        rng.standard_normal((n, centers.shape[1])) + c
+        for n, c in zip(sizes, centers, strict=True)
+    )
+    labels = (0, 1, 2)
+
+    X = np.concatenate(features, axis=0)
+    y = np.concatenate([
+        np.full(n, label, dtype=int) for n, label in zip(sizes, labels, strict=True)
+    ])
+
+    C = 1.0
+    bias = 1.0
+    clf = classify_support_vector_machine(features, labels, C=C, bias=bias, xp=np)
+
+    # NOTE: scikit-learn parameters:
+    #   * loss="hinge": matches our primal hinge loss (the default is "squared_hinge")
+    #   * dual=True: solves the dual problem too.
+    #   * intercept_scaling = bias
+    #   * fit_intercept=True: required for `intercept_scaling` to take effect.
+    #   * LinearSVC: uses one-vs-rest (SVC uses one-vs-one).
+    ref = sksvm.LinearSVC(
+        loss="hinge",
+        dual=True,
+        C=C,
+        fit_intercept=True,
+        intercept_scaling=bias,
+        tol=1e-10,
+        max_iter=100000,
+    ).fit(X, y)
+
+    assert np.array_equal(clf.predict(X), ref.predict(X))
 
 
 # }}}
