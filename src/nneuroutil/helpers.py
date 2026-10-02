@@ -9,7 +9,7 @@ import os
 import pathlib
 import sys
 import time
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
@@ -208,7 +208,7 @@ class TicTocTimer:
 
 
 @contextmanager
-def tictoc(name: str = "timing") -> Iterator[None]:
+def tictoc(name: str = "timing") -> Generator[None]:
     tt = TicTocTimer()
     tt.tic()
 

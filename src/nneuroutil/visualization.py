@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pathlib
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -203,7 +203,7 @@ def figure(
     projection: str | None = None,
     figsize: tuple[float, float] | None = None,
     **kwargs: Any,
-) -> Iterator[Any]:
+) -> Generator["mp.Figure"]:
     """A small wrapper context manager around :class:`matplotlib.figure.Figure`.
 
     :arg nrows: number of rows of subplots.
