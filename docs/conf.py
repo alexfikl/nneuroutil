@@ -230,6 +230,8 @@ intersphinx_mapping = {
 
 # fmt: off
 custom_type_links = {
+    # numpy
+    "np.floating": ("numpy", "numpy.floating", "class"),
     # flax
     "nnx.Module": ("flax", "flax.nnx.Module", "class"),
     "nnx.Param": ("flax", "flax.nnx.Param", "class"),
