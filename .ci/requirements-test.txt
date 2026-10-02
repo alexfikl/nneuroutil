@@ -20,7 +20,7 @@ beautifulsoup4==4.15.0
     # via pydata-sphinx-theme
 certifi==2026.7.22
     # via requests
-charset-normalizer==3.5.1
+charset-normalizer==3.5.2
     # via requests
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
@@ -42,7 +42,7 @@ flax==0.12.8 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml:jax)
 flax==0.12.10 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:jax)
-fonttools==4.66.0
+fonttools==4.66.1
     # via matplotlib
 fsspec==2026.9.0
     # via etils
@@ -195,7 +195,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.16.9
+ruff==0.16.10
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -263,7 +263,7 @@ typing-extensions==4.16.0
     #   orbax-checkpoint
 urllib3==2.8.0
     # via requests
-uvloop==0.22.1 ; sys_platform != 'win32'
+uvloop==0.23.0 ; sys_platform != 'win32'
     # via orbax-checkpoint
 zipp==4.1.0
     # via etils
