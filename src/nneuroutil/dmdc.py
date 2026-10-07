@@ -306,8 +306,20 @@ def build_dense_symmetric_dmdc(
             = \tilde{X}^H \tilde{Y} + \tilde{Y}^H \tilde{X},
 
     where :math:`\tilde{X} = (I - P) X` and :math:`\tilde{Y} = (I - P) Y`
-    are the snapshots with the control contribution projected out. The
-    implemented methods mirror :func:`build_dense_dmdc`:
+    are the snapshots with the control contribution projected out.
+
+    .. note::
+        Unlike ``pinv`` in :func:`build_dense_dmdc`, the Sylvester equation
+        requires forming the Gram matrix :math:`\tilde{X}^H \tilde{X}`, so the
+        condition number of the data is squared.
+
+    .. note::
+        The ``ridge`` path avoids materializing the projected snapshots
+        :math:`\tilde{X}` and :math:`\tilde{Y}` using the Woodbury identity.
+        This is cheaper, but, like any normal-equation solve, loses accuracy
+        when :math:`U` and :math:`X` are strongly correlated (i.e. when
+        :math:`\|(I - P) X\| \ll \|X\|`). The ``pinv`` path forms the explicit
+        projection and does not square that ratio.
 
     :arg X: state snapshot matrix of shape ``(nsnapshots, dim_x)``.
     :arg U: control input snapshot matrix of shape ``(nsnapshots, dim_u)``.
@@ -362,38 +374,30 @@ def build_dense_symmetric_dmdc(
     if eps < 0:
         raise ValueError(f"'eps' must be positive: {eps}")
 
-    # NOTE: Build the (regularized) pseudo-inverse of U so that the control space
-    # can be projected out of the snapshots. With P = U U^+, this gives
-    #   Xt = (I - P) X,  Yt = (I - P) Y,
-    # leaving only the symmetric (Hermitian) operator A in the fit.
-
     if method == "pinv":
+        # Project out the control space with the (truncated) pseudo-inverse
+        #   Xt = (I - P) X,  Yt = (I - P) Y,  P = U U^+,
+        # using the SVD of U directly, i.e. without forming the (du, n) U^+.
         U_u, S_u, Vh_u = xp.linalg.svd(U, full_matrices=False)
-        mask = eps * S_u[0] < S_u
-        S_u_inv = xp.where(mask, 1.0 / S_u, xp.zeros_like(S_u))
+        mask_u = eps * S_u[0] < S_u
+        S_u_safe = xp.where(mask_u, S_u, xp.ones_like(S_u))
+        S_u_inv = xp.where(mask_u, 1.0 / S_u_safe, xp.zeros_like(S_u))
 
-        U_dagger = (xp.conj(Vh_u).T * S_u_inv) @ xp.conj(U_u).T
-    elif method == "ridge":
-        I_U = xp.eye(du, du, dtype=U.dtype, device=U.device)
-        S_U = xp.conj(U).T @ U + eps * I_U
+        Qx = xp.conj(U_u).T @ X
+        Qy = xp.conj(U_u).T @ Y
+        Xt = X - U_u @ (mask_u[:, None] * Qx)
+        Yt = Y - U_u @ (mask_u[:, None] * Qy)
 
-        U_dagger = xp.linalg.solve(S_U, xp.conj(U).T)
-    else:
-        raise ValueError(f"unknown method: {method!r}")
+        # C = Xt^T Yt + Yt^T Xt only needs a single matrix product as the
+        # second term is the conjugate transpose of the first.
+        G = xp.conj(Xt).T @ Yt
+        C = G + xp.conj(G).T
 
-    Xt = X - U @ (U_dagger @ X)
-    Yt = Y - U @ (U_dagger @ Y)
-
-    # Solve the Sylvester equation M A + A M = C with the (regularized) Gram
-    # matrix M = Xt^T Xt and C = Xt^T Yt + Yt^T Xt. Since M is symmetric
-    # (Hermitian), diagonalizing it gives A = Q (Ctilde / (lambda_i + lambda_j)) Q^T.
-
-    C = xp.conj(Xt).T @ Yt + xp.conj(Yt).T @ Xt
-
-    if method == "pinv":
+        # Solve the Sylvester equation in the right singular basis of Xt, so
+        # that A = V (Ctilde / (s_i^2 + s_j^2)) V^T.
         _, S, Vh = xp.linalg.svd(Xt, full_matrices=False)
-        mask = eps * S[0] < S
-        S = xp.where(mask, S, xp.zeros_like(S))
+        mask_x = eps * S[0] < S
+        S = xp.where(mask_x, S, xp.zeros_like(S))
 
         CV = Vh @ C @ xp.conj(Vh).T
         denom = S[:, None] ** 2 + S[None, :] ** 2
@@ -401,15 +405,46 @@ def build_dense_symmetric_dmdc(
 
         At = xp.where(valid, CV / xp.where(valid, denom, 1.0), xp.zeros_like(CV))
         A = xp.conj(Vh).T @ At @ Vh
-    else:
+
+        # Recover the control operator without forming the (n, dx) residual.
+        B = (xp.conj(Vh_u).T * S_u_inv) @ (Qy - Qx @ A)
+    elif method == "ridge":
+        I_U = xp.eye(du, du, dtype=U.dtype, device=U.device)
+        S_U = xp.conj(U).T @ U + eps * I_U
+
+        Gx = xp.conj(U).T @ X
+        Gy = xp.conj(U).T @ Y
+        Zx = xp.linalg.solve(S_U, Gx)
+        Zy = xp.linalg.solve(S_U, Gy)
+
+        # Solve the Sylvester equation M A + A M = C with M = Xt^T Xt + eps I and
+        # C = Xt^T Yt + Yt^T Xt, where Xt = (I - P) X and Yt = (I - P) Y are
+        # the projected snapshots. To avoid forming the (n, dx) projections, we
+        # eliminate them with the Woodbury identity
+        #   Xt^T Xt = X^T X - Gx^T Zx - eps Zx^T Zx,
+        #   Xt^T Yt = X^T Y - Gx^T Zy - eps Zx^T Zy,
+        # where Gx = U^T X, Gy = U^T Y and Zx = (U^T U + eps I)^{-1} Gx. The
+        # terms proportional to 'eps' account for the (regularized) projection
+        # P not being idempotent. Since M is symmetric, diagonalizing it gives
+        # A = Q (Ctilde / (lambda_i + lambda_j)) Q^T.
         I_X = xp.eye(dx, dx, dtype=X.dtype, device=X.device)
-        M = xp.conj(Xt).T @ Xt + eps * I_X
+        M = (
+            xp.conj(X).T @ X
+            - xp.conj(Gx).T @ Zx
+            - eps * (xp.conj(Zx).T @ Zx)
+            + eps * I_X
+        )
+        G = xp.conj(X).T @ Y - xp.conj(Gx).T @ Zy - eps * (xp.conj(Zx).T @ Zy)
+        C = G + xp.conj(G).T
 
         lam, Q = xp.linalg.eigh(M)
         At = (xp.conj(Q).T @ C @ Q) / (lam[:, None] + lam[None, :])
         A = Q @ At @ xp.conj(Q).T
 
-    B = U_dagger @ (Y - X @ A)
+        # Recover the control operator from the (small) normal equations.
+        B = xp.linalg.solve(S_U, Gy - Gx @ A)
+    else:
+        raise ValueError(f"unknown method: {method!r}")
 
     return DenseDMDc(A=A, B=B)
 
