@@ -275,6 +275,148 @@ def build_dense_dmdc(
 # }}}
 
 
+# {{{ symmetric dense DMDc
+
+
+def build_dense_symmetric_dmdc(
+    X: Array2D[ScalarTypeT],
+    U: Array2D[ScalarTypeT],
+    Y: Array2D[ScalarTypeT] | None = None,
+    *,
+    method: Literal["pinv", "ridge"] = "ridge",
+    eps: float | None = None,
+    xp: Any = None,
+) -> DenseDMDc[ScalarTypeT]:
+    r"""Fit a symmetric linear input-driven model :math:`Y = X A + U B`.
+
+    This is the symmetric counterpart of :func:`build_dense_dmdc`, where the
+    state operator is constrained to be symmetric (Hermitian for complex
+    inputs), i.e.
+
+    .. math::
+
+        A^*, B^* = \arg\min_{A = A^H} \|Y - X A - U B\|_F^2.
+
+    Eliminating :math:`B` by projecting out the control space spanned by
+    :math:`U`, the minimizer satisfies the Sylvester equation
+
+    .. math::
+
+        \tilde{X}^H \tilde{X} A + A \tilde{X}^H \tilde{X}
+            = \tilde{X}^H \tilde{Y} + \tilde{Y}^H \tilde{X},
+
+    where :math:`\tilde{X} = (I - P) X` and :math:`\tilde{Y} = (I - P) Y`
+    are the snapshots with the control contribution projected out. The
+    implemented methods mirror :func:`build_dense_dmdc`:
+
+    :arg X: state snapshot matrix of shape ``(nsnapshots, dim_x)``.
+    :arg U: control input snapshot matrix of shape ``(nsnapshots, dim_u)``.
+    :arg Y: output state snapshot matrix of shape ``(nsnapshots, dim_x)``.
+        If *None*, the pairs ``(X[:-1], X[1:])`` and inputs ``U[:-1]`` are used.
+    :arg method: regularized solver (``"ridge"`` or ``"pinv"``).
+    :arg eps: regularization tolerance.
+
+    :returns: a symmetric approximation of the input-driven state dynamics.
+    """
+    if X.ndim != 2:
+        raise ValueError(
+            f"inputs 'X' must be of shape ``(nsnapshots, dim)``: {X.shape}"
+        )
+
+    if Y is None:
+        Y = X[1:, :]
+        X = X[:-1, :]
+        U = U[:-1, :]
+
+    if Y.ndim != 2:
+        raise ValueError(
+            f"outputs 'Y' must be of shape ``(nsnapshots, dim)``: {Y.shape}"
+        )
+
+    if U.ndim != 2:
+        raise ValueError(
+            f"inputs 'U' must be of shape ``(nsnapshots, dim)``: {U.shape}"
+        )
+
+    n, dx = X.shape
+    _, du = U.shape
+    _, dy = Y.shape
+    if not (n == U.shape[0] == Y.shape[0]):
+        raise ValueError(
+            f"inputs 'X', 'U', and 'Y' must have matching snapshot counts: "
+            f"{X.shape}, {U.shape}, and {Y.shape}"
+        )
+
+    if dx != dy:
+        raise ValueError(
+            f"'A' operator must be square, so 'X' and 'Y' must have the same "
+            f"number of columns: {X.shape} and {Y.shape}"
+        )
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(X, U, Y)
+
+    if eps is None:
+        eps = max(n, dx + du, dy) * xp.finfo(X.dtype).eps
+
+    if eps < 0:
+        raise ValueError(f"'eps' must be positive: {eps}")
+
+    # NOTE: Build the (regularized) pseudo-inverse of U so that the control space
+    # can be projected out of the snapshots. With P = U U^+, this gives
+    #   Xt = (I - P) X,  Yt = (I - P) Y,
+    # leaving only the symmetric (Hermitian) operator A in the fit.
+
+    if method == "pinv":
+        U_u, S_u, Vh_u = xp.linalg.svd(U, full_matrices=False)
+        mask = eps * S_u[0] < S_u
+        S_u_inv = xp.where(mask, 1.0 / S_u, xp.zeros_like(S_u))
+
+        U_dagger = (xp.conj(Vh_u).T * S_u_inv) @ xp.conj(U_u).T
+    elif method == "ridge":
+        I_U = xp.eye(du, du, dtype=U.dtype, device=U.device)
+        S_U = xp.conj(U).T @ U + eps * I_U
+
+        U_dagger = xp.linalg.solve(S_U, xp.conj(U).T)
+    else:
+        raise ValueError(f"unknown method: {method!r}")
+
+    Xt = X - U @ (U_dagger @ X)
+    Yt = Y - U @ (U_dagger @ Y)
+
+    # Solve the Sylvester equation M A + A M = C with the (regularized) Gram
+    # matrix M = Xt^T Xt and C = Xt^T Yt + Yt^T Xt. Since M is symmetric
+    # (Hermitian), diagonalizing it gives A = Q (Ctilde / (lambda_i + lambda_j)) Q^T.
+
+    C = xp.conj(Xt).T @ Yt + xp.conj(Yt).T @ Xt
+
+    if method == "pinv":
+        _, S, Vh = xp.linalg.svd(Xt, full_matrices=False)
+        mask = eps * S[0] < S
+        S = xp.where(mask, S, xp.zeros_like(S))
+
+        CV = Vh @ C @ xp.conj(Vh).T
+        denom = S[:, None] ** 2 + S[None, :] ** 2
+        valid = (S[:, None] > 0) & (S[None, :] > 0)
+
+        At = xp.where(valid, CV / xp.where(valid, denom, 1.0), xp.zeros_like(CV))
+        A = xp.conj(Vh).T @ At @ Vh
+    else:
+        I_X = xp.eye(dx, dx, dtype=X.dtype, device=X.device)
+        M = xp.conj(Xt).T @ Xt + eps * I_X
+
+        lam, Q = xp.linalg.eigh(M)
+        At = (xp.conj(Q).T @ C @ Q) / (lam[:, None] + lam[None, :])
+        A = Q @ At @ xp.conj(Q).T
+
+    B = U_dagger @ (Y - X @ A)
+
+    return DenseDMDc(A=A, B=B)
+
+
+# }}}
+
+
 # {{{ dense extended DMDc
 
 
