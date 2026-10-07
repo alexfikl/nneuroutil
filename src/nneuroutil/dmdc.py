@@ -308,19 +308,6 @@ def build_dense_symmetric_dmdc(
     where :math:`\tilde{X} = (I - P) X` and :math:`\tilde{Y} = (I - P) Y`
     are the snapshots with the control contribution projected out.
 
-    .. note::
-        Unlike ``pinv`` in :func:`build_dense_dmdc`, the Sylvester equation
-        requires forming the Gram matrix :math:`\tilde{X}^H \tilde{X}`, so the
-        condition number of the data is squared.
-
-    .. note::
-        The ``ridge`` path avoids materializing the projected snapshots
-        :math:`\tilde{X}` and :math:`\tilde{Y}` using the Woodbury identity.
-        This is cheaper, but, like any normal-equation solve, loses accuracy
-        when :math:`U` and :math:`X` are strongly correlated (i.e. when
-        :math:`\|(I - P) X\| \ll \|X\|`). The ``pinv`` path forms the explicit
-        projection and does not square that ratio.
-
     :arg X: state snapshot matrix of shape ``(nsnapshots, dim_x)``.
     :arg U: control input snapshot matrix of shape ``(nsnapshots, dim_u)``.
     :arg Y: output state snapshot matrix of shape ``(nsnapshots, dim_x)``.
