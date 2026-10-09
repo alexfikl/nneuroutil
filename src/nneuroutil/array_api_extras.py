@@ -109,13 +109,13 @@ def fill_diagonal(
 
         n, m = x.shape[-2:]
         k = min(n, m)
-        idx = xp.arange(0, k, device=x.device)
+        idx = xp.arange(0, k, device=array_api_compat.device(x))
         x[idx, idx] = value
     else:
         n, m = x.shape[-2:]
         k = min(n, m)
-        rows = xp.arange(n, device=x.device)[:, None]
-        cols = xp.arange(m, device=x.device)[None, :]
+        rows = xp.arange(n, device=array_api_compat.device(x))[:, None]
+        cols = xp.arange(m, device=array_api_compat.device(x))[None, :]
         x = xp.where(rows == cols, value, x)
 
     return x
@@ -280,26 +280,33 @@ def histogram(
 
     # compute where each element in x falls using searchsorted
     dtype = xp.result_type(x.dtype, xp.float64)
-    edges = xp.linspace(xmin, xmax, bins + 1, dtype=dtype, device=x.device)
+    edges = xp.linspace(
+        xmin, xmax, bins + 1, dtype=dtype, device=array_api_compat.device(x)
+    )
     idx = xp.searchsorted(edges, x, side="right") - 1
 
     # clamp values at the last edge into the last bin, like numpy does
-    idx = xp.minimum(idx, xp.asarray(bins - 1, dtype=idx.dtype, device=x.device))
+    idx = xp.minimum(
+        idx,
+        xp.asarray(bins - 1, dtype=idx.dtype, device=array_api_compat.device(x)),
+    )
 
     # drop any elements outside of the given range
     mask = (x >= xmin) & (x <= xmax)  # ty: ignore[unsupported-operator]
-    idx = xp.where(mask, idx, xp.asarray(bins, dtype=idx.dtype, device=x.device))
+    idx = xp.where(
+        mask, idx, xp.asarray(bins, dtype=idx.dtype, device=array_api_compat.device(x))
+    )
 
     # count elements per bin by sorting the bin indices and using searchsorted
     # (O(n log n)) instead of building an O(n * bins) boolean matrix
     sorted_idx = xp.sort(idx)
     boundaries = xp.searchsorted(
         sorted_idx,
-        xp.arange(1, bins + 1, dtype=idx.dtype, device=x.device),
+        xp.arange(1, bins + 1, dtype=idx.dtype, device=array_api_compat.device(x)),
         side="left",
     )
     pad = xp.concatenate([
-        xp.zeros((1,), dtype=boundaries.dtype, device=x.device),
+        xp.zeros((1,), dtype=boundaries.dtype, device=array_api_compat.device(x)),
         boundaries,
     ])
     counts = xp.diff(pad)

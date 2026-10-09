@@ -72,7 +72,7 @@ class SlicedDataLoader:
         self.drop_last = drop_last
         self.num_samples = num_samples
 
-        self.device = dataset.device
+        self.device = array_api_compat.device(dataset)
         self.rng = rng
 
     def __len__(self) -> int:
@@ -242,7 +242,9 @@ def random_split(
 
     from itertools import accumulate
 
-    indices = xp.asarray(rng.permutation(n), dtype=xp.int32, device=xs[0].device)
+    indices = xp.asarray(
+        rng.permutation(n), dtype=xp.int32, device=array_api_compat.device(xs[0])
+    )
     return tuple(
         tuple(x[indices[offset - length : offset]] for x in xs)
         for offset, length in zip(accumulate(lengths), lengths, strict=True)

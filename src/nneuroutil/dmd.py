@@ -368,7 +368,7 @@ def build_dense_dmd(
         del Q1
 
         # Step 2: Regularized QR on the small (2 * dx, dx) stacked R1 factor
-        I = xp.eye(dx, dx, dtype=X.dtype, device=X.device)  # ruff: ignore[ambiguous-variable-name]
+        I = xp.eye(dx, dx, dtype=X.dtype, device=array_api_compat.device(X))  # ruff: ignore[ambiguous-variable-name]
         R_aug = xp.concat([R1, eps**0.5 * I], axis=0)
         del R1
 
@@ -519,7 +519,12 @@ def build_dense_extended_dmd(
 
     if first_observable_is_state:
         A = build_dense_dmd(X_lift, Y_lift, method=method, eps=eps, xp=xp).A
-        C = xp.eye(X_lift.shape[1], X.shape[1], dtype=X.dtype, device=X.device)
+        C = xp.eye(
+            X_lift.shape[1],
+            X.shape[1],
+            dtype=X.dtype,
+            device=array_api_compat.device(X),
+        )
     else:
         # NOTE: this should avoid performing two SVDs on X_lift (for A and C)
         YX_lift = xp.concat([Y_lift, X], axis=1)

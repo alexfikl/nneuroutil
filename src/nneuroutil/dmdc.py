@@ -252,7 +252,9 @@ def build_dense_dmdc(
         B1 = xp.conj(Q1).T @ Y
         del Q1
 
-        I = xp.eye(d_omega, d_omega, dtype=Omega.dtype, device=Omega.device)  # ruff: ignore[ambiguous-variable-name]
+        I = xp.eye(  # ruff: ignore[ambiguous-variable-name]
+            d_omega, d_omega, dtype=Omega.dtype, device=array_api_compat.device(Omega)
+        )
         R_aug = xp.concat([R1, eps**0.5 * I], axis=0)
         del R1
 
@@ -396,7 +398,7 @@ def build_dense_symmetric_dmdc(
         # Recover the control operator without forming the (n, dx) residual.
         B = (xp.conj(Vh_u).T * S_u_inv) @ (Qy - Qx @ A)
     elif method == "ridge":
-        I_U = xp.eye(du, du, dtype=U.dtype, device=U.device)
+        I_U = xp.eye(du, du, dtype=U.dtype, device=array_api_compat.device(U))
         S_U = xp.conj(U).T @ U + eps * I_U
 
         Gx = xp.conj(U).T @ X
@@ -414,7 +416,7 @@ def build_dense_symmetric_dmdc(
         # terms proportional to 'eps' account for the (regularized) projection
         # P not being idempotent. Since M is symmetric, diagonalizing it gives
         # A = Q (Ctilde / (lambda_i + lambda_j)) Q^T.
-        I_X = xp.eye(dx, dx, dtype=X.dtype, device=X.device)
+        I_X = xp.eye(dx, dx, dtype=X.dtype, device=array_api_compat.device(X))
         M = (
             xp.conj(X).T @ X
             - xp.conj(Gx).T @ Zx
@@ -552,7 +554,7 @@ def build_dense_extended_dmdc(
         dmdc_model = build_dense_dmdc(X_lift, U, Y_lift, method=method, eps=eps, xp=xp)
         A = dmdc_model.A
         B = dmdc_model.B
-        C = xp.eye(d_lift, X.shape[1], dtype=X.dtype, device=X.device)
+        C = xp.eye(d_lift, X.shape[1], dtype=X.dtype, device=array_api_compat.device(X))
     else:
         # Fit A, B, and decoder C in a single factorization pass
         Y_combo = xp.concat([Y_lift, X], axis=1)
