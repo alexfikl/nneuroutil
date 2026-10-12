@@ -17,6 +17,7 @@ from nneuroutil.classifier import (
     _solve_svm_torch,  # ruff: ignore[import-private-name]
     classify_linear_discriminant_analysis,
     classify_support_vector_machine,
+    compute_anova_scores,
 )
 from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array2D
@@ -69,9 +70,9 @@ def test_classify_linear_discriminant_analysis(xp: Any) -> None:
     pred0 = clf.predict(c0)
     pred1 = clf.predict(c1)
     pred2 = clf.predict(c2)
-    assert bool(xp.all(pred0 == 0))
-    assert bool(xp.all(pred1 == 1))
-    assert bool(xp.all(pred2 == 2))
+    assert xp.all(pred0 == 0)
+    assert xp.all(pred1 == 1)
+    assert xp.all(pred2 == 2)
 
     # predict batch of combined data
     all_data = xp.concat([c0, c1, c2], axis=0)
@@ -81,12 +82,12 @@ def test_classify_linear_discriminant_analysis(xp: Any) -> None:
         2 * xp.ones(len(c2), dtype=dtype, device=device),
     ])
     preds = clf.predict(all_data)
-    assert bool(xp.all(preds == all_labels))
+    assert xp.all(preds == all_labels)
 
     # predict on class centroids themselves
     cs = xp.stack([xp.mean(x, axis=0) for x in features])
     cs_preds = clf.predict(cs)
-    assert bool(xp.all(cs_preds == clf.labels))
+    assert xp.all(cs_preds == clf.labels)
 
     # }}}
 
@@ -105,8 +106,8 @@ def test_classify_linear_discriminant_analysis(xp: Any) -> None:
     clf_binary = classify_linear_discriminant_analysis((b0, b1), (10, 20), xp=xp)
     assert clf_binary.G.shape == (3, 1)
     assert clf_binary.proj_centroids.shape == (2, 1)
-    assert bool(xp.all(clf_binary.predict(b0) == 10))
-    assert bool(xp.all(clf_binary.predict(b1) == 20))
+    assert xp.all(clf_binary.predict(b0) == 10)
+    assert xp.all(clf_binary.predict(b1) == 20)
 
     # }}}
 
@@ -223,9 +224,9 @@ def test_classify_support_vector_machine(xp: Any) -> None:
     pred0 = clf.predict(c0)
     pred1 = clf.predict(c1)
     pred2 = clf.predict(c2)
-    assert bool(xp.all(pred0 == 0))
-    assert bool(xp.all(pred1 == 1))
-    assert bool(xp.all(pred2 == 2))
+    assert xp.all(pred0 == 0)
+    assert xp.all(pred1 == 1)
+    assert xp.all(pred2 == 2)
 
     # predict batch of combined data
     all_data = xp.concat([c0, c1, c2], axis=0)
@@ -235,7 +236,7 @@ def test_classify_support_vector_machine(xp: Any) -> None:
         2 * xp.ones(len(c2), dtype=dtype, device=device),
     ])
     preds = clf.predict(all_data)
-    assert bool(xp.all(preds == all_labels))
+    assert xp.all(preds == all_labels)
 
     # predict 1D single sample
     assert clf.predict(c0[0]) == 0
@@ -259,8 +260,8 @@ def test_classify_support_vector_machine(xp: Any) -> None:
     clf_binary = classify_support_vector_machine((b0, b1), (10, 20), xp=xp)
     assert clf_binary.W.shape == (4, 2)
     assert clf_binary.mu.shape == (3,)
-    assert bool(xp.all(clf_binary.predict(b0) == 10))
-    assert bool(xp.all(clf_binary.predict(b1) == 20))
+    assert xp.all(clf_binary.predict(b0) == 10)
+    assert xp.all(clf_binary.predict(b1) == 20)
 
     # }}}
 
@@ -276,35 +277,35 @@ def test_classify_support_vector_machine(xp: Any) -> None:
     clf_fista = classify_support_vector_machine(
         (b0, b1), (10, 20), solver=partial(_solve_svm_fista, L0=L0_est), xp=xp
     )
-    assert bool(xp.all(clf_fista.predict(b0) == 10))
-    assert bool(xp.all(clf_fista.predict(b1) == 20))
+    assert xp.all(clf_fista.predict(b0) == 10)
+    assert xp.all(clf_fista.predict(b1) == 20)
 
     if array_api_compat.is_numpy_array(b0):
         clf_np = classify_support_vector_machine(
             (b0, b1), (10, 20), solver=_solve_svm_numpy, xp=xp
         )
-        assert bool(xp.all(clf_np.predict(b0) == 10))
-        assert bool(xp.all(clf_np.predict(b1) == 20))
+        assert xp.all(clf_np.predict(b0) == 10)
+        assert xp.all(clf_np.predict(b1) == 20)
     elif array_api_compat.is_torch_array(b0):
         clf_torch = classify_support_vector_machine(
             (b0, b1), (10, 20), solver=_solve_svm_torch, xp=xp
         )
-        assert bool(xp.all(clf_torch.predict(b0) == 10))
-        assert bool(xp.all(clf_torch.predict(b1) == 20))
+        assert xp.all(clf_torch.predict(b0) == 10)
+        assert xp.all(clf_torch.predict(b1) == 20)
     elif array_api_compat.is_jax_array(b0):
         clf_jax = classify_support_vector_machine(
             (b0, b1), (10, 20), solver=partial(_solve_svm_jax, L0=L0_est), xp=xp
         )
-        assert bool(xp.all(clf_jax.predict(b0) == 10))
-        assert bool(xp.all(clf_jax.predict(b1) == 20))
+        assert xp.all(clf_jax.predict(b0) == 10)
+        assert xp.all(clf_jax.predict(b1) == 20)
 
         # test pytree flattening/unflattening
         import jax
 
         leaves, treedef = jax.tree_util.tree_flatten(clf_jax)
         clf_reconstructed = jax.tree_util.tree_unflatten(treedef, leaves)
-        assert bool(xp.all(clf_reconstructed.W == clf_jax.W))
-        assert bool(xp.all(clf_reconstructed.mu == clf_jax.mu))
+        assert xp.all(clf_reconstructed.W == clf_jax.W)
+        assert xp.all(clf_reconstructed.mu == clf_jax.mu)
 
     # }}}
 
@@ -403,6 +404,121 @@ def test_classify_support_vector_machine_sklearn() -> None:
     ).fit(X, y)
 
     assert np.array_equal(clf.predict(X), ref.predict(X))
+
+
+# }}}
+
+
+# {{{ test_compute_anova_scores
+
+
+def test_compute_anova_scores(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+
+    device = xp.empty(0).device
+    dtype = xp.float64
+
+    c0 = xp.asarray(
+        rng.standard_normal((20, 4)) + np.array([3.0, 0.0, 0.0, 0.0]),
+        dtype=dtype,
+        device=device,
+    )
+    c1 = xp.asarray(
+        rng.standard_normal((25, 4)) + np.array([0.0, 3.0, 0.0, 0.0]),
+        dtype=dtype,
+        device=device,
+    )
+    c2 = xp.asarray(
+        rng.standard_normal((30, 4)) + np.array([0.0, 0.0, 3.0, 0.0]),
+        dtype=dtype,
+        device=device,
+    )
+
+    scores = compute_anova_scores((c0, c1, c2), xp=xp)
+
+    assert scores.eta2.shape == (4,)
+    assert scores.f_stat.shape == (4,)
+    assert xp.all(scores.eta2 >= 0.0)  # ty: ignore[unsupported-operator]
+    assert xp.all(scores.eta2 <= 1.0)  # ty: ignore[unsupported-operator]
+    assert xp.all(scores.f_stat >= 0.0)  # ty: ignore[unsupported-operator]
+
+    # the shifted features are clearly discriminative, the last one is noise
+    assert xp.all(scores.eta2[:-1] > 0.5)
+    assert scores.eta2[-1] < 0.5
+
+    # input validation / error cases
+    with pytest.raises(ValueError, match="0 or 1 classes"):
+        compute_anova_scores((c0,), xp=xp)
+
+    with pytest.raises(ValueError, match="0 or 1 classes"):
+        compute_anova_scores((), xp=xp)
+
+    c_mismatched = xp.asarray(rng.standard_normal((10, 2)), dtype=dtype, device=device)
+    with pytest.raises(ValueError, match="same number of features"):
+        compute_anova_scores((c0, c_mismatched), xp=xp)
+
+
+def test_compute_anova_scores_degenerate(xp: Any) -> None:
+    """Constant and perfectly separating features give finite scores."""
+    device = xp.empty(0).device
+    dtype = xp.float64
+
+    # feature 0 is constant, feature 1 separates the two classes exactly
+    c0 = xp.asarray([[1.0, 0.0], [1.0, 0.0]], dtype=dtype, device=device)
+    c1 = xp.asarray([[1.0, 10.0], [1.0, 10.0]], dtype=dtype, device=device)
+
+    scores = compute_anova_scores((c0, c1), xp=xp)
+
+    assert xp.all(scores.eta2 >= 0.0)  # ty: ignore[unsupported-operator]
+    assert xp.all(scores.eta2 <= 1.0)  # ty: ignore[unsupported-operator]
+    assert xp.all(scores.f_stat >= 0.0)  # ty: ignore[unsupported-operator]
+
+    assert scores.eta2[0] == 0
+    assert scores.f_stat[0] == 0
+    assert scores.eta2[1] == 1
+    assert scores.f_stat[1] > 1
+
+
+# }}}
+
+
+# {{{ test_compute_anova_scores_sklearn
+
+
+def test_compute_anova_scores_sklearn() -> None:
+    """Cross-check against scikit-learn's ``f_classif`` (NumPy-only, optional)."""
+    fsel = pytest.importorskip("sklearn.feature_selection")
+
+    rng = np.random.default_rng(seed=42)
+
+    sizes = (15, 40, 8)
+    centers = np.array([
+        [0.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 1.5, 0.5],
+    ])
+    features = tuple(
+        rng.standard_normal((n, centers.shape[1])) * 0.9 + c
+        for n, c in zip(sizes, centers, strict=True)
+    )
+
+    X = np.concatenate(features, axis=0)
+    y = np.repeat(np.arange(len(sizes)), sizes)
+
+    scores = compute_anova_scores(features, xp=np)
+
+    # the F statistic must match scikit-learn's one-way ANOVA
+    f_ref, _ = fsel.f_classif(X, y)
+    assert np.allclose(scores.f_stat, f_ref)
+
+    # the effect size reference
+    grand_mean = X.mean(axis=0)
+    ss_total = ((X - grand_mean) ** 2).sum(axis=0)
+    ss_between = sum(
+        n * (f.mean(axis=0) - grand_mean) ** 2
+        for n, f in zip(sizes, features, strict=True)
+    )
+    assert np.allclose(scores.eta2, ss_between / ss_total)
 
 
 # }}}
