@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 import array_api_compat
 import numpy as np
@@ -594,6 +594,100 @@ def classify_support_vector_machine(
         bias=bias,
         labels=xp.asarray(labels, dtype=dtype, device=device),
     )
+
+
+# }}}
+
+
+# {{{ compute_anova_scores
+
+
+class AnovaScores(NamedTuple):
+    """One-way ANOVA scores for a set of features."""
+
+    eta2: Array1D[np.floating[Any]]
+    r"""The effect size :math:`\eta^2 = SS_b / SS_t` for each feature."""
+    f_stat: Array1D[np.floating[Any]]
+    """The one-way ANOVA :math:`F` statistic for each feature."""
+
+
+def compute_anova_scores(
+    features: Sequence[Array2D[np.floating[Any]]],
+    *,
+    eps: float | None = None,
+    xp: Any = None,
+) -> AnovaScores:
+    r"""Compute one-way ANOVA scores for the given class features.
+
+    For each feature, we test whether the means of the classes are equal using
+    the standard sum of squares decomposition
+
+    .. math::
+
+        SS_b = \sum_i n_i (\bar{x}_i - \bar{x})^2, \qquad
+        SS_t = \sum_i \sum_j (x_{ij} - \bar{x})^2,
+
+    where :math:`x_{ij}` is sample :math:`j` of class :math:`i`, :math:`n_i` is
+    the number of samples in class :math:`i`, :math:`\bar{x}_i` is the mean of
+    class :math:`i` and :math:`\bar{x}` is the grand mean. This gives the effect
+    size and :math:`F` statistic
+
+    .. math::
+
+        \eta^2 = \frac{SS_b}{SS_t}, \qquad
+        F = \frac{SS_b / (k - 1)}{(SS_t - SS_b) / (N - k)},
+
+    for :math:`k` classes and :math:`N` samples in total.
+
+    :arg features: sequence of 2D arrays containing the sample features for
+        each class, each of shape ``(n_samples_i, nfeatures)``.
+    :arg eps: tolerance used to floor zero variances, so that constant features
+        or perfectly separating features give finite scores instead of ``nan``.
+    :returns: the effect size and :math:`F` statistic for each feature.
+    """
+
+    if len(features) <= 1:
+        raise ValueError("cannot compute ANOVA on 'features' with 0 or 1 classes")
+
+    _, nfeatures = features[0].shape
+    if any(f.ndim != 2 or f.shape[-1] != nfeatures for f in features[1:]):
+        raise ValueError(
+            f"'features' do not have the same number of features: '{nfeatures}'"
+        )
+
+    if xp is None:
+        xp = array_api_compat.array_namespace(*features)
+
+    device = array_api_compat.device(features[0])
+    dtype = features[0].dtype
+    if eps is None:
+        eps = 10.0 * xp.finfo(dtype).eps
+
+    nclasses = len(features)
+    sizes = [f.shape[0] for f in features]
+    nsamples = sum(sizes)
+    ns = xp.asarray(sizes, dtype=dtype, device=device)
+
+    # class means and the sample-weighted grand mean
+    means = xp.stack([xp.mean(f, axis=0) for f in features])
+    grand_mean = xp.sum(ns[:, None] * means, axis=0) / nsamples
+
+    # between- and within-class sum of squares
+    ss_between = xp.sum(ns[:, None] * (means - grand_mean) ** 2, axis=0)
+    ss_total = xp.sum(
+        xp.stack([xp.sum((f - grand_mean) ** 2, axis=0) for f in features]),
+        axis=0,
+    )
+
+    ss_within = xp.maximum(ss_total - ss_between, 0.0)
+
+    df_between = max(nclasses - 1, 1)
+    df_within = max(nsamples - nclasses, 1)
+
+    eta2 = xp.minimum(ss_between / xp.maximum(ss_total, eps), 1.0)
+    f_stat = (ss_between / df_between) / xp.maximum(ss_within / df_within, eps)
+
+    return AnovaScores(eta2=eta2, f_stat=f_stat)
 
 
 # }}}
