@@ -681,3 +681,60 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
 
 
 # }}}
+
+
+# {{{ find_git_revision
+
+
+def find_git_revision(tree_root: str | os.PathLike[str]) -> str | None:
+    from warnings import warn
+
+    tree_root = pathlib.Path(tree_root).expanduser().resolve()
+    if not (tree_root / ".git").exists():
+        return None
+
+    # construct minimal environment -- stolen from
+    # https://github.com/numpy/numpy/blob/055ce3e90b50b5f9ef8cf1b8641c42e391f10735/setup.py#L70-L92
+    env: dict[str, str] = {}
+    for k in ["SYSTEMROOT", "PATH", "HOME"]:
+        if (v := os.environ.get(k)) is not None:
+            env[k] = v
+
+    # LANGUAGE is used on win32
+    env["LANGUAGE"] = "C"
+    env["LANG"] = "C"
+    env["LC_ALL"] = "C"
+
+    import shutil
+
+    git = shutil.which("git")
+    if git is None:
+        warn("unable to find git executable", stacklevel=1)
+        return None
+
+    from subprocess import PIPE, STDOUT, Popen  # ruff: ignore[suspicious-subprocess-import]
+
+    p = Popen(  # ruff: ignore[subprocess-without-shell-equals-true]
+        [git, "rev-parse", "HEAD"],
+        shell=False,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT,
+        close_fds=True,
+        cwd=tree_root,
+        env=env,
+    )
+    (git_rev, _) = p.communicate()
+    git_rev = git_rev.decode().rstrip()
+
+    retcode = p.returncode
+    assert retcode is not None
+
+    if retcode != 0:
+        warn(f"unable to find git revision in '{tree_root}'", stacklevel=1)
+        return None
+
+    return git_rev
+
+
+# }}}
