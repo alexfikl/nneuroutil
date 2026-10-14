@@ -13,7 +13,7 @@ from collections.abc import Callable, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import array_api_compat
 import numpy as np
@@ -686,11 +686,18 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
 # {{{ find_git_revision
 
 
-def find_git_revision(tree_root: str | os.PathLike[str]) -> str | None:
+def find_git_revision(root: str | os.PathLike[str]) -> str | None:
+    """Find the Git revision at the given *root*, if it exists.
+
+    :arg root: path to the root of a Git repository, i.e. a directory that
+        contains a ``.git`` subdirectory.
+    :returns: the full ``HEAD`` commit hash, or *None* if *root* is not a Git
+        repository or the ``git`` executable cannot be found.
+    """
     from warnings import warn
 
-    tree_root = pathlib.Path(tree_root).expanduser().resolve()
-    if not (tree_root / ".git").exists():
+    root = pathlib.Path(root).expanduser().resolve()
+    if not (root / ".git").exists():
         return None
 
     # construct minimal environment -- stolen from
@@ -721,7 +728,7 @@ def find_git_revision(tree_root: str | os.PathLike[str]) -> str | None:
         stdout=PIPE,
         stderr=STDOUT,
         close_fds=True,
-        cwd=tree_root,
+        cwd=root,
         env=env,
     )
     (git_rev, _) = p.communicate()
@@ -731,10 +738,51 @@ def find_git_revision(tree_root: str | os.PathLike[str]) -> str | None:
     assert retcode is not None
 
     if retcode != 0:
-        warn(f"unable to find git revision in '{tree_root}'", stacklevel=1)
+        warn(f"unable to find git revision in '{root}'", stacklevel=1)
         return None
 
     return git_rev
+
+
+# }}}
+
+
+# {{{ machine
+
+
+class MachineInfo(NamedTuple):
+    """Information about the machine and environment a checkpoint was created in."""
+
+    timestamp: str
+    """A timestamp (in ISO 8601 format) of when the information was collected."""
+    hostname: str
+    """The name of the machine on which the code is running."""
+    platform: str
+    """A description of the platform, as given by :func:`platform.platform`."""
+    python: str
+    """The version of the Python interpreter, as given by :data:`sys.version`."""
+    git_rev: str | None
+    """The Git revision of the code, if it can be determined, see
+    :func:`find_git_revision`.
+    """
+
+
+def machine_info(root: pathlib.Path) -> MachineInfo:
+    """Collect information about the machine on which the code is running.
+
+    :arg root: path to the root of a Git repository, used to determine the
+        current Git revision with :func:`find_git_revision`.
+    """
+    import datetime
+    import platform
+
+    return MachineInfo(
+        timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+        hostname=platform.node(),
+        platform=platform.platform(),
+        python=sys.version,
+        git_rev=find_git_revision(root),
+    )
 
 
 # }}}
