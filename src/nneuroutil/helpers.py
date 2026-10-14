@@ -780,7 +780,7 @@ class MachineInfo(NamedTuple):
         )
 
 
-def machine_info(root: pathlib.Path) -> MachineInfo:
+def machine_info(root: str | os.PathLike[str] | None = None) -> MachineInfo:
     """Collect information about the machine on which the code is running.
 
     :arg root: path to the root of a Git repository, used to determine the
@@ -788,6 +788,16 @@ def machine_info(root: pathlib.Path) -> MachineInfo:
     """
     import datetime
     import platform
+
+    if root is None:
+        root = pathlib.Path.cwd()
+    else:
+        root = pathlib.Path(root).expanduser().resolve()
+
+    for path in (root, *root.parents):
+        if (path / ".git").exists():
+            root = path
+            break
 
     return MachineInfo(
         timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
