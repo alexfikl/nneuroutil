@@ -766,6 +766,19 @@ class MachineInfo(NamedTuple):
     :func:`find_git_revision`.
     """
 
+    def pretty(self) -> str:
+        """Format the information as a human-readable string."""
+        info = {
+            name: "<unknown>" if value is None else value
+            for name, value in self._asdict().items()
+        }
+        width = max(map(len, info))
+
+        return "\n".join(
+            f"{name:<{width}} : {' '.join(str(value).split())}"
+            for name, value in info.items()
+        )
+
 
 def machine_info(root: pathlib.Path) -> MachineInfo:
     """Collect information about the machine on which the code is running.
