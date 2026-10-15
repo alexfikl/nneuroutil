@@ -672,6 +672,8 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
             # NOTE: this uses the default value from torch and flax
             alpha = kwargs.get("alpha", 0.01)
             scale = math.sqrt(2.0 / (1.0 + alpha**2))
+        elif nonlinearity == "gelu":
+            scale = 6.0 * math.pi / (2.0 * math.pi + math.sqrt(3.0))
         elif nonlinearity == "selu":
             scale = 3.0 / 4.0
         else:
