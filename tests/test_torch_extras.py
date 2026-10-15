@@ -95,6 +95,58 @@ def test_linear_quadratic() -> None:
     assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 
 
+def test_learnable_blended_quadratic() -> None:
+    from nneuroutil.torch_extras import BlendedQuadratic, ComplexBlendedQuadratic
+
+    n = 6
+    x = torch.randn(4, n)
+
+    # 1. Real learnable scalar
+    mod_real_scalar = BlendedQuadratic(alpha=0.3, learnable=True)
+    assert isinstance(mod_real_scalar.alpha, torch.Tensor)
+    assert math.isclose(mod_real_scalar.alpha.item(), 0.3)
+
+    y = mod_real_scalar(x)
+    y.sum().backward()
+    assert mod_real_scalar.alpha_param.grad is not None
+
+    # 2. Real learnable vector
+    mod_real_vec = BlendedQuadratic(alpha=0.4, num_parameters=n, learnable=True)
+    assert mod_real_vec.alpha.shape == (n,)  # ty: ignore[unresolved-attribute]
+
+    y = mod_real_vec(x)
+    y.sum().backward()
+    assert mod_real_vec.alpha_param.grad is not None
+
+    # 3. Complex learnable scalar
+    d = n // 2
+    mod_c_scalar = ComplexBlendedQuadratic(alpha=0.6, learnable=True, interleaved=True)
+    assert isinstance(mod_c_scalar.alpha, torch.Tensor)
+
+    y = mod_c_scalar(x)
+    y.sum().backward()
+    assert mod_c_scalar.alpha_param.grad is not None
+
+    # 4. Complex learnable vector (interleaved)
+    mod_c_vec = ComplexBlendedQuadratic(
+        alpha=0.7, num_parameters=d, learnable=True, interleaved=True
+    )
+    assert mod_c_vec.alpha.shape == (d,)  # ty: ignore[unresolved-attribute]
+
+    y = mod_c_vec(x)
+    y.sum().backward()
+    assert mod_c_vec.alpha_param.grad is not None
+
+    # 5. Complex learnable vector (stacked/non-interleaved)
+    mod_c_split = ComplexBlendedQuadratic(
+        alpha=0.7, num_parameters=d, learnable=True, interleaved=False
+    )
+    assert mod_c_split.alpha.shape == (d,)  # ty: ignore[unresolved-attribute]
+    y = mod_c_split(x)
+    y.sum().backward()
+    assert mod_c_split.alpha_param.grad is not None
+
+
 def test_complex_tanh() -> None:
     from nneuroutil.torch_extras import ComplexTanh
 

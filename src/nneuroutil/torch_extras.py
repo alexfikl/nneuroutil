@@ -104,25 +104,53 @@ class BlendedQuadratic(nn.Module):
 
         f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
 
-    Note that a quadratic activation is not "depth-stable", meaning in a deep
-    network it will eventually explode the variance of the inputs. For the
-    blended case, setting :math:`\alpha` close to 1 will delay the explosion,
-    allowing for deeper networks, but it does not solve the issue.
+    When *learnable* is *True*, :math:`\alpha` is parameterized as
+    :math:`\alpha = \sigma(\theta)` with learnable logits :math:`\theta`.
     """
 
-    alpha: float
-    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
+    learnable: bool
+    """If *True*, :math:`\alpha` is a learnable parameter."""
+    num_parameters: int
+    """Number of learnable parameters (1 for a shared scalar, or number of channels)."""
 
-    def __init__(self, alpha: float = 0.5) -> None:
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
-
+    def __init__(
+        self,
+        alpha: float = 0.5,
+        *,
+        num_parameters: int = 1,
+        learnable: bool = False,
+        device: str | torch.device | None = None,
+        dtype: Any = None,
+    ) -> None:
         super().__init__()
-        self.alpha = alpha
+
+        self.learnable = learnable
+        self.num_parameters = num_parameters
+
+        if learnable:
+            if not 0.0 < alpha < 1.0:
+                raise ValueError(f"'alpha' must be in (0, 1) exclusive: {alpha}")
+
+            init_theta = math.log(alpha / (1.0 - alpha))
+            shape = (num_parameters,) if num_parameters > 1 else ()
+            self.alpha_param = nn.Parameter(
+                torch.full(shape, init_theta, device=device, dtype=dtype)
+            )
+        else:
+            if not 0.0 <= alpha <= 1.0:
+                raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
+            self.alpha_value = alpha
+
+    @property
+    def alpha(self) -> float | torch.Tensor:
+        if self.learnable:
+            return torch.sigmoid(self.alpha_param)
+        return self.alpha_value
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return self.alpha * x + (1.0 - self.alpha) * x * x
+        alpha = self.alpha
+        return alpha * x + (1.0 - alpha) * x * x
 
 
 class ComplexBlendedQuadratic(nn.Module):
@@ -133,27 +161,57 @@ class ComplexBlendedQuadratic(nn.Module):
 
         f(z; \alpha) = \alpha z + (1 - \alpha) z^2.
 
-    Note that a quadratic activation is not "depth-stable", meaning in a deep
-    network it will eventually explode the variance of the inputs. For the
-    blended case, setting :math:`\alpha` close to 1 will delay the explosion,
-    allowing for deeper networks, but it does not solve the issue.
+    When *learnable* is *True*, :math:`\alpha` is parameterized as
+    :math:`\alpha = \sigma(\theta)` with learnable logits :math:`\theta`.
     """
 
-    alpha: float
-    """A non-learnable hyperparameter with values in :math:`[0, 1]`."""
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
     ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
     imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
     """
+    learnable: bool
+    """If *True*, :math:`\alpha` is a learnable parameter."""
+    num_parameters: int
+    """Number of learnable parameters (1 for a shared scalar, or number of
+    complex channels).
+    """
 
-    def __init__(self, alpha: float = 0.5, *, interleaved: bool = False) -> None:
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
-
+    def __init__(
+        self,
+        alpha: float = 0.5,
+        *,
+        num_parameters: int = 1,
+        learnable: bool = False,
+        interleaved: bool = False,
+        device: str | torch.device | None = None,
+        dtype: Any = None,
+    ) -> None:
         super().__init__()
-        self.alpha = alpha
+
         self.interleaved = interleaved
+        self.learnable = learnable
+        self.num_parameters = num_parameters
+
+        if learnable:
+            if not 0.0 < alpha < 1.0:
+                raise ValueError(f"'alpha' must be in (0, 1) exclusive: {alpha}")
+
+            init_theta = math.log(alpha / (1.0 - alpha))
+            shape = (num_parameters,) if num_parameters > 1 else ()
+            self.alpha_param = nn.Parameter(
+                torch.full(shape, init_theta, device=device, dtype=dtype)
+            )
+        else:
+            if not 0.0 <= alpha <= 1.0:
+                raise ValueError(f"'alpha' must be in [0, 1]: {alpha}")
+            self.alpha_value = alpha
+
+    @property
+    def alpha(self) -> float | torch.Tensor:
+        if self.learnable:
+            return torch.sigmoid(self.alpha_param)
+        return self.alpha_value
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
@@ -164,9 +222,25 @@ def cblended_quadratic(
     x: torch.Tensor,
     *,
     interleaved: bool = False,
-    alpha: float = 0.5,
+    alpha: float | torch.Tensor = 0.5,
 ) -> torch.Tensor:
     x2 = cquadratic(x, interleaved=interleaved)
+
+    # NOTE: we need to make sure alpha broadcasts correctly to the complex variable
+    if isinstance(alpha, torch.Tensor):
+        if alpha.ndim == 0 or alpha.shape[-1] == x.shape[-1]:
+            pass
+        elif 2 * alpha.shape[-1] == x.shape[-1]:
+            if interleaved:
+                alpha = torch.repeat_interleave(alpha, 2, dim=-1)
+            else:
+                alpha = torch.concat([alpha, alpha], dim=-1)
+        else:
+            raise ValueError(
+                f"'alpha' last dimension ({alpha.shape[-1]}) does not match input "
+                f"features ({x.shape[-1]}) or complex channels ({x.shape[-1] // 2})"
+            )
+
     return alpha * x + (1.0 - alpha) * x2
 
 
