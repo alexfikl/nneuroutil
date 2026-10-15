@@ -614,11 +614,17 @@ def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
 
 
 def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
-    """Calculate the recommended gain for the given nonlinearity function.
+    """Calculate the recommended gain for the given *nonlinearity* function.
 
     See :ref:`notes-initializers` for the values of the gain for custom
     functions. This also supports all the activations mentioned in
     :func:`torch.nn.init.calculate_gain` for completeness.
+
+    .. warning::
+
+        Most of the activation functions used here are not homogeneous. Therefore,
+        the computed gains are only valid under the stated assumptions, i.e.
+        the inputs are unit variance Gaussian, etc.
     """
     import math
 
