@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 import pathlib
 from typing import Literal
 
@@ -291,6 +292,79 @@ def test_zrelu_known_values() -> None:
     assert torch.allclose(res, x)
 
 
+def test_complex_log() -> None:
+    from nneuroutil.torch_extras import ComplexLog
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    expected = torch.log1p(torch.abs(z)) * torch.sgn(z)
+
+    # interleaved storage
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = ComplexLog(interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = ComplexLog(interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_complex_log_known_values() -> None:
+    from nneuroutil.torch_extras import ComplexLog
+
+    # on the positive real axis the phase is preserved and the magnitude is
+    # compressed to log(1 + |z|)
+    z = torch.tensor([1.0 + 0.0j])
+    xi = torch.view_as_real(z).reshape(2)
+    res = ComplexLog(interleaved=True)(xi)
+    assert torch.allclose(res, torch.tensor([math.log(2.0), 0.0]))
+
+    # the origin maps to the origin (sgn(0) = 0)
+    res = ComplexLog(interleaved=True)(torch.zeros(2))
+    assert torch.allclose(res, torch.zeros(2))
+
+
+def test_complex_exp() -> None:
+    from nneuroutil.torch_extras import ComplexExp
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+
+    expected = torch.expm1(torch.abs(z)) * torch.sgn(z)
+
+    # interleaved storage
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+    res = ComplexExp(interleaved=True)(x)
+    expected_inter = torch.view_as_real(expected).reshape(3, 2 * n)
+    assert res.shape == x.shape
+    assert torch.allclose(res, expected_inter)
+
+    # stacked storage
+    x = torch.cat([z.real, z.imag], dim=-1)
+    res = ComplexExp(interleaved=False)(x)
+    expected_stack = torch.cat([expected.real, expected.imag], dim=-1)
+    assert torch.allclose(res, expected_stack)
+
+
+def test_complex_exp_log_are_inverses() -> None:
+    from nneuroutil.torch_extras import ComplexExp, ComplexLog
+
+    n = 5
+    z = torch.complex(torch.randn(3, n), torch.randn(3, n))
+    x = torch.view_as_real(z).reshape(3, 2 * n)
+
+    # cexp(clog(z)) == z and clog(cexp(z)) == z (the phase is preserved)
+    clog = ComplexLog(interleaved=True)
+    cexp = ComplexExp(interleaved=True)
+    assert torch.allclose(cexp(clog(x)), x)
+    assert torch.allclose(clog(cexp(x)), x)
+
+
 # }}}
 
 
@@ -384,7 +458,9 @@ def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-t
 # {{{ test_init
 
 
-@pytest.mark.parametrize("nonlinearity", ["quadratic", "blended_quadratic", "relu"])
+@pytest.mark.parametrize(
+    "nonlinearity", ["quadratic", "blended_quadratic", "relu", "clog", "cexp"]
+)
 @pytest.mark.parametrize("param", [None, 0.0, 0.2])
 @pytest.mark.parametrize("mode", ["fan_in", "fan_out"])
 def test_kaiming_init(
