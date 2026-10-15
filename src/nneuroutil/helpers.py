@@ -644,6 +644,14 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
             raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
 
         scale = 1.0 / (alpha**2 + 2.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "clog":
+        # NOTE: this was evaluated numerically, will need to work on it
+        scale = 2.353051
+    elif nonlinearity == "cexp":
+        scale = 1.0 / (
+            math.sqrt(math.pi)
+            * (math.e * math.erfc(-1) - math.exp(0.25) * math.erfc(-0.5))
+        )
     elif nonlinearity == "modrelu":
         b = kwargs.get("b", 0.0)
 
