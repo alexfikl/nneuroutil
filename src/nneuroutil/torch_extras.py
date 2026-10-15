@@ -409,6 +409,70 @@ def zrelu(z: torch.Tensor) -> torch.Tensor:
     return z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
 
 
+class ComplexLog(nn.Module):
+    r"""A phase-preserving logarithmic activation for complex tensors.
+
+    .. math::
+
+        f(z) = \log(1 + |z|) \operatorname{sgn}(z),
+    """
+
+    interleaved: bool
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            return view_as_real(clog(view_as_complex(x)))
+        else:
+            result = clog(torch.complex(*torch.chunk(x, 2, dim=-1)))
+            return torch.cat([result.real, result.imag], dim=-1)
+
+
+def clog(z: torch.Tensor) -> torch.Tensor:
+    """Functional version of :class:`ComplexLog` for a complex tensor *z*."""
+    return torch.log1p(torch.abs(z)) * torch.sgn(z)
+
+
+class ComplexExp(nn.Module):
+    r"""A phase-preserving exponential activation for complex tensors.
+
+    .. math::
+
+        f(z) = (e^{|z|} - 1) \operatorname{sgn}(z),
+    """
+
+    interleaved: bool
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
+    """
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        if self.interleaved:
+            return view_as_real(cexp(view_as_complex(x)))
+        else:
+            result = cexp(torch.complex(*torch.chunk(x, 2, dim=-1)))
+            return torch.cat([result.real, result.imag], dim=-1)
+
+
+def cexp(z: torch.Tensor) -> torch.Tensor:
+    """Functional version of :class:`ComplexExp` for a complex tensor *z*."""
+    return torch.expm1(torch.abs(z)) * torch.sgn(z)
+
+
 # }}}
 
 
