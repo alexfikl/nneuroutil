@@ -360,3 +360,45 @@ We can rewrite this as
 
 where we have used the fact that :math:`\theta` is uniform and the probability
 of it landing in the first quadrant is just :math:`1/4`.
+
+Phase-Preserving Log and Exp Activations
+-----------------------------------------
+
+The phase-preserving logarithmic and exponential activations are given by
+
+.. math::
+
+    f_{\log}(y) = \log(1 + \|y\|) \operatorname{sgn}(y), \qquad
+    f_{\exp}(y) = (e^{\|y\|} - 1) \operatorname{sgn}(y),
+
+where :math:`\operatorname{sgn}(y) = y / \|y\|` preserves the phase. Since only
+the magnitude is transformed, both are real functions of :math:`\|y\|` applied
+to the modulus (and not the analytic complex logarithm or exponential). They
+are exact inverses of each other.
+
+Assuming, as above, that the input is circularly symmetric with :math:`r =
+\|y\|` Rayleigh distributed with scale :math:`\sigma_y`, the second moment of
+the logarithmic activation is
+
+.. math::
+
+   \mathbb{E}[\|x_l\|^2] =
+   \int_0^\infty \log(1 + r)^2 \frac{2 r}{\sigma_y^2}
+       \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r,
+
+which has no elementary closed form and is evaluated numerically, while for the
+exponential activation we get
+
+.. math::
+
+   \mathbb{E}[\|x_l\|^2] =
+   \int_0^\infty (e^r - 1)^2 \frac{2 r}{\sigma_y^2}
+       \exp\left(-\frac{r^2}{\sigma_y^2}\right) \,\mathrm{d} r
+   = \sqrt{\pi} \left[
+       e \operatorname{erfc}(-1) - e^{1/4} \operatorname{erfc}\left(-\frac{1}{2}\right)
+   \right],
+
+where we used :math:`\mathbb{E}[e^{a r}] = 1 + \frac{a \sqrt{\pi}}{2} e^{a^2 /
+4} \operatorname{erfc}(-a / 2)`. At the unit second moment :math:`\sigma_y^2 =
+1`, this gives the initialization gains used by
+:func:`~nneuroutil.helpers.calculate_gain`.
