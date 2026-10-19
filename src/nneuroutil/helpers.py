@@ -9,16 +9,16 @@ import os
 import pathlib
 import sys
 import time
-from collections.abc import Callable, Generator, Iterable, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 from functools import cache
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import array_api_compat
 import numpy as np
 
-from nneuroutil.typing import Array1D, DataclassInstanceT
+from nneuroutil.typing import Array1D, DataclassInstance, DataclassInstanceT
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -135,6 +135,92 @@ def module_logger(
 
 
 log = module_logger(__name__)
+
+# }}}
+
+
+# {{{ dataclass
+
+
+def dc_asdict(dc: DataclassInstance, *, init_only: bool = True) -> dict[str, Any]:
+    """
+    :returns: a shallow copy of the fields in the dataclass *dc*.
+    """
+    if not is_dataclass(dc):
+        raise TypeError("input 'dc' is not a dataclass")
+
+    return dict(dc_items(dc, init_only=init_only))
+
+
+def dc_items(
+    dc: DataclassInstance, *, init_only: bool = True
+) -> Iterator[tuple[str, Any]]:
+    """
+    :arg init_only: if *False*, all the fields of the dataclass are returned,
+        even those with ``init=False``.
+    :returns: tuples of the form ``(field, value)`` with the fields from the
+        dataclass.
+    """
+    if not is_dataclass(dc):
+        raise TypeError("input 'dc' is not a dataclass")
+
+    from dataclasses import fields
+
+    for f in fields(dc):
+        if not init_only or f.init:
+            yield f.name, getattr(dc, f.name)
+
+
+def dc_stringify(
+    dc: DataclassInstance | NamedTuple | dict[str, Any],
+    header: tuple[str, str] | None = None,
+) -> str:
+    """Stringify a dataclass, namedtuple or dictionary in a fancy way.
+
+    :returns: a string containing two columns with the object attributes and
+        values shown in a nice way.
+    """
+    if is_dataclass(dc):
+        assert not isinstance(dc, type)
+        fields = dc_asdict(dc)
+    elif isinstance(dc, tuple) and hasattr(dc, "_asdict"):  # is_namedtuple
+        fields = dc._asdict()
+    elif isinstance(dc, dict):
+        fields = dc
+    else:
+        raise TypeError(f"unrecognized type: '{type(dc).__name__}'")
+
+    width = len(max(fields, key=len))
+    fmt = f"{{:{width} }} : {{}}"
+
+    def stringify(v: Any) -> str:
+        sv = repr(v)
+        if len(sv) > 128:
+            sv = f"{type(v).__name__}<...>"
+
+        return sv
+
+    instance_attrs = sorted(
+        {k: stringify(v) for k, v in fields.items() if k != "name"}.items()
+    )
+
+    header_attrs = []
+    if header is None:
+        if not isinstance(dc, dict):
+            header_attrs.append(("class", type(dc).__name__))
+        if "name" in fields:
+            header_attrs.append(("name", fields["name"]))
+        if not header_attrs:
+            header_attrs.append(("attribute", "value"))
+    else:
+        header_attrs.append(header)
+    header_attrs.append(("-" * width, "-" * width))
+
+    return "\n".join([
+        "\t{}".format("\n\t".join(fmt.format(k, v) for k, v in header_attrs)),
+        "\t{}".format("\n\t".join(fmt.format(k, v) for k, v in instance_attrs)),
+    ])
+
 
 # }}}
 
