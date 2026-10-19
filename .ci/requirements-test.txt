@@ -18,7 +18,7 @@ babel==2.18.0
     #   sphinx
 beautifulsoup4==4.15.0
     # via pydata-sphinx-theme
-certifi==2026.7.22
+certifi==2026.10.18
     # via requests
 charset-normalizer==3.5.2
     # via requests
@@ -42,7 +42,7 @@ flax==0.12.8 ; python_full_version < '3.12'
     # via nneuroutil (pyproject.toml:jax)
 flax==0.12.10 ; python_full_version >= '3.12'
     # via nneuroutil (pyproject.toml:jax)
-fonttools==4.66.1
+fonttools==4.67.0
     # via matplotlib
 fsspec==2026.9.0
     # via etils
@@ -152,9 +152,9 @@ packaging==26.3
     #   matplotlib
     #   pytest
     #   sphinx
-pillow==12.3.0
+pillow==13.0.0
     # via matplotlib
-pluggy==1.6.0
+pluggy==1.7.0
     # via pytest
 prometheus-client==0.26.0
     # via orbax-checkpoint
@@ -195,7 +195,7 @@ rich==15.0.0
     #   flax
 roman-numerals==4.1.0
     # via sphinx
-ruff==0.17.0
+ruff==0.17.1
     # via nneuroutil (pyproject.toml:test)
 scienceplots==2.2.2
     # via nneuroutil (pyproject.toml:visualization)
@@ -253,7 +253,7 @@ tensorstore==0.1.85
     #   orbax-checkpoint
 treescope==0.1.10
     # via flax
-ty==0.0.86
+ty==0.0.89
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
