@@ -191,7 +191,7 @@ def dc_stringify(
         raise TypeError(f"unrecognized type: '{type(dc).__name__}'")
 
     width = len(max(fields, key=len))
-    fmt = f"{{:{width} }} : {{}}"
+    fmt = f"{{:{width}}} : {{}}"
 
     def stringify(v: Any) -> str:
         sv = repr(v)
