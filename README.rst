@@ -20,18 +20,17 @@ data from neuroscience. The focus is mainly on AI implementations of various
 models and pipelines. It will mainly grow as various needs arise and it does
 not aim to be a general framework for such problems, as the field is too vast.
 
-There are many frameworks and libraries that can be used for this sort of stuff.
-For some Python examples, see
+There are many frameworks and libraries that can be used for this sort of
+stuff. For some Python examples, see
 
-* `MNE <https://github.com/mne-tools/mne-python>`__: Package for exploring,
-  visualizing, and analyzing human neurophysiological data such as MEG, EEG,
-  sEEG, ECoG, and more.
+* `MNE-Python <https://github.com/mne-tools/mne-python>`__: Package for
+  exploring, visualizing, and analyzing human neurophysiological data such as
+  MEG, EEG, sEEG, ECoG, and more.
 * `Braindecode <https://github.com/braindecode/braindecode>`__: Deep learning
-  software to decode EEG, ECG or MEG signals. This uses ``mne-python`` as a
-  dependency.
-* `Nilearn <https://github.com/nilearn/nilearn>`__: machine learning and
+  software to decode EEG, ECG or MEG signals. It builds on MNE-Python.
+* `Nilearn <https://github.com/nilearn/nilearn>`__: Machine learning and
   decoding for neuroimaging (e.g. fMRI).
-* `NeuroKit <https://github.com/neuropsychology/NeuroKit>`__: Generic package
+* `NeuroKit2 <https://github.com/neuropsychology/NeuroKit>`__: Generic package
   for advanced biosignal processing routines.
 * `PyRiemann <https://github.com/pyRiemann/pyRiemann>`__: Generic multivariate
   data analysis, with a focus on biosignals (EEG, MEG, EMG).
@@ -41,16 +40,15 @@ For some Python examples, see
 Scope
 -----
 
-The main driving philosophy of ``nneuroutil`` is that it should be backend
-agnostic. All current algorithms are implemented against the `Array API
-Standard <https://data-apis.org/array-api/latest>`__ and work both with
-mutable backends (e.g. ``numpy`` or ``pytorch``) or immutable backends (e.g.
-``jax``).
+The main driving philosophy of ``nneuroutil`` is that it should be
+backend-agnostic. All current algorithms are implemented against the `Array API
+Standard <https://data-apis.org/array-api/latest>`__ and work with both mutable
+backends (e.g. ``numpy`` or ``torch``) and immutable backends (e.g. ``jax``).
 
 On top of that, the scope is not to overthrow other libraries. The algorithms
 that are added here should be either (a) standard and not worth an extra
-dependency or (b) novel or with different tradeoffs. An example for the is the
-``LDA`` algorithm implemented in ``nneuroutil.classifier``, that focuses on
+dependency or (b) novel or with different tradeoffs. An example of this is the
+``LDA`` algorithm implemented in ``nneuroutil.classifier``, which focuses on
 cases where the number of features is larger than the number of samples (i.e.
 the system is singular), unlike the standard one implemented in
 ``scikit-learn``.

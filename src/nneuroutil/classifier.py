@@ -82,7 +82,7 @@ def classify_linear_discriminant_analysis(
     shrinkage: float = 1.0,
     xp: Any = None,
 ) -> LinearDiscriminandAnalysisClassifier:
-    """Classify the given dataset GSVD-based LDA (mainly based on Algorithm 1
+    """Classify the given dataset using GSVD-based LDA (mainly based on Algorithm 1
     from [Howland2004]_).
 
     .. [Howland2004] P. Howland, H. Park,
