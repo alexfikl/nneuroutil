@@ -47,11 +47,14 @@ backends (e.g. ``numpy`` or ``torch``) and immutable backends (e.g. ``jax``).
 
 On top of that, the scope is not to overthrow other libraries. The algorithms
 that are added here should be either (a) standard and not worth an extra
-dependency or (b) novel or with different tradeoffs. An example of this is the
-``LDA`` algorithm implemented in ``nneuroutil.classifier``, which focuses on
-cases where the number of features is larger than the number of samples (i.e.
-the system is singular), unlike the standard one implemented in
-``scikit-learn``.
+dependency or (b) novel / with different tradeoffs.
+
+An example of this is the ``LDA`` algorithm implemented in
+``nneuroutil.classifier``, which uses a GSVD-based formulation for
+rank-deficient problems where the within-class scatter matrix is singular.
+Unlike ``scikit-learn``'s default SVD-based LDA, it can retain discriminative
+directions in the null space of that matrix, which can be useful when there are
+more features than samples.
 
 Links
 -----

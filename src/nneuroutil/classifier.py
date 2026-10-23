@@ -85,6 +85,25 @@ def classify_linear_discriminant_analysis(
     """Classify the given dataset using GSVD-based LDA (mainly based on Algorithm 1
     from [Howland2004]_).
 
+    Use this instead of ``scikit-learn``'s LDA when the number of features is
+    comparable to or larger than the number of samples, so that the
+    within-class scatter matrix :math:`S_W` is singular or ill-conditioned.
+    ``scikit-learn``'s default ``svd`` solver truncates the null space of
+    :math:`S_W`, while the GSVD retains directions there that may separate the
+    classes. If those directions are mostly noise, prefer a regularized LDA and
+    compare on held-out data.
+
+    The *shrinkage* parameter interpolates between the classic LDA metric
+    :math:`S_W` (:math:`s \to 0`) and the mixture scatter :math:`S_M` (:math:`s
+    = 1`). ``scikit-learn``'s ``shrinkage``, available for its ``lsqr`` and
+    ``eigen`` solvers, instead pulls the covariance towards a scaled identity.
+    That also handles a singular :math:`S_W`, but with a different bias. Its
+    ``tol`` is only a numerical rank cutoff for the ``svd`` solver.
+
+    In general, if ``scikit-learn`` is already one of your dependency, it should
+    give very similar results with appropriate parameters. Also, if you know that
+    your data is noisy, this algorithm can actually hurt.
+
     .. [Howland2004] P. Howland, H. Park,
         *Generalizing Discriminant Analysis Using the Generalized Singular Value
         Decomposition*,
@@ -98,9 +117,9 @@ def classify_linear_discriminant_analysis(
     :arg eps: tolerance used for rank determination in the SVD truncation.
     :arg shrinkage: a float in :math:`(0, 1]` that regularizes the projection
         matrix such that :math:`G^T ((1 - s) S_W + s S_M) G = I`. If this is 1,
-        it matches Algorithm 1 from [Howland2004]_. If it is 0, :math:`G` is
-        rescaled to match the classic LDA algorithm (where the matches are
-        determined using the Mahalanobis distance).
+        it matches Algorithm 1 from [Howland2004]_. As :math:`s \to 0`,
+        :math:`G` is rescaled to match the classic LDA algorithm (where the
+        matches are determined using the Mahalanobis distance).
     """
 
     if len(features) != len(labels):
