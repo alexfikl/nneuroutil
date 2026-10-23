@@ -38,6 +38,9 @@ For some Python examples, see
 * `PyDMD <https://github.com/PyDMD/PyDMD>`__ and `PySINDy
   <https://github.com/dynamicslab/pysindy>`__: More generic dynamics libraries.
 
+Scope
+-----
+
 The main driving philosophy of ``nneuroutil`` is that it should be backend
 agnostic. All current algorithms are implemented against the `Array API
 Standard <https://data-apis.org/array-api/latest>`__ and work both with
