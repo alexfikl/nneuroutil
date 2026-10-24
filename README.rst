@@ -2,6 +2,10 @@
     :alt: Build Status
     :target: https://github.com/alexfikl/nneuroutil/actions/workflows/ci.yml
 
+.. |badge-pypi| image:: https://badge.fury.io/py/nneuroutil.svg
+    :alt: PyPI
+    :target: https://pypi.org/project/nneuroutil/
+
 .. |badge-rtd| image:: https://readthedocs.org/projects/nneuroutil/badge/?version=latest
     :alt: Documentation
     :target: https://nneuroutil.readthedocs.io/en/latest/?badge=latest
@@ -14,7 +18,7 @@
     :alt: MIT license
     :target: https://spdx.org/licenses/MIT.html
 
-|badge-ci| |badge-rtd| |badge-reuse| |badge-mit|
+|badge-ci| |badge-pypi| |badge-rtd| |badge-reuse| |badge-mit|
 
 nneuroutil
 ==========
