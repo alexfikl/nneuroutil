@@ -75,8 +75,8 @@ requirements_test_txt:
     uv pip compile --upgrade --universal --python-version '3.11' \
         --group test \
         --group docs \
-        --group jax \
-        --group visualization \
+        --extra jax \
+        --extra visualization \
         -o {{ REQUIREMENTS_DIR }}/requirements-test.txt \
         pyproject.toml
 

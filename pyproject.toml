@@ -40,15 +40,15 @@ dependencies = [
     "scipy>=1.14",
     "typing-extensions>=4.10",
 ]
+optional-dependencies.jax = [ "flax>=0.10", "jax>=0.7" ]
+optional-dependencies.torch = [ "torch>=2" ]
+optional-dependencies.visualization = [ "matplotlib", "scienceplots" ]
 urls.Repository = "https://github.com/alexfikl/nneuroutil"
 
 [dependency-groups]
 dev = [ "pyproject-fmt", "reuse", "typos", "uv" ]
 test = [ "pytest", "pytest-github-actions-annotate-failures", "ruff", "scipy-stubs", "ty" ]
 docs = [ "sphinx>=6", "sphinx-book-theme" ]
-jax = [ "flax>=0.10", "jax>=0.7" ]
-torch = [ "torch>=2" ]
-visualization = [ "matplotlib", "scienceplots" ]
 
 [tool.ruff]
 target-version = "py311"
