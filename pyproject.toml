@@ -6,7 +6,7 @@ requires = [
 
 [project]
 name = "nneuroutil"
-version = "2026.0"
+version = "0.1.0"
 description = "Utils for applying simple neural networks to neuroscience data"
 readme = "README.rst"
 keywords = [

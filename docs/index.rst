@@ -18,6 +18,7 @@ nneuroutil: utilities for neuroscience
     :hidden:
     :caption: Notes
 
+    notes/changelog.rst
     notes/initializers.rst
 
 .. warning::
