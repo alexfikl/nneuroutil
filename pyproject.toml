@@ -45,6 +45,8 @@ dependencies = [
 optional-dependencies.jax = [ "flax>=0.10", "jax>=0.7" ]
 optional-dependencies.torch = [ "torch>=2" ]
 optional-dependencies.visualization = [ "matplotlib>=3.9", "scienceplots>=2.2" ]
+urls.Documentation = "https://nneuroutil.readthedocs.io/"
+urls.Issues = "https://github.com/alexfikl/nneuroutil/issues"
 urls.Repository = "https://github.com/alexfikl/nneuroutil"
 
 [dependency-groups]
