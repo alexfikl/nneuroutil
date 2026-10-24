@@ -7,6 +7,12 @@ SPDX-PackageSupplier = "Alexandru Fikl <alexfikl@gmail.com>"
 SPDX-PackageDownloadLocation = "https://github.com/alexfikl/nneuroutil"
 
 [[annotations]]
+path = ["py.typed"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
 path = [".gitignore", ".github/**.yml"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Alexandru Fikl <alexfikl@gmail.com>"
