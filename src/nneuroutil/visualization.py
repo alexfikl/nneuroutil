@@ -187,6 +187,8 @@ def set_plotting_defaults(
 
 def with_savefig_suffix(filename: PathLike) -> pathlib.Path:
     """Adds the default :mod:`matplotlib` ``savefig.format`` extension to the path."""
+    import matplotlib.pyplot as mp
+
     filename = pathlib.Path(filename)
 
     ext = mp.rcParams["savefig.format"]
