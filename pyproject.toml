@@ -47,7 +47,7 @@ dev = [ "pyproject-fmt", "reuse", "typos", "uv" ]
 test = [ "pytest", "pytest-github-actions-annotate-failures", "ruff", "scipy-stubs", "ty" ]
 docs = [ "sphinx>=6", "sphinx-book-theme" ]
 jax = [ "flax>=0.10", "jax>=0.7" ]
-torch = [ "pytorch>=2" ]
+torch = [ "torch>=2" ]
 visualization = [ "matplotlib", "scienceplots" ]
 
 [tool.ruff]
