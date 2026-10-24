@@ -16,7 +16,7 @@ try:
     import torch
     from torch import nn
 except ImportError:
-    log.error("This example requires 'pytorch'.")
+    log.error("This example requires 'torch'.")
     raise SystemExit(0) from None
 
 import nneuroutil.torch_extras as nnx
