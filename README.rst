@@ -60,6 +60,45 @@ Unlike ``scikit-learn``'s default SVD-based LDA, it can retain discriminative
 directions in the null space of that matrix, which can be useful when there are
 more features than samples.
 
+Install
+-------
+
+.. code-block:: bash
+
+    pip install nneuroutil
+    # or: uv add nneuroutil
+
+Optional backends are extras: ``nneuroutil[jax]``, ``nneuroutil[torch]``, and
+``nneuroutil[visualization]``.
+
+Quick Start
+-----------
+
+The library contains a few different algorithms and tools for general analysis
+of (mainly) timeseries data, classification, constructing neural network
+models, etc.
+
+It's generally pretty straightforward. For example, the code below shows a
+standard LDA classifier based on the GSVD algorithm of `Howland & Park (2004)
+<https://doi.org/10.1109/tpami.2004.46>`__ that uses ``jax``.
+
+.. code-block:: python
+
+    import jax
+    import jax.numpy as jnp
+
+    from nneuroutil.classifier import classify_linear_discriminant_analysis
+
+    key = jax.random.PRNGKey(0)
+    key1, key2 = jax.random.split(key)
+    features = [
+        jax.random.normal(key1, (50, 2)) * 0.5 + jnp.array([-2.0, 0.0]),
+        jax.random.normal(key2, (50, 2)) * 0.5 + jnp.array([2.0, 0.0]),
+    ]
+
+    clf = classify_linear_discriminant_analysis(features, [0, 1])
+    print(clf.predict(jnp.array([[1.8, 0.2], [-1.9, -0.1]])))  # [1. 0.]
+
 Links
 -----
 
