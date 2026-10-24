@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import array_api_compat
 import numpy as np
 
-from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array1D, Array2D
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ as_grayscale

@@ -3,18 +3,19 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from nneuroutil.helpers import BOOLEAN_STATES, module_logger, on_ci
+from nneuroutil.helpers import BOOLEAN_STATES, on_ci
 from nneuroutil.typing import PathLike
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as mp
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 # {{{ load_scienceplots_styles
 

@@ -3,18 +3,18 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 import array_api_compat
 import numpy as np
 
-from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array1D, ArrayND, ScalarTypeT
 
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ to_dtype

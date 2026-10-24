@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import pathlib
 from typing import Literal
@@ -11,12 +12,10 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from nneuroutil.helpers import module_logger
-
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ test_activation_functions

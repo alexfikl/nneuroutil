@@ -8,8 +8,21 @@ from typing import TYPE_CHECKING, Any
 import array_api_compat
 import pytest
 
+from nneuroutil.helpers import set_up_logging
+
 if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
+
+
+# {{{ logging
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_up_test_logging() -> None:
+    set_up_logging("INFO")
+
+
+# }}}
 
 
 # {{{ xp

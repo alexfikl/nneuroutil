@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
@@ -15,9 +16,9 @@ from torch.utils._python_dispatch import (  # ruff:ignore[import-private-name]
     TorchDispatchMode,
 )
 
-from nneuroutil.helpers import MemorySnapshot, MemoryTracker, module_logger
+from nneuroutil.helpers import MemorySnapshot, MemoryTracker
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ activation functions

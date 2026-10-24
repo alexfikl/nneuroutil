@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -11,10 +12,10 @@ from typing import Any, Generic, Literal
 import array_api_compat
 import numpy as np
 
-from nneuroutil.helpers import module_logger, register_dataclass
+from nneuroutil.helpers import register_dataclass
 from nneuroutil.typing import Array0D, Array1D, Array2D, ArrayND, ScalarTypeT
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ DMDcBase

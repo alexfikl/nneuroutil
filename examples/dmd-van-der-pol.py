@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import Any
 
@@ -11,10 +12,11 @@ from rich.table import Table
 from scipy.integrate import solve_ivp
 
 from nneuroutil import dmd
-from nneuroutil.helpers import module_logger, stringify_table
+from nneuroutil.helpers import set_up_logging, stringify_table
 from nneuroutil.typing import Array2D
 
-log = module_logger(__name__)
+set_up_logging("INFO")
+log = logging.getLogger(__name__)
 rng = np.random.default_rng(seed=42)
 
 

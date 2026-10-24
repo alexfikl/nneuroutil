@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 
     import rich.table
 
+log = logging.getLogger(__name__)
+
+
 # {{{ environment
 
 
@@ -78,63 +81,76 @@ def enable_test_plotting() -> bool:
 # {{{ logging
 
 
-def module_logger(
-    module: str,
+NNEUROUTIL_ROOT_LOGGER_NAME = "nneuroutil"
+
+
+def set_up_logging(
     level: int | str | None = None,
     *,
-    root_name: str = "nneuroutil",
+    rich: bool = True,
+    force: bool = False,
 ) -> logging.Logger:
-    """Create a new logging for the module *module*.
+    """Set up logging for scripts, examples, and tests.
 
-    The logger is created using a :class:`rich.logging.RichHandler` for fancy
-    highlighting. The ``NO_COLOR`` environment variable can be used to
-    disable colors.
+    By default, a :class:`rich.logging.RichHandler` writing to ``stderr`` is
+    installed. The ``NO_COLOR`` environment variable disables highlighting.
+    The ``NNEUROUTIL_LOGGING_LEVEL`` can be used to set a default logging level.
 
-    :arg module: a name for the module to create a logger for.
-    :arg level: if *None*, the default value is taken to from the
-        ``NNEUROUTIL_LOGGING_LEVEL`` environment variable and falls back to the
-        ``INFO`` level if it does not exist (see :mod:`logging`).
+    :arg level: log level as an integer or case insensitive name (e.g. ``"INFO"``).
+    :arg rich: if *False*, use a plain :class:`logging.StreamHandler` instead.
+    :arg force: if *True* remove any existing root handlers before setting up logging.
     """
+    root = logging.getLogger()
+
+    if force:
+        for handler in root.handlers[:]:
+            root.removeHandler(handler)
+
     if level is None:
-        level = os.environ.get("NNEUROUTIL_LOGGING_LEVEL", "INFO").upper()
+        level = os.environ.get("NNEUROUTIL_LOGGING_LEVEL", "INFO")
 
     if isinstance(level, str):
         level = getattr(logging, level.upper())
 
-    assert isinstance(level, int)
+    if not isinstance(level, int):
+        raise TypeError(f"'level' must be an int or str: {level!r}")
 
-    # NOTE: insist on putting everything under the root
-    path = pathlib.Path(module)
-    if path.exists():
-        module = f"{root_name}.{path.stem}".replace("-", "_")
+    # find the root package handler
+    handler = None
+    for h in root.handlers:
+        if h.get_name() == NNEUROUTIL_ROOT_LOGGER_NAME:
+            handler = h
+            break
 
-    # set up the root logger
-    root = logging.getLogger(root_name)
-    root.propagate = False
+    # if no handler was found, set one up
+    if handler is None:
+        if rich:
+            from rich.console import Console
+            from rich.highlighter import NullHighlighter
+            from rich.logging import RichHandler
 
-    if not root.handlers:
-        from rich.highlighter import NullHighlighter
-        from rich.logging import RichHandler
+            no_color = "NO_COLOR" in os.environ
+            handler = RichHandler(
+                level,
+                console=Console(stderr=True),
+                show_time=True,
+                omit_repeated_times=False,
+                show_level=True,
+                show_path=True,
+                highlighter=NullHighlighter() if no_color else None,
+                markup=False,
+            )
+        else:
+            handler = logging.StreamHandler()
 
-        no_color = "NO_COLOR" in os.environ
-        handler = RichHandler(
-            level,
-            show_time=True,
-            omit_repeated_times=False,
-            show_level=True,
-            show_path=True,
-            highlighter=NullHighlighter() if no_color else None,
-            markup=True,
-        )
-
+        handler.set_name(NNEUROUTIL_ROOT_LOGGER_NAME)
         root.addHandler(handler)
-        root.setLevel(level)
 
-    _, *rest = module.split(".", maxsplit=1)
-    return root.getChild(rest[0]) if rest else root
+    handler.setLevel(level)
+    root.setLevel(level)
 
+    return root
 
-log = module_logger(__name__)
 
 # }}}
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import Any
 
@@ -19,13 +20,12 @@ from nneuroutil.classifier import (
     classify_support_vector_machine,
     compute_anova_scores,
 )
-from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array0D, Array2D
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ test_classify_linear_discriminant_analysis

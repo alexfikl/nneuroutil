@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import copy
+import logging
 from collections.abc import Callable
 
 from rich.table import Table
 
-from nneuroutil.helpers import module_logger, stringify_table
+from nneuroutil.helpers import set_up_logging, stringify_table
 
-log = module_logger(__name__)
+set_up_logging("INFO")
+log = logging.getLogger(__name__)
 
 try:
     import torch

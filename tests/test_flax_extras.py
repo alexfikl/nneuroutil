@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 
 import pytest
-
-from nneuroutil.helpers import module_logger
 
 pytest.importorskip("flax")
 
@@ -18,7 +17,7 @@ from flax import nnx
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ test_activation_functions

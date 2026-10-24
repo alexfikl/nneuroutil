@@ -3,19 +3,20 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 import array_api_compat
 import numpy as np
 
-from nneuroutil.helpers import module_logger, register_dataclass
+from nneuroutil.helpers import register_dataclass
 from nneuroutil.typing import Array0D, Array1D, Array2D
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 # {{{ classify_linear_discriminant_analysis
 

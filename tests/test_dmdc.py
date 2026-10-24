@@ -3,15 +3,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
 import numpy as np
 import pytest
 
-from nneuroutil.helpers import module_logger
 from nneuroutil.typing import Array1D, Array2D, ArrayND
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def simulate_linear_system(

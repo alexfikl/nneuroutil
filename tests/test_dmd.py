@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import Any, Literal
 
@@ -10,13 +11,13 @@ import array_api_compat
 import numpy as np
 import pytest
 
-from nneuroutil.helpers import module_logger, spectrum_error
+from nneuroutil.helpers import spectrum_error
 from nneuroutil.typing import ArrayND
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 # {{{ test_dmd_classic_linear
 

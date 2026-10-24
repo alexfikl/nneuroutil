@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -13,15 +14,9 @@ from flax import nnx
 from jax.nn.initializers import Initializer
 
 from nneuroutil.array_api_extras import deinterleave, interleave
-from nneuroutil.helpers import (
-    MemorySnapshot,
-    MemoryTracker,
-    calculate_gain,
-    module_logger,
-    to_real,
-)
+from nneuroutil.helpers import MemorySnapshot, MemoryTracker, calculate_gain, to_real
 
-log = module_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 # {{{ activation functions
