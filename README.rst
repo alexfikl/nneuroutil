@@ -15,10 +15,14 @@
     :target: https://api.reuse.software/info/github.com/alexfikl/nneuroutil
 
 .. |badge-mit| image:: https://img.shields.io/badge/License-MIT-blue.svg
-    :alt: MIT license
+    :alt: MIT License
     :target: https://spdx.org/licenses/MIT.html
 
-|badge-ci| |badge-pypi| |badge-rtd| |badge-reuse| |badge-mit|
+.. |badge-zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.23623448.svg
+    :alt: Zenodo Archive
+    :target: https://doi.org/10.5281/zenodo.23623448
+
+|badge-ci| |badge-pypi| |badge-rtd| |badge-reuse| |badge-mit| |badge-zenodo|
 
 nneuroutil
 ==========
