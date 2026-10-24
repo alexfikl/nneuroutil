@@ -81,30 +81,26 @@ def enable_test_plotting() -> bool:
 # {{{ logging
 
 
-NNEUROUTIL_ROOT_LOGGER_NAME = "nneuroutil"
+NNEUROUTIL_HANDLER_NAME = "nneuroutil"
 
 
 def set_up_logging(
     level: int | str | None = None,
     *,
     rich: bool = True,
-    force: bool = False,
 ) -> logging.Logger:
     """Set up logging for scripts, examples, and tests.
 
-    By default, a :class:`rich.logging.RichHandler` writing to ``stderr`` is
-    installed. The ``NO_COLOR`` environment variable disables highlighting.
-    The ``NNEUROUTIL_LOGGING_LEVEL`` can be used to set a default logging level.
+    A :class:`rich.logging.RichHandler` writing to ``stderr`` is installed by
+    default; the ``NO_COLOR`` environment variable disables colors and
+    highlighting. The ``NNEUROUTIL_LOGGING_LEVEL`` environment variable can be
+    used to set a default logging level. Any handler previously installed by
+    this function is replaced.
 
     :arg level: log level as an integer or case insensitive name (e.g. ``"INFO"``).
     :arg rich: if *False*, use a plain :class:`logging.StreamHandler` instead.
-    :arg force: if *True* remove any existing root handlers before setting up logging.
     """
     root = logging.getLogger()
-
-    if force:
-        for handler in root.handlers[:]:
-            root.removeHandler(handler)
 
     if level is None:
         level = os.environ.get("NNEUROUTIL_LOGGING_LEVEL", "INFO")
@@ -115,38 +111,39 @@ def set_up_logging(
     if not isinstance(level, int):
         raise TypeError(f"'level' must be an int or str: {level!r}")
 
-    # find the root package handler
-    handler = None
-    for h in root.handlers:
-        if h.get_name() == NNEUROUTIL_ROOT_LOGGER_NAME:
-            handler = h
-            break
+    # remove any existing handler installed by this function
+    for handler in root.handlers[:]:
+        if handler.get_name() == NNEUROUTIL_HANDLER_NAME:
+            root.removeHandler(handler)
 
-    # if no handler was found, set one up
-    if handler is None:
-        if rich:
-            from rich.console import Console
-            from rich.highlighter import NullHighlighter
-            from rich.logging import RichHandler
+    if rich:
+        from rich.console import Console
+        from rich.highlighter import NullHighlighter
+        from rich.logging import RichHandler
 
-            no_color = "NO_COLOR" in os.environ
-            handler = RichHandler(
-                level,
-                console=Console(stderr=True),
-                show_time=True,
-                omit_repeated_times=False,
-                show_level=True,
-                show_path=True,
-                highlighter=NullHighlighter() if no_color else None,
-                markup=False,
+        no_color = "NO_COLOR" in os.environ
+        handler: logging.Handler = RichHandler(
+            level,
+            console=Console(stderr=True, no_color=no_color),
+            show_time=True,
+            omit_repeated_times=False,
+            show_level=True,
+            show_path=True,
+            highlighter=NullHighlighter() if no_color else None,
+            markup=False,
+        )
+    else:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
             )
-        else:
-            handler = logging.StreamHandler()
+        )
 
-        handler.set_name(NNEUROUTIL_ROOT_LOGGER_NAME)
-        root.addHandler(handler)
-
+    handler.set_name(NNEUROUTIL_HANDLER_NAME)
     handler.setLevel(level)
+    root.addHandler(handler)
     root.setLevel(level)
 
     return root
