@@ -6,11 +6,15 @@
     :alt: Documentation
     :target: https://nneuroutil.readthedocs.io/en/latest/?badge=latest
 
+.. |badge-reuse| image:: https://api.reuse.software/badge/github.com/alexfikl/nneuroutil
+    :alt: REUSE
+    :target: https://api.reuse.software/info/github.com/alexfikl/nneuroutil
+
 .. |badge-mit| image:: https://img.shields.io/badge/License-MIT-blue.svg
     :alt: MIT license
     :target: https://spdx.org/licenses/MIT.html
 
-|badge-ci| |badge-rtd| |badge-mit|
+|badge-ci| |badge-rtd| |badge-reuse| |badge-mit|
 
 nneuroutil
 ==========
