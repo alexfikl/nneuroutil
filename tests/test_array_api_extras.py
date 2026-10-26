@@ -7,6 +7,7 @@ import logging
 import pathlib
 from typing import Any
 
+import array_api_compat
 import numpy as np
 import pytest
 
@@ -17,6 +18,8 @@ from nneuroutil.array_api_extras import (
     histogram,
     interleave,
     sign,
+    view_as_complex,
+    view_as_real,
 )
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -61,6 +64,96 @@ def test_deinterleave_odd_size(xp: Any) -> None:
 
     with pytest.raises(ValueError, match="must be even"):
         deinterleave(z, axis=-1)
+
+
+# }}}
+
+
+# {{{ test_view_as_complex
+
+
+def test_view_as_complex(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
+    z = xp.asarray(z_np)
+
+    x = view_as_real(z)
+    assert tuple(x.shape) == (3, 8)
+    assert array_equal(view_as_complex(x), z)
+    assert array_equal(view_as_complex(view_as_real(z)), z)
+
+
+def test_view_as_complex_no_copy(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
+
+    x_np = np.stack([z_np.real, z_np.imag], axis=-1).reshape(3, 8)
+    x = xp.asarray(x_np)
+
+    z = view_as_complex(x)
+    if array_api_compat.is_numpy_array(z):
+        assert np.shares_memory(x, z)
+    elif array_api_compat.is_torch_array(z):
+        assert z.data_ptr() == x.data_ptr()
+    else:
+        pytest.skip(f"{xp.__name__} does not expose shared-memory information")
+
+    r = view_as_real(z)
+    if array_api_compat.is_numpy_array(z):
+        assert np.shares_memory(z, r)
+    elif array_api_compat.is_torch_array(z):
+        assert r.data_ptr() == z.data_ptr()
+
+
+def test_view_as_complex_odd_size(xp: Any) -> None:
+    x = xp.asarray(np.ones((3, 7)))
+
+    with pytest.raises(ValueError, match="must be even"):
+        view_as_complex(x)
+
+
+def test_view_as_complex_copy(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
+    x_np = np.stack([z_np.real, z_np.imag], axis=-1).reshape(3, 8)
+    x = xp.asarray(x_np)[:, ::2]
+
+    if "jax" in xp.__name__:
+        pytest.skip("jax supports views of non-contiguous arrays")
+
+    with pytest.raises(ValueError, match="without copying"):
+        view_as_complex(x)
+
+    x_np = np.asarray(x)
+    expected = x_np[..., ::2] + 1j * x_np[..., 1::2]
+    assert array_equal(view_as_complex(x, copy=True), xp.asarray(expected))
+
+
+def test_view_as_real_copy(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
+    z = xp.asarray(z_np)[:, ::2]
+
+    if "jax" in xp.__name__:
+        pytest.skip("jax supports views of non-contiguous arrays")
+
+    with pytest.raises(ValueError, match="without copying"):
+        view_as_real(z)
+
+    z_np = np.asarray(z)
+    expected = np.stack([z_np.real, z_np.imag], axis=-1).reshape(3, 4)
+    assert array_equal(view_as_real(z, copy=True), xp.asarray(expected))
+
+
+def test_view_dtype_validation(xp: Any) -> None:
+    rng = np.random.default_rng(seed=42)
+    z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
+
+    with pytest.raises(TypeError, match="real dtype"):
+        view_as_complex(xp.asarray(z_np))
+
+    with pytest.raises(TypeError, match="complex dtype"):
+        view_as_real(xp.asarray(np.ones((3, 8))))
 
 
 # }}}

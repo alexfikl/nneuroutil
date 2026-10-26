@@ -200,6 +200,151 @@ def deinterleave(
 # }}}
 
 
+# {{{ view_as_complex
+
+
+def view_as_complex(
+    x: ArrayND[np.floating[Any]],
+    *,
+    copy: bool = False,
+    xp: Any = None,
+) -> ArrayND[np.complexfloating[Any]]:
+    """Reinterpret interleaved real storage as a complex array.
+
+    The last dimension of *x* must have even size ``2 d`` and contain the real
+    and imaginary parts interleaved as ``(Re z[0], Im z[0], ...)``. The result
+    has shape ``(..., d)`` and shares memory with *x* when the last axis is
+    contiguous.
+
+    :arg copy: if *True*, allow a copy when a zero-copy view is not possible.
+        If *False*, raise a :class:`ValueError` instead.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if not xp.isdtype(x.dtype, "real floating"):
+        raise TypeError(f"'x' must have a real dtype: {x.dtype}")
+
+    if x.ndim == 0 or x.shape[-1] % 2 != 0:
+        raise ValueError(f"the last dimension of 'x' must be even: {x.shape}")
+
+    if array_api_compat.is_torch_array(x):
+        import torch
+
+        # NOTE: this is always a view, unlike x.reshape, which could copy
+        x = x.unflatten(-1, (-1, 2))
+
+        try:
+            return torch.view_as_complex(x)
+        except RuntimeError as exc:
+            if not copy:
+                raise ValueError(
+                    "'x' cannot be viewed as complex without copying (pass 'copy=True')"
+                ) from exc
+
+            return torch.view_as_complex(x.contiguous())
+    elif array_api_compat.is_numpy_array(x):
+        dtype = np.result_type(x.dtype, np.complex64)  # f4 -> c8, f8 -> c16
+
+        try:
+            return x.view(dtype)
+        except ValueError as exc:
+            if not copy:
+                raise ValueError(
+                    "'x' cannot be viewed as complex without copying (pass 'copy=True')"
+                ) from exc
+
+            return np.ascontiguousarray(x).view(dtype)
+    elif array_api_compat.is_jax_array(x):
+        import jax.numpy as jnp
+
+        out = x.view(jnp.result_type(x.dtype, jnp.complex64))
+        return jnp.array(out, copy=True) if copy else out
+    else:
+        if not copy:
+            raise TypeError(f"zero-copy complex views are not supported for {type(x)}")
+
+        d = x.shape[-1] // 2
+        z = xp.reshape(x, (*x.shape[:-1], d, 2))
+
+        return z[..., 0] + 1j * z[..., 1]
+
+
+# }}}
+
+
+# {{{ view_as_real
+
+
+def view_as_real(
+    z: ArrayND[np.complexfloating[Any]],
+    *,
+    copy: bool = False,
+    xp: Any = None,
+) -> ArrayND[np.floating[Any]]:
+    """Reinterpret a complex array as interleaved real storage.
+
+    The result has shape ``(..., 2 d)`` and contains the real and imaginary
+    parts interleaved as ``(Re z[0], Im z[0], ...)``. It shares memory with *z*
+    when the last axis is contiguous.
+
+    :arg copy: if *True*, allow a copy when a zero-copy view is not possible.
+        If *False*, raise a :class:`ValueError` instead.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(z)
+
+    if not xp.isdtype(z.dtype, "complex floating"):
+        raise TypeError(f"'z' must have a complex dtype: {z.dtype}")
+
+    if z.ndim == 0:
+        raise ValueError("'z' must have at least one dimension")
+
+    if array_api_compat.is_torch_array(z):
+        import torch
+
+        r = torch.view_as_real(z)
+        try:
+            return r.view(*z.shape[:-1], -1)
+        except RuntimeError as exc:
+            if not copy:
+                raise ValueError(
+                    "'z' cannot be viewed as real without copying (pass 'copy=True')"
+                ) from exc
+
+            return r.reshape(*z.shape[:-1], -1)
+    elif array_api_compat.is_numpy_array(z):
+        dtype = np.finfo(z.dtype).dtype
+
+        try:
+            return z.view(dtype)
+        except ValueError as exc:
+            if not copy:
+                raise ValueError(
+                    "'z' cannot be viewed as real without copying (pass 'copy=True')"
+                ) from exc
+
+            return np.ascontiguousarray(z).view(dtype)
+    elif array_api_compat.is_jax_array(z):
+        import jax.numpy as jnp
+
+        dtype = np.finfo(z.dtype).dtype
+        out = z.view(dtype)
+
+        return jnp.array(out, copy=True) if copy else out
+    else:
+        if not copy:
+            raise TypeError(f"zero-copy real views are not supported for {type(z)}")
+
+        d = z.shape[-1]
+        return xp.reshape(
+            xp.stack([xp.real(z), xp.imag(z)], axis=-1), (*z.shape[:-1], 2 * d)
+        )
+
+
+# }}}
+
+
 # {{{ sign
 
 
