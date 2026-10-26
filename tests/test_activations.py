@@ -75,6 +75,54 @@ def test_blended_quadratic(xp: Any) -> None:
 # }}}
 
 
+# {{{ test_complex_storage
+
+
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_complex_from_real(xp: Any, interleaved: bool) -> None:  # ruff: ignore[boolean-type-hint-positional-argument]
+    rng = np.random.default_rng(seed=42)
+    z = z_complex(xp, rng)
+    z_np = np.asarray(z)
+
+    x = activations.real_from_complex(z, interleaved=interleaved)
+
+    assert tuple(x.shape) == (*z.shape[:-1], 2 * z.shape[-1])
+    assert np.allclose(activations.complex_from_real(x, interleaved=interleaved), z)
+
+    if interleaved:
+        expected = np.stack([z_np.real, z_np.imag], axis=-1).reshape(
+            *z_np.shape[:-1], -1
+        )
+    else:
+        expected = np.concatenate([z_np.real, z_np.imag], axis=-1)
+
+    assert np.allclose(x, expected)
+
+
+@pytest.mark.parametrize("interleaved", [False, True])
+def test_apply_complex(xp: Any, interleaved: bool) -> None:  # ruff: ignore[boolean-type-hint-positional-argument]
+    rng = np.random.default_rng(seed=42)
+    z = z_complex(xp, rng)
+    z_np = np.asarray(z)
+
+    # complex input is passed through directly
+    res = activations.apply_complex(activations.complex_quadratic, z)
+    assert np.allclose(res, z_np * z_np)
+
+    # real input is converted, activated, and converted back
+    x = activations.real_from_complex(z, interleaved=interleaved)
+    res = activations.apply_complex(
+        activations.complex_quadratic, x, interleaved=interleaved
+    )
+    expected = activations.real_from_complex(
+        xp.asarray(z_np * z_np), interleaved=interleaved
+    )
+    assert np.allclose(res, expected)
+
+
+# }}}
+
+
 # {{{ test_complex_activations
 
 
