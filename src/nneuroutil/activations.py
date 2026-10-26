@@ -23,7 +23,7 @@ import array_api_compat
 import numpy as np
 
 from nneuroutil.array_api_extras import sign, view_as_complex, view_as_real
-from nneuroutil.typing import Array, ArrayND
+from nneuroutil.typing import Array, ArrayND, ScalarTypeT
 
 log = logging.getLogger(__name__)
 
@@ -125,27 +125,30 @@ def real_from_complex(
 
 
 def apply_complex(
-    fn: Callable[..., ArrayND[np.complexfloating[Any]]],
-    x: ArrayND[np.number[Any]],
+    fn: Callable[[ArrayND[ScalarTypeT]], ArrayND[ScalarTypeT]],
+    x: ArrayND[ScalarTypeT],
     *,
     interleaved: bool = False,
     xp: Any = None,
-) -> ArrayND[np.number[Any]]:
+) -> ArrayND[ScalarTypeT]:
     """Apply a complex-valued activation *fn* to *x*.
 
     If *x* is already a complex array, it is passed to *fn* directly and the
     complex result is returned. Otherwise, *x* is converted with
     :func:`complex_from_real`, *fn* is applied, and the result is converted back
     with :func:`real_from_complex`, preserving the original real storage layout.
+
+    *fn* is called with the complex array as its only positional argument. Bind
+    any additional parameters with :func:`functools.partial`.
     """
     if xp is None:
         xp = array_api_compat.array_namespace(x)
 
     if xp.isdtype(x.dtype, "complex floating"):
-        return fn(x, xp=xp)
+        return fn(x)
 
     z = complex_from_real(x, interleaved=interleaved, xp=xp)
-    return real_from_complex(fn(z, xp=xp), interleaved=interleaved, xp=xp)
+    return real_from_complex(fn(z), interleaved=interleaved, xp=xp)
 
 
 # }}}
