@@ -211,11 +211,11 @@ def sign(
 ) -> ArrayND[np.number[Any]]:
     r"""The sign of *x*, with a safe complex case.
 
-    For real-valued inputs this is exactly the ``xp.sign``. However, it differs
-    in how the complex case is evaluated. There, ``x / abs(x)`` is computed for
-    all entries and the zeros are masked out afterwards, so the division still
-    evaluates ``0 / 0``. As a result, e.g. PyTorch records ``0 / 0`` in the
-    autograd graph and returns a ``nan`` gradient at the origin.
+    For real-valued inputs this is exactly the ``xp.sign``. However, for
+    complex values ``xp.sign`` computes ``x / abs(x)`` for all entries then
+    masks out the zeros, so the division still evaluates ``0 / 0``. As a
+    result, e.g. PyTorch records ``0 / 0`` in the autograd graph and returns a
+    ``nan`` gradient at the origin.
 
     Here the denominator is replaced by one wherever ``abs(x) == 0`` before
     dividing and the zeros are selected afterwards. This avoids the issue
