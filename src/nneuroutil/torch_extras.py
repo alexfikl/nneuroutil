@@ -7,6 +7,7 @@ import logging
 import math
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from functools import partial
 from typing import Any, Literal, NamedTuple, TypeVar
 
 import torch
@@ -25,40 +26,25 @@ log = logging.getLogger(__name__)
 
 
 def view_as_complex(x: torch.Tensor) -> torch.Tensor:
-    """View a real tensor of shape ``(..., 2d)`` as an interleaved complex tensor.
-
-    This is mostly :func:`torch.view_as_complex` with a reshape.
-    """
     return torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
 
 
 def view_as_real(x: torch.Tensor) -> torch.Tensor:
-    """View a complex tensor of shape ``(..., d)`` as an interleaved real tensor.
-
-    This is mostly :func:`torch.view_as_real` with a reshape.
-    """
     return torch.view_as_real(x).reshape(*x.shape[:-1], -1)
 
 
 class Quadratic(nn.Module):
-    """A quadratic :math:`x^2` activation function.
-
-    Note that a quadratic activation is not "depth-stable", meaning in a deep
-    network it will eventually explode the variance of the inputs.
-    """
+    """A wrapper around :func:`~nneuroutil.activations.quadratic`."""
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
         """Define the computation performed at every call."""
-        return x * x
+        from nneuroutil.activations import quadratic
+
+        return quadratic(x)
 
 
 class ComplexQuadratic(nn.Module):
-    r"""A quadratic activation :math:`f(z) = z^2` for complex values stored in
-    real tensors (see :func:`cquadratic`).
-
-    Note that a quadratic activation is not "depth-stable", meaning in a deep
-    network it will eventually explode the variance of the inputs.
-    """
+    """A wrapper around :func:`~nneuroutil.activations.complex_quadratic`."""
 
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
@@ -72,38 +58,13 @@ class ComplexQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return cquadratic(x, interleaved=self.interleaved)
+        from nneuroutil.activations import apply_complex, complex_quadratic
 
-
-def cquadratic(x: torch.Tensor, *, interleaved: bool = False) -> torch.Tensor:
-    r"""Compute the complex square of a real vector *x*.
-
-    The storage of the array depends on *interleaved*. If *True*, we assume that
-    the array is stored as ``[z[0].real, z[0].imag, ..., z[d - 1].real,
-    z[d - 1].imag]``. Otherwise, we assume that it is stacked as
-    ``[z[0].real, ..., z[d - 1].real, z[0].imag, ..., z[d - 1].imag]``.
-
-    The result uses the same storage as the input.
-    """
-    if x.shape[-1] % 2 != 0:
-        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
-
-    if interleaved:
-        z = view_as_complex(x)
-        result = torch.view_as_real(z * z).reshape(*x.shape)
-    else:
-        x_re, x_im = torch.chunk(x, 2, dim=-1)
-        result = torch.concat([x_re * x_re - x_im * x_im, 2 * x_re * x_im], dim=-1)
-
-    return result
+        return apply_complex(complex_quadratic, x, interleaved=self.interleaved)
 
 
 class BlendedQuadratic(nn.Module):
-    r"""A convex combination of a linear and a quadratic activation.
-
-    .. math::
-
-        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
+    r"""A wrapper around :func:`~nneuroutil.activations.blended_quadratic`.
 
     When *learnable* is *True*, :math:`\alpha` is parameterized as
     :math:`\alpha = \sigma(\theta)` with learnable logits :math:`\theta`.
@@ -150,17 +111,13 @@ class BlendedQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        alpha = self.alpha
-        return alpha * x + (1.0 - alpha) * x * x
+        from nneuroutil.activations import blended_quadratic
+
+        return blended_quadratic(x, alpha=self.alpha)
 
 
 class ComplexBlendedQuadratic(nn.Module):
-    r"""A convex combination of a linear and a quadratic activation, where the
-    quadratic term uses :func:`cquadratic`.
-
-    .. math::
-
-        f(z; \alpha) = \alpha z + (1 - \alpha) z^2.
+    r"""A wrapper around :func:`~nneuroutil.activations.complex_blended_quadratic`.
 
     When *learnable* is *True*, :math:`\alpha` is parameterized as
     :math:`\alpha = \sigma(\theta)` with learnable logits :math:`\theta`.
@@ -216,83 +173,37 @@ class ComplexBlendedQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        return cblended_quadratic(x, interleaved=self.interleaved, alpha=self.alpha)
+        from nneuroutil.activations import apply_complex, complex_blended_quadratic
 
-
-def cblended_quadratic(
-    x: torch.Tensor,
-    *,
-    interleaved: bool = False,
-    alpha: float | torch.Tensor = 0.5,
-) -> torch.Tensor:
-    x2 = cquadratic(x, interleaved=interleaved)
-
-    # NOTE: we need to make sure alpha broadcasts correctly to the complex variable
-    if isinstance(alpha, torch.Tensor):
-        if alpha.ndim == 0 or alpha.shape[-1] == x.shape[-1]:
-            pass
-        elif 2 * alpha.shape[-1] == x.shape[-1]:
-            if interleaved:
-                alpha = torch.repeat_interleave(alpha, 2, dim=-1)
-            else:
-                alpha = torch.concat([alpha, alpha], dim=-1)
-        else:
-            raise ValueError(
-                f"'alpha' last dimension ({alpha.shape[-1]}) does not match input "
-                f"features ({x.shape[-1]}) or complex channels ({x.shape[-1] // 2})"
-            )
-
-    return alpha * x + (1.0 - alpha) * x2
+        return apply_complex(
+            partial(complex_blended_quadratic, alpha=self.alpha),
+            x,
+            interleaved=self.interleaved,
+        )
 
 
 class ComplexTanh(nn.Module):
-    r"""A split hyperbolic tangent for complex tensors.
+    r"""A wrapper around :func:`~nneuroutil.activations.complex_tanh`."""
 
-    .. math::
-
-        f(z) = \tanh(\Re z) + i \tanh(\Im z)
-
-    The hyperbolic tangent is applied to the real and imaginary components
-    separately, so this is different from the analytic :math:`\tanh(z)` for a
-    complex :math:`z`. Unlike the other activations in this module, the input
-    is expected to be a complex tensor; real inputs are promoted to complex
-    tensors with a zero imaginary part.
+    interleaved: bool
+    """If *True*, assume tensors store complex values interleaved as
+    ``[z[0].real, z[0].imag, z[1].real, ...]``. Otherwise, assume the real and
+    imaginary parts are stacked as ``[z[0].real, ..., z[d - 1].real, z[0].imag, ...]``.
     """
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
+    def __init__(self, *, interleaved: bool = False) -> None:
+        super().__init__()
+        self.interleaved = interleaved
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if x.is_complex():
-            return torch.complex(torch.tanh(x.real), torch.tanh(x.imag))
-        else:
-            return torch.complex(torch.tanh(x), torch.zeros_like(x))
+        from nneuroutil.activations import apply_complex, complex_tanh
+
+        return apply_complex(complex_tanh, x, interleaved=self.interleaved)
 
 
 class ModReLU(nn.Module):
-    r"""A modified ReLU activation function for complex networks from [Arjovsky2015]_.
-
-    .. math::
-
-        f(z; b) = \operatorname{ReLU}(|z| + b) \operatorname{sgn}(z),
-
-    where :math:`\operatorname{sgn}(z) = z / |z|` (taken to be zero at the
-    origin) preserves the phase of the input. For :math:`b < 0`, all inputs in
-    the disk :math:`|z| < -b` are zeroed out, analogously to the standard
-    :class:`~torch.nn.ReLU`. For :math:`b \ge 0`, the function reduces to
-    :math:`f(z) = z + b \operatorname{sgn}(z)`.
-
-    Note that for :math:`b < 0`, this activation function is not "depth-stable",
-    meaning that in a deep network it will eventually explode the variance. At
-    the unit second moment operating point (see :ref:`notes-initializers`),
-    deviations from it are amplified by a factor of :math:`\approx 1.6` per
-    layer for :math:`b = -0.5` and :math:`\approx 2.6` for :math:`b = -1`,
-    worsening as :math:`b` decreases, so the variance quickly compounds with
-    depth. This is not an issue for :math:`b \ge 0`.
-
-    .. [Arjovsky2015] M. Arjovsky, A. Shah, Y. Bengio,
-        *Unitary Evolution Recurrent Neural Networks*,
-        2015,
-        `URL <http://arxiv.org/abs/1511.06464v4>`__.
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.modrelu`."""
 
     bias: float
     """The bias :math:`b`. A non-learnable hyperparameter."""
@@ -309,46 +220,15 @@ class ModReLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(modrelu(view_as_complex(x), self.bias))
-        else:
-            result = modrelu(torch.complex(*torch.chunk(x, 2, dim=-1)), self.bias)
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, modrelu
 
-
-def modrelu(z: torch.Tensor, b: float | torch.Tensor) -> torch.Tensor:
-    """Functional version of :class:`ModReLU` for a complex tensor *z*."""
-    return torch.relu(torch.abs(z) + b) * torch.sgn(z)
+        return apply_complex(
+            partial(modrelu, b=self.bias), x, interleaved=self.interleaved
+        )
 
 
 class LeakyModReLU(nn.Module):
-    r"""A leaky variant of the :class:`ModReLU` activation function.
-
-    .. math::
-
-        f(z; b, \alpha) = \operatorname{sgn}(z) \times
-        \begin{cases}
-        |z| + b, & \quad |z| + b \ge 0, \\
-        \alpha |z|, & \quad \text{otherwise}.
-        \end{cases}
-
-    Note that this is not the same as applying a standard
-    :class:`~torch.nn.LeakyReLU` to the :math:`|z| + b` term of :class:`ModReLU`,
-    which would give the negative magnitude :math:`\alpha (|z| + b) < 0` and
-    thereby flip the phase by :math:`\pi`. Here the magnitude itself is scaled
-    by :math:`\alpha`, so the phase is always maintained. The trade-off is a
-    jump discontinuity of size :math:`\alpha |b|` at :math:`|z| = -b` when
-    :math:`b < 0`. For :math:`b \ge 0`, the leaky branch never triggers and the
-    function is identical to :class:`ModReLU`.
-
-    Note that for :math:`b < 0`, this activation function is not "depth-stable",
-    meaning that in a deep network it will eventually explode the variance. At
-    the unit second moment operating point (see :ref:`notes-initializers`),
-    deviations grow by roughly the same factor as for :class:`ModReLU`
-    (:math:`\approx 1.6` per layer for :math:`b = -0.5`), because the leak
-    only enters the signal statistics at :math:`O(\alpha^2)`. This is not an
-    issue for :math:`b \ge 0`.
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.leaky_modrelu`."""
 
     bias: float
     """The bias :math:`b`. A non-learnable hyperparameter."""
@@ -375,47 +255,17 @@ class LeakyModReLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(
-                leaky_modrelu(view_as_complex(x), self.bias, alpha=self.alpha)
-            )
-        else:
-            result = leaky_modrelu(
-                torch.complex(*torch.chunk(x, 2, dim=-1)), self.bias, alpha=self.alpha
-            )
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, leaky_modrelu
 
-
-def leaky_modrelu(
-    z: torch.Tensor,
-    b: float | torch.Tensor,
-    *,
-    alpha: float = 0.1,
-) -> torch.Tensor:
-    """Functional version of :class:`LeakyModReLU` for a complex tensor *z*."""
-    r = torch.abs(z)
-    rb = r + b
-    return torch.where(rb >= 0.0, rb, alpha * r) * torch.sgn(z)
+        return apply_complex(
+            partial(leaky_modrelu, b=self.bias, alpha=self.alpha),
+            x,
+            interleaved=self.interleaved,
+        )
 
 
 class ComplexCardioid(nn.Module):
-    r"""A complex cardioid activation function from [Virtue2017]_.
-
-    .. math::
-
-        f(z) = \frac{1}{2} (1 + \cos \theta(z)) z,
-
-    where :math:`\theta(z) = \operatorname{arg} z` is the phase of the input.
-    The magnitude is attenuated based on the phase, while the phase itself is
-    preserved: inputs on the positive real axis are kept as is and inputs on
-    the negative real axis are zeroed out. For real inputs, this reduces to
-    the standard :class:`~torch.nn.ReLU`.
-
-    .. [Virtue2017] P. Virtue, S. X. Yu, M. Lustig,
-        *Better Than Real: Complex-Valued Neural Nets for MRI Fingerprinting*,
-        2017,
-        `URL <https://arxiv.org/abs/1707.00070>`__.
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.complex_cardioid`."""
 
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
@@ -429,36 +279,13 @@ class ComplexCardioid(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(ccardioid(view_as_complex(x)))
-        else:
-            result = ccardioid(torch.complex(*torch.chunk(x, 2, dim=-1)))
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, complex_cardioid
 
-
-def ccardioid(z: torch.Tensor) -> torch.Tensor:
-    """Functional version of :class:`ComplexCardioid` for a complex tensor *z*."""
-    return 0.5 * (1 + torch.cos(torch.angle(z))) * z
+        return apply_complex(complex_cardioid, x, interleaved=self.interleaved)
 
 
 class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
-    r"""A complex ReLU function from [Guberman2016]_ that keeps the first quadrant.
-
-    .. math::
-
-        f(z) =
-        \begin{cases}
-        z, & \quad \Re(z) \geq 0, \Im(z) \geq 0, \\
-        0, & \quad \text{otherwise}.
-        \end{cases}
-
-    Inputs with a phase outside of :math:`[0, \pi / 2]` are zeroed out.
-
-    .. [Guberman2016] N. Guberman,
-        *On Complex Valued Convolutional Neural Networks*,
-        2016,
-        `URL <https://arxiv.org/abs/1602.09046>`__.
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.zrelu`."""
 
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
@@ -472,25 +299,13 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(zrelu(view_as_complex(x)))
-        else:
-            result = zrelu(torch.complex(*torch.chunk(x, 2, dim=-1)))
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, zrelu
 
-
-def zrelu(z: torch.Tensor) -> torch.Tensor:
-    """Functional version of :class:`zReLU` for a complex tensor *z*."""
-    return z * ((z.real >= 0.0) & (z.imag >= 0)).to(z.real.dtype)
+        return apply_complex(zrelu, x, interleaved=self.interleaved)
 
 
 class ComplexLog(nn.Module):
-    r"""A phase-preserving logarithmic activation for complex tensors.
-
-    .. math::
-
-        f(z) = \log(1 + |z|) \operatorname{sgn}(z),
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.complex_log`."""
 
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
@@ -504,25 +319,13 @@ class ComplexLog(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(clog(view_as_complex(x)))
-        else:
-            result = clog(torch.complex(*torch.chunk(x, 2, dim=-1)))
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, complex_log
 
-
-def clog(z: torch.Tensor) -> torch.Tensor:
-    """Functional version of :class:`ComplexLog` for a complex tensor *z*."""
-    return torch.log1p(torch.abs(z)) * torch.sgn(z)
+        return apply_complex(complex_log, x, interleaved=self.interleaved)
 
 
 class ComplexExp(nn.Module):
-    r"""A phase-preserving exponential activation for complex tensors.
-
-    .. math::
-
-        f(z) = (e^{|z|} - 1) \operatorname{sgn}(z),
-    """
+    r"""A wrapper around :func:`~nneuroutil.activations.complex_exp`."""
 
     interleaved: bool
     """If *True*, assume tensors store complex values interleaved as
@@ -536,16 +339,9 @@ class ComplexExp(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        if self.interleaved:
-            return view_as_real(cexp(view_as_complex(x)))
-        else:
-            result = cexp(torch.complex(*torch.chunk(x, 2, dim=-1)))
-            return torch.cat([result.real, result.imag], dim=-1)
+        from nneuroutil.activations import apply_complex, complex_exp
 
-
-def cexp(z: torch.Tensor) -> torch.Tensor:
-    """Functional version of :class:`ComplexExp` for a complex tensor *z*."""
-    return torch.expm1(torch.abs(z)) * torch.sgn(z)
+        return apply_complex(complex_exp, x, interleaved=self.interleaved)
 
 
 # }}}

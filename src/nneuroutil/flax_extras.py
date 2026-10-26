@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 from contextlib import contextmanager
+from functools import partial
 from typing import Any
 
 import jax
@@ -13,6 +14,7 @@ import jax.numpy as jnp
 from flax import nnx
 from jax.nn.initializers import Initializer
 
+from nneuroutil import activations
 from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import MemorySnapshot, MemoryTracker, calculate_gain, to_real
 
@@ -23,29 +25,24 @@ log = logging.getLogger(__name__)
 
 
 class Quadratic(nnx.Module):
-    """A quadratic :math:`x^2` activation function."""
+    """A wrapper around :func:`~nneuroutil.activations.quadratic`."""
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return quadratic(x)
+        return activations.quadratic(x)  # ty: ignore[invalid-return-type]
 
 
 class BlendedQuadratic(nnx.Module):
-    r"""A convex combination of a linear and a quadratic activation.
-
-    .. math::
-
-        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
-    """
+    """A wrapper around :func:`~nneuroutil.activations.blended_quadratic`."""
 
     def __init__(self, alpha: float = 0.5) -> None:
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return blended_quadratic(x, alpha=self.alpha)
+        return activations.blended_quadratic(x, alpha=self.alpha)  # ty: ignore[invalid-return-type]
 
 
 class ComplexQuadratic(nnx.Module):
-    """An activation function that uses :func:`complex_quadratic`."""
+    """A wrapper around :func:`~nneuroutil.activations.complex_quadratic`."""
 
     interleaved: bool
     """If *True*, assume that the tensors have interleaved real and complex parts."""
@@ -54,17 +51,13 @@ class ComplexQuadratic(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_quadratic(x, interleaved=self.interleaved)
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.complex_quadratic, x, interleaved=self.interleaved
+        )
 
 
 class ComplexBlendedQuadratic(nnx.Module):
-    r"""A convex combination of a linear and a quadratic activation, where the
-    quadratic term uses :func:`complex_quadratic`.
-
-    .. math::
-
-        f(x; \alpha) = \alpha x + (1 - \alpha) x^2.
-    """
+    """A wrapper around :func:`~nneuroutil.activations.complex_blended_quadratic`."""
 
     alpha: float
     interleaved: bool
@@ -75,64 +68,26 @@ class ComplexBlendedQuadratic(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_blended_quadratic(
-            x, alpha=self.alpha, interleaved=self.interleaved
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            partial(activations.complex_blended_quadratic, alpha=self.alpha),
+            x,
+            interleaved=self.interleaved,
         )
 
 
 class ComplexTanh(nnx.Module):
-    r"""A hyperbolic tangent for a complex vector of shape ``(d,)``.
+    """A wrapper around :func:`~nneuroutil.activations.complex_tanh`."""
 
-    This applies the hyperbolic tangent to the real and imaginary components
-    separately. Note that this is different than :math:`\tanh(z)` for a complex
-    :math:`z`.
-    """
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return complex_tanh(x)
-
-
-def quadratic(x: jax.Array) -> jax.Array:
-    """The quadratic activation :math:`x^2`."""
-    return x * x
-
-
-def blended_quadratic(x: jax.Array, *, alpha: float = 0.1) -> jax.Array:
-    r"""The blended quadratic activation :math:`\alpha x + (1 - \alpha) x^2`."""
-    return alpha * x + (1 - alpha) * x * x
-
-
-def complex_quadratic(x: jax.Array, *, interleaved: bool = False) -> jax.Array:
-    """Treat *x* as a ``(2 d,)`` shaped complex array and compute its square.
-
-    The storage of the array depends on *interleaved*. If *True*, we assume that
-    the array is stored as ``[x[0].real, x[0].imag, ..., x[n].real,
-    x[n].imag]``. Otherwise, we assume that it is stacked as ``[x[0].real, ...,
-    x[n].real, x[0].imag, ..., x[n].imag]``.
-    """
-    if x.shape[-1] % 2 != 0:
-        raise ValueError(f"dimension 'd' of 'x[..., d]' must be even: {x.shape}")
-
-    if interleaved:
-        x_re, x_im = deinterleave(x)
-        result_re = x_re * x_re - x_im * x_im
-        result_im = 2.0 * x_re * x_im
-        return interleave(result_re, result_im)  # ty: ignore[invalid-return-type]
-    else:
-        x_re, x_im = jnp.split(x, 2, axis=-1)
-        return jnp.concatenate([x_re * x_re - x_im * x_im, 2.0 * x_re * x_im], axis=-1)
-
-
-def complex_blended_quadratic(
-    x: jax.Array, *, alpha: float = 0.1, interleaved: bool = False
-) -> jax.Array:
-    r"""Blended quadratic for complex-valued inputs."""
-    return alpha * x + (1 - alpha) * complex_quadratic(x, interleaved=interleaved)
-
-
-def complex_tanh(x: jax.Array) -> jax.Array:
-    """Hyperbolic tangent applied separately to real and imaginary parts."""
-    return jnp.tanh(x.real) + 1j * jnp.tanh(x.imag)
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.complex_tanh, x, interleaved=self.interleaved
+        )
 
 
 # }}}
@@ -321,7 +276,8 @@ def blended_quadratic_uniform(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
-    """A uniform init that preserves variance through :func:`blended_quadratic`."""
+    """A uniform init that preserves variance through
+    :func:`nneuroutil.activations.blended_quadratic`."""
 
     return nnx.initializers.variance_scaling(
         scale=calculate_gain("blended_quadratic", alpha=alpha),
@@ -341,7 +297,8 @@ def blended_quadratic_normal(
     batch_axis: int | tuple[int, ...] = (),
     dtype: Any = None,
 ) -> Initializer:
-    """A normal init that preserves variance through :func:`blended_quadratic`."""
+    """A normal init that preserves variance through
+    :func:`nneuroutil.activations.blended_quadratic`."""
     return nnx.initializers.variance_scaling(
         scale=calculate_gain("blended_quadratic", alpha=alpha),
         mode="fan_in",

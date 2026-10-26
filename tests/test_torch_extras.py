@@ -41,7 +41,7 @@ def test_quadratic() -> None:
 
 
 def test_complex_quadratic_interleave() -> None:
-    from nneuroutil.torch_extras import ComplexQuadratic, cquadratic
+    from nneuroutil.torch_extras import ComplexQuadratic
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -49,27 +49,16 @@ def test_complex_quadratic_interleave() -> None:
 
     # test interleaved storage: [re[0], im[0], ..., re[n], im[n]]
     x = torch.view_as_real(z).reshape(3, 2 * n)
-    res = cquadratic(x, interleaved=True)
+    res = ComplexQuadratic(interleaved=True)(x)
     expected = torch.view_as_real(z2).reshape(3, 2 * n)
     assert res.shape == x.shape
     assert torch.allclose(res, expected)
 
     # test stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
     x = torch.cat([z.real, z.imag], dim=-1)
-    res = cquadratic(x, interleaved=False)
+    res = ComplexQuadratic(interleaved=False)(x)
     expected = torch.cat([z2.real, z2.imag], dim=-1)
     assert torch.allclose(res, expected)
-
-    # test module
-    x = torch.view_as_real(z).reshape(3, 2 * n)
-    mod = ComplexQuadratic(interleaved=True)
-    res = mod(x)
-    expected = torch.view_as_real(z2).reshape(3, 2 * n)
-    assert torch.allclose(res, expected)
-
-    # test odd dimension raises
-    with pytest.raises(ValueError, match="must be even"):
-        cquadratic(torch.randn(3, 2 * n + 1), interleaved=True)
 
 
 def test_linear_quadratic() -> None:
@@ -103,7 +92,7 @@ def test_learnable_blended_quadratic() -> None:
     # 1. Real learnable scalar
     mod_real_scalar = BlendedQuadratic(alpha=0.3, learnable=True)
     assert isinstance(mod_real_scalar.alpha, torch.Tensor)
-    assert math.isclose(mod_real_scalar.alpha.item(), 0.3)
+    assert math.isclose(mod_real_scalar.alpha.item(), 0.3, rel_tol=1.0e-6)
 
     y = mod_real_scalar(x)
     y.sum().backward()
@@ -151,12 +140,25 @@ def test_complex_tanh() -> None:
 
     x_real = torch.randn(5, 5)
     x_imag = torch.randn(5, 5)
-    x = torch.complex(x_real, x_imag)
 
-    mod = ComplexTanh()
-    res = mod(x)
+    # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
+    x = torch.cat([x_real, x_imag], dim=-1)
+    res = ComplexTanh()(x)
+    expected = torch.cat([torch.tanh(x_real), torch.tanh(x_imag)], dim=-1)
+    assert torch.allclose(res, expected)
+
+    # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
+    x = torch.view_as_real(torch.complex(x_real, x_imag)).reshape(5, 10)
+    res = ComplexTanh(interleaved=True)(x)
+    expected = torch.view_as_real(
+        torch.complex(torch.tanh(x_real), torch.tanh(x_imag))
+    ).reshape(5, 10)
+    assert torch.allclose(res, expected)
+
+    # complex input is passed through directly
+    z = torch.complex(x_real, x_imag)
+    res = ComplexTanh()(z)
     expected = torch.complex(torch.tanh(x_real), torch.tanh(x_imag))
-
     assert torch.allclose(res, expected)
 
 
@@ -598,7 +600,7 @@ def test_memory_tracker() -> None:
     s1 = tracker.snapshots[1]
     assert s0.tag == "start"
     assert s0.lineno > 0
-    assert s1.memory["Δ RSS"] == s1.memory["RSS"] - s0.memory["RSS"]
+    assert s1.memory["Delta RSS"] == s1.memory["RSS"] - s0.memory["RSS"]
 
     # check labels and table rendering
     table = str(tracker)

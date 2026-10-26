@@ -682,6 +682,7 @@ def compute_anova_scores(
     dtype = features[0].dtype
     if eps is None:
         eps = 10.0 * xp.finfo(dtype).eps
+    eps = xp.asarray(eps)
 
     nclasses = len(features)
     sizes = [f.shape[0] for f in features]
@@ -699,12 +700,12 @@ def compute_anova_scores(
         axis=0,
     )
 
-    ss_within = xp.maximum(ss_total - ss_between, 0.0)
+    ss_within = xp.maximum(ss_total - ss_between, xp.asarray(0.0))
 
     df_between = max(nclasses - 1, 1)
     df_within = max(nsamples - nclasses, 1)
 
-    eta2 = xp.minimum(ss_between / xp.maximum(ss_total, eps), 1.0)
+    eta2 = xp.minimum(ss_between / xp.maximum(ss_total, eps), xp.asarray(1.0))
     f_stat = (ss_between / df_between) / xp.maximum(ss_within / df_within, eps)
 
     return AnovaScores(eta2=eta2, f_stat=f_stat)

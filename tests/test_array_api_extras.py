@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from typing import Any
+from typing import Any, cast
 
 import array_api_compat
 import numpy as np
@@ -102,6 +102,9 @@ def test_view_as_complex_no_copy(xp: Any) -> None:
     if array_api_compat.is_numpy_array(z):
         assert np.shares_memory(z, r)
     elif array_api_compat.is_torch_array(z):
+        import torch
+
+        assert isinstance(r, torch.Tensor)
         assert r.data_ptr() == z.data_ptr()
 
 
@@ -113,13 +116,14 @@ def test_view_as_complex_odd_size(xp: Any) -> None:
 
 
 def test_view_as_complex_copy(xp: Any) -> None:
+    if array_api_compat.is_jax_namespace(xp):
+        pytest.skip("jax supports views of non-contiguous arrays")
+
     rng = np.random.default_rng(seed=42)
+
     z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
     x_np = np.stack([z_np.real, z_np.imag], axis=-1).reshape(3, 8)
     x = xp.asarray(x_np)[:, ::2]
-
-    if "jax" in xp.__name__:
-        pytest.skip("jax supports views of non-contiguous arrays")
 
     with pytest.raises(ValueError, match="without copying"):
         view_as_complex(x)
@@ -130,12 +134,12 @@ def test_view_as_complex_copy(xp: Any) -> None:
 
 
 def test_view_as_real_copy(xp: Any) -> None:
+    if array_api_compat.is_jax_namespace(xp):
+        pytest.skip("jax supports views of non-contiguous arrays")
+
     rng = np.random.default_rng(seed=42)
     z_np = rng.standard_normal((3, 4)) + 1j * rng.standard_normal((3, 4))
     z = xp.asarray(z_np)[:, ::2]
-
-    if "jax" in xp.__name__:
-        pytest.skip("jax supports views of non-contiguous arrays")
 
     with pytest.raises(ValueError, match="without copying"):
         view_as_real(z)
@@ -186,7 +190,7 @@ def test_fill_diagonal_3d(xp: Any) -> None:
 
 
 def test_fill_diagonal_inplace(xp: Any) -> None:
-    if "jax" in xp.__name__:
+    if array_api_compat.is_jax_namespace(xp):
         pytest.skip("jax arrays are immutable")
 
     rng = np.random.default_rng(seed=42)
@@ -200,7 +204,7 @@ def test_fill_diagonal_inplace(xp: Any) -> None:
 
 
 def test_fill_diagonal_not_writable(xp: Any) -> None:
-    if "jax" in xp.__name__ or "torch" in xp.__name__:
+    if not array_api_compat.is_numpy_namespace(xp):
         pytest.skip("only numpy supports read-only arrays")
 
     a = xp.asarray(np.eye(3))
@@ -241,22 +245,25 @@ def test_sign(xp: Any) -> None:
 
 
 def test_sign_gradient_at_origin(xp: Any) -> None:
-    if "numpy" in xp.__name__:
+    if array_api_compat.is_numpy_namespace(xp):
         pytest.skip("numpy does not provide autodiff")
 
     z = xp.asarray(np.array([0.0 + 0.0j], dtype=np.complex64))
+    if array_api_compat.is_torch_array(z):
+        import torch
 
-    if "torch" in xp.__name__:
         z.requires_grad_(requires_grad=True)
-        sign(z).real.sum().backward()
+        s = cast(torch.Tensor, sign(z))
+
+        s.real.sum().backward()
         grad = z.grad
-    else:
+    elif array_api_compat.is_jax_array(z):
         import jax
 
         grad = jax.grad(lambda x: xp.real(xp.sum(sign(x))))(z)
+    else:
+        raise TypeError(f"unsupported array backend: {xp.__name__}")
 
-    # the gradient at the origin is zero by convention, as in jax.numpy.sign,
-    # torch.sgn, and tf.sign (the function is not differentiable there)
     assert grad is not None
     assert array_equal(grad, xp.zeros_like(grad))
 

@@ -24,51 +24,59 @@ log = logging.getLogger(__name__)
 
 
 def test_quadratic() -> None:
-    from nneuroutil.flax_extras import Quadratic, quadratic
+    from nneuroutil.flax_extras import Quadratic
 
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
     mod = Quadratic()
-    res_mod = mod(x)
-    res_func = quadratic(x)
+    res = mod(x)
 
-    assert jnp.allclose(res_mod, x * x)
-    assert jnp.allclose(res_func, x * x)
+    assert jnp.allclose(res, x * x)
 
 
 def test_blended_quadratic() -> None:
-    from nneuroutil.flax_extras import BlendedQuadratic, blended_quadratic
+    from nneuroutil.flax_extras import BlendedQuadratic
 
     alpha = 0.2
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
 
     mod = BlendedQuadratic(alpha=alpha)
-    res_mod = mod(x)
-    res_func = blended_quadratic(x, alpha=alpha)
+    res = mod(x)
     expected = alpha * x + (1.0 - alpha) * x * x
 
-    assert jnp.allclose(res_mod, expected)
-    assert jnp.allclose(res_func, expected)
+    assert jnp.allclose(res, expected)
 
 
 def test_complex_tanh() -> None:
-    from nneuroutil.flax_extras import ComplexTanh, complex_tanh
+    from nneuroutil.flax_extras import ComplexTanh
 
     key1, key2 = jax.random.split(jax.random.PRNGKey(0))
     x_real = jax.random.normal(key1, (5, 5))
     x_imag = jax.random.normal(key2, (5, 5))
-    x = x_real + 1j * x_imag
 
-    mod = ComplexTanh()
-    res_mod = mod(x)
-    res_func = complex_tanh(x)
+    # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
+    x = jnp.concatenate([x_real, x_imag], axis=-1)
+    res = ComplexTanh()(x)
+    expected = jnp.concatenate([jnp.tanh(x_real), jnp.tanh(x_imag)], axis=-1)
+
+    assert jnp.allclose(res, expected)
+
+    # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
+    x = jnp.stack([x_real, x_imag], axis=-1).reshape(5, 10)
+    res = ComplexTanh(interleaved=True)(x)
+    expected = jnp.stack([jnp.tanh(x_real), jnp.tanh(x_imag)], axis=-1).reshape(5, 10)
+
+    assert jnp.allclose(res, expected)
+
+    # complex input is passed through directly
+    z = x_real + 1j * x_imag
+    res = ComplexTanh()(z)
     expected = jnp.tanh(x_real) + 1j * jnp.tanh(x_imag)
 
-    assert jnp.allclose(res_mod, expected)
-    assert jnp.allclose(res_func, expected)
+    assert jnp.allclose(res, expected)
 
 
 def test_complex_quadratic_interleave() -> None:
-    from nneuroutil.flax_extras import ComplexQuadratic, complex_quadratic
+    from nneuroutil.flax_extras import ComplexQuadratic
 
     n = 5
     key_re, key_im = jax.random.split(jax.random.PRNGKey(0))
@@ -80,7 +88,8 @@ def test_complex_quadratic_interleave() -> None:
     # interleaved storage: [re[0], im[0], ..., re[n], im[n]]
     x = jnp.empty((3, 2 * n))
     x = x.at[:, ::2].set(z_re).at[:, 1::2].set(z_im)
-    res = complex_quadratic(x, interleaved=True)
+    mod = ComplexQuadratic(interleaved=True)
+    res = mod(x)
     expected = jnp.empty((3, 2 * n))
     expected = expected.at[:, ::2].set(z2_re).at[:, 1::2].set(z2_im)
     assert res.shape == x.shape
@@ -88,22 +97,9 @@ def test_complex_quadratic_interleave() -> None:
 
     # stacked storage: [re[0], ..., re[n], im[0], ..., im[n]]
     x = jnp.concatenate([z_re, z_im], axis=-1)
-    res = complex_quadratic(x, interleaved=False)
+    res = ComplexQuadratic(interleaved=False)(x)
     expected = jnp.concatenate([z2_re, z2_im], axis=-1)
     assert jnp.allclose(res, expected)
-
-    # test module
-    x = jnp.empty((3, 2 * n))
-    x = x.at[:, ::2].set(z_re).at[:, 1::2].set(z_im)
-    mod = ComplexQuadratic(interleaved=True)
-    res = mod(x)
-    expected = jnp.empty((3, 2 * n))
-    expected = expected.at[:, ::2].set(z2_re).at[:, 1::2].set(z2_im)
-    assert jnp.allclose(res, expected)
-
-    # test odd dimension raises
-    with pytest.raises(ValueError, match="must be even"):
-        complex_quadratic(jnp.empty((3, 2 * n + 1)), interleaved=True)
 
 
 # }}}
