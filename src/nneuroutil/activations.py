@@ -16,12 +16,13 @@ layout or by assembling the real and imaginary parts into a complex array.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import array_api_compat
 import numpy as np
 
-from nneuroutil.array_api_extras import sign
+from nneuroutil.array_api_extras import sign, view_as_complex, view_as_real
 from nneuroutil.typing import Array, ArrayND
 
 log = logging.getLogger(__name__)
@@ -60,6 +61,91 @@ def blended_quadratic(
         :math:`\alpha \to 1`.
     """
     return alpha * x + (1.0 - alpha) * x * x
+
+
+# }}}
+
+
+# {{{ complex storage
+
+
+def complex_from_real(
+    x: ArrayND[np.floating[Any]],
+    *,
+    interleaved: bool = False,
+    xp: Any = None,
+) -> ArrayND[np.complexfloating[Any]]:
+    """Convert real-valued complex storage into a complex array.
+
+    The last dimension of *x* must have even size ``2 d``.
+
+    * If *interleaved*, the real and imaginary parts are stored as ``(Re z[0],
+      Im z[0], ...)`` and the conversion is a zero-copy view.
+    * Otherwise, they are stored as ``(Re z[0], ..., Re z[d - 1], Im z[0], ...,
+      Im z[d - 1])`` and the conversion allocates a new complex array.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if not xp.isdtype(x.dtype, "real floating"):
+        raise TypeError(f"'x' must have a real dtype: {x.dtype}")
+
+    if x.ndim == 0 or x.shape[-1] % 2 != 0:
+        raise ValueError(f"the last dimension of 'x' must be even: {x.shape}")
+
+    if interleaved:
+        return view_as_complex(x, copy=False, xp=xp)
+    else:
+        d = x.shape[-1] // 2
+        return x[..., :d] + 1j * x[..., d:]
+
+
+def real_from_complex(
+    z: ArrayND[np.complexfloating[Any]],
+    *,
+    interleaved: bool = False,
+    xp: Any = None,
+) -> ArrayND[np.floating[Any]]:
+    """Convert a complex array into real-valued complex storage.
+
+    This is the inverse of :func:`complex_from_real`. If *interleaved* is
+    *True*, the conversion is a zero-copy view. Otherwise, it allocates a new
+    real array.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(z)
+
+    if not xp.isdtype(z.dtype, "complex floating"):
+        raise TypeError(f"'z' must have a complex dtype: {z.dtype}")
+
+    if interleaved:
+        return view_as_real(z, copy=False, xp=xp)
+    else:
+        return xp.concat([xp.real(z), xp.imag(z)], axis=-1)
+
+
+def apply_complex(
+    fn: Callable[..., ArrayND[np.complexfloating[Any]]],
+    x: ArrayND[np.number[Any]],
+    *,
+    interleaved: bool = False,
+    xp: Any = None,
+) -> ArrayND[np.number[Any]]:
+    """Apply a complex-valued activation *fn* to *x*.
+
+    If *x* is already a complex array, it is passed to *fn* directly and the
+    complex result is returned. Otherwise, *x* is converted with
+    :func:`complex_from_real`, *fn* is applied, and the result is converted back
+    with :func:`real_from_complex`, preserving the original real storage layout.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if xp.isdtype(x.dtype, "complex floating"):
+        return fn(x, xp=xp)
+
+    z = complex_from_real(x, interleaved=interleaved, xp=xp)
+    return real_from_complex(fn(z, xp=xp), interleaved=interleaved, xp=xp)
 
 
 # }}}
