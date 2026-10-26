@@ -90,6 +90,115 @@ class ComplexTanh(nnx.Module):
         )
 
 
+class ModReLU(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.modrelu`."""
+
+    bias: float
+    """The bias :math:`b`."""
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, bias: float = 0.0, *, interleaved: bool = False) -> None:
+        self.bias = bias
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            partial(activations.modrelu, b=self.bias),
+            x,
+            interleaved=self.interleaved,
+        )
+
+
+class LeakyModReLU(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.leaky_modrelu`."""
+
+    bias: float
+    """The bias :math:`b`."""
+    alpha: float
+    r"""The leak slope :math:`\alpha`."""
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(
+        self,
+        bias: float = 0.0,
+        *,
+        alpha: float = 0.1,
+        interleaved: bool = False,
+    ) -> None:
+        self.bias = bias
+        self.alpha = alpha
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            partial(activations.leaky_modrelu, b=self.bias, alpha=self.alpha),
+            x,
+            interleaved=self.interleaved,
+        )
+
+
+class ComplexCardioid(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.complex_cardioid`."""
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.complex_cardioid, x, interleaved=self.interleaved
+        )
+
+
+class zReLU(nnx.Module):  # ruff:ignore[invalid-class-name]
+    """A wrapper around :func:`~nneuroutil.activations.zrelu`."""
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.zrelu, x, interleaved=self.interleaved
+        )
+
+
+class ComplexLog(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.complex_log`."""
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.complex_log, x, interleaved=self.interleaved
+        )
+
+
+class ComplexExp(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.complex_exp`."""
+
+    interleaved: bool
+    """If *True*, assume that the tensors have interleaved real and complex parts."""
+
+    def __init__(self, *, interleaved: bool = False) -> None:
+        self.interleaved = interleaved
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+            activations.complex_exp, x, interleaved=self.interleaved
+        )
+
+
 # }}}
 
 
