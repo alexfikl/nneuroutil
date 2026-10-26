@@ -16,6 +16,7 @@ from nneuroutil.array_api_extras import (
     fill_diagonal,
     histogram,
     interleave,
+    sign,
 )
 
 TEST_FILENAME = pathlib.Path(__file__)
@@ -122,6 +123,49 @@ def test_fill_diagonal_validation(xp: Any) -> None:
 
     with pytest.raises(NotImplementedError, match="not implemented"):
         fill_diagonal(xp.asarray(np.eye(2)), 1.0, wrap=True, inplace=False)
+
+
+# }}}
+
+
+# {{{ test_sign
+
+
+def test_sign(xp: Any) -> None:
+    z_np = np.array([0.0 + 0.0j, 1.0 + 2.0j, -3.0 + 0.0j, 0.0 - 0.25j])
+    z = xp.asarray(z_np)
+
+    res = sign(z)
+
+    # sgn(0) = 0 and sgn(z) = z / |z| otherwise
+    r = np.abs(z_np)
+    expected = np.divide(z_np, r, out=np.zeros_like(z_np), where=r > 0)
+    np.testing.assert_allclose(np.asarray(res), expected, rtol=1e-6, atol=1e-7)
+
+    # real-valued inputs are delegated to the backend
+    x_np = np.array([-2.0, 0.0, 3.0])
+    np.testing.assert_allclose(np.asarray(sign(xp.asarray(x_np))), np.sign(x_np))
+
+
+def test_sign_gradient_at_origin(xp: Any) -> None:
+    if "numpy" in xp.__name__:
+        pytest.skip("numpy does not provide autodiff")
+
+    z = xp.asarray(np.array([0.0 + 0.0j], dtype=np.complex64))
+
+    if "torch" in xp.__name__:
+        z.requires_grad_(requires_grad=True)
+        sign(z).real.sum().backward()
+        grad = z.grad
+    else:
+        import jax
+
+        grad = jax.grad(lambda x: xp.real(xp.sum(sign(x))))(z)
+
+    # the gradient at the origin is zero by convention, as in jax.numpy.sign,
+    # torch.sgn, and tf.sign (the function is not differentiable there)
+    assert grad is not None
+    assert array_equal(grad, xp.zeros_like(grad))
 
 
 # }}}

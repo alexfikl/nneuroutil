@@ -200,6 +200,42 @@ def deinterleave(
 # }}}
 
 
+# {{{ sign
+
+
+def sign(
+    x: ArrayND[np.number[Any]],
+    /,
+    *,
+    xp: Any = None,
+) -> ArrayND[np.number[Any]]:
+    r"""The sign of *x*, with a safe complex case.
+
+    For real-valued inputs this is exactly the ``xp.sign``. However, it differs
+    in how the complex case is evaluated. There, ``x / abs(x)`` is computed for
+    all entries and the zeros are masked out afterwards, so the division still
+    evaluates ``0 / 0``. As a result, e.g. PyTorch records ``0 / 0`` in the
+    autograd graph and returns a ``nan`` gradient at the origin.
+
+    Here the denominator is replaced by one wherever ``abs(x) == 0`` before
+    dividing and the zeros are selected afterwards. This avoids the issue
+    and gives a zero gradient at the origin.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    if not xp.isdtype(x.dtype, "complex floating"):
+        return xp.sign(x)
+
+    r = xp.abs(x)
+    is_zero = r == 0
+    r_safe = xp.where(is_zero, xp.ones_like(r), r)
+    return xp.where(is_zero, xp.zeros_like(x), x / r_safe)
+
+
+# }}}
+
+
 # {{{ histogram
 
 
