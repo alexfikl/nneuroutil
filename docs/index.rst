@@ -6,6 +6,7 @@ nneuroutil: utilities for neuroscience
     :hidden:
     :caption: API Reference
 
+    api/activations
     api/classifier
     api/dmd
     api/flax_extras
