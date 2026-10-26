@@ -44,7 +44,7 @@ def xp(request: SubRequest) -> Any:
     elif request.param == "jax":
         jnp = pytest.importorskip("jax.numpy")
 
-        from nneuroutil.flax_extras import set_jax_config
+        from nneuroutil.interop.flax import set_jax_config
 
         set_jax_config()
         dummy = jnp.empty(0)

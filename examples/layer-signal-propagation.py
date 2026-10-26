@@ -21,7 +21,7 @@ except ImportError:
     log.error("This example requires 'torch'.")
     raise SystemExit(0) from None
 
-import nneuroutil.torch_extras as nnx
+import nneuroutil.interop.torch as nnx
 
 # {{{ activation
 

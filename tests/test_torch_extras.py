@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 
 def test_quadratic() -> None:
-    from nneuroutil.torch_extras import ComplexQuadratic, Quadratic
+    from nneuroutil.interop.torch import ComplexQuadratic, Quadratic
 
     # test real only
     x = torch.randn(5, 5)
@@ -41,7 +41,7 @@ def test_quadratic() -> None:
 
 
 def test_complex_quadratic_interleave() -> None:
-    from nneuroutil.torch_extras import ComplexQuadratic
+    from nneuroutil.interop.torch import ComplexQuadratic
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -62,7 +62,7 @@ def test_complex_quadratic_interleave() -> None:
 
 
 def test_linear_quadratic() -> None:
-    from nneuroutil.torch_extras import BlendedQuadratic, ComplexBlendedQuadratic
+    from nneuroutil.interop.torch import BlendedQuadratic, ComplexBlendedQuadratic
 
     n = 5
     alpha = 0.2
@@ -84,7 +84,7 @@ def test_linear_quadratic() -> None:
 
 
 def test_learnable_blended_quadratic() -> None:
-    from nneuroutil.torch_extras import BlendedQuadratic, ComplexBlendedQuadratic
+    from nneuroutil.interop.torch import BlendedQuadratic, ComplexBlendedQuadratic
 
     n = 6
     x = torch.randn(4, n)
@@ -136,7 +136,7 @@ def test_learnable_blended_quadratic() -> None:
 
 
 def test_complex_tanh() -> None:
-    from nneuroutil.torch_extras import ComplexTanh
+    from nneuroutil.interop.torch import ComplexTanh
 
     x_real = torch.randn(5, 5)
     x_imag = torch.randn(5, 5)
@@ -164,7 +164,7 @@ def test_complex_tanh() -> None:
 
 @pytest.mark.parametrize("bias", [0.0, 0.5, 2.0])
 def test_modrelu(bias: float) -> None:
-    from nneuroutil.torch_extras import ModReLU
+    from nneuroutil.interop.torch import ModReLU
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -186,7 +186,7 @@ def test_modrelu(bias: float) -> None:
 
 
 def test_modrelu_known_values() -> None:
-    from nneuroutil.torch_extras import ModReLU
+    from nneuroutil.interop.torch import ModReLU
 
     # z = 1 + 1j has |z| = sqrt(2); with bias = -sqrt(2) the magnitude vanishes
     z = torch.tensor([1.0 + 1.0j])
@@ -208,7 +208,7 @@ def test_modrelu_known_values() -> None:
 @pytest.mark.parametrize("bias", [-2.0, 0.0, 1.0])
 @pytest.mark.parametrize("alpha", [0.1, 0.5])
 def test_leaky_modrelu(bias: float, alpha: float) -> None:
-    from nneuroutil.torch_extras import LeakyModReLU
+    from nneuroutil.interop.torch import LeakyModReLU
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -231,7 +231,7 @@ def test_leaky_modrelu(bias: float, alpha: float) -> None:
 
 
 def test_leaky_modrelu_known_values() -> None:
-    from nneuroutil.torch_extras import LeakyModReLU
+    from nneuroutil.interop.torch import LeakyModReLU
 
     # with bias = 0: |z| >= 0 always, so we are always in the positive branch and
     # LeakyModReLU(z) = |z| * sgn(z) = z, independent of alpha
@@ -256,7 +256,7 @@ def test_leaky_modrelu_known_values() -> None:
 
 def test_leaky_modrelu_matches_modrelu() -> None:
     # with alpha = 0, LeakyModReLU coincides with ModReLU
-    from nneuroutil.torch_extras import LeakyModReLU, ModReLU
+    from nneuroutil.interop.torch import LeakyModReLU, ModReLU
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -269,7 +269,7 @@ def test_leaky_modrelu_matches_modrelu() -> None:
 
 
 def test_complex_cardioid() -> None:
-    from nneuroutil.torch_extras import ComplexCardioid
+    from nneuroutil.interop.torch import ComplexCardioid
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -291,7 +291,7 @@ def test_complex_cardioid() -> None:
 
 
 def test_complex_cardioid_known_values() -> None:
-    from nneuroutil.torch_extras import ComplexCardioid
+    from nneuroutil.interop.torch import ComplexCardioid
 
     # for real positive z (angle 0): factor = 0.5 * (1 + 1) = 1, so f(z) = z
     z = torch.tensor([2.0 + 0.0j])
@@ -307,7 +307,7 @@ def test_complex_cardioid_known_values() -> None:
 
 
 def test_zrelu() -> None:
-    from nneuroutil.torch_extras import zReLU
+    from nneuroutil.interop.torch import zReLU
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -330,7 +330,7 @@ def test_zrelu() -> None:
 
 
 def test_zrelu_known_values() -> None:
-    from nneuroutil.torch_extras import zReLU
+    from nneuroutil.interop.torch import zReLU
 
     # interleaved input z = [1+1j, -1+1j, 1-1j, -1-1j]; only the first quadrant
     # entry (1 + 1j) passes through, the rest are zeroed.
@@ -346,7 +346,7 @@ def test_zrelu_known_values() -> None:
 
 
 def test_complex_log() -> None:
-    from nneuroutil.torch_extras import ComplexLog
+    from nneuroutil.interop.torch import ComplexLog
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -368,7 +368,7 @@ def test_complex_log() -> None:
 
 
 def test_complex_log_known_values() -> None:
-    from nneuroutil.torch_extras import ComplexLog
+    from nneuroutil.interop.torch import ComplexLog
 
     # on the positive real axis the phase is preserved and the magnitude is
     # compressed to log(1 + |z|)
@@ -383,7 +383,7 @@ def test_complex_log_known_values() -> None:
 
 
 def test_complex_exp() -> None:
-    from nneuroutil.torch_extras import ComplexExp
+    from nneuroutil.interop.torch import ComplexExp
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -405,7 +405,7 @@ def test_complex_exp() -> None:
 
 
 def test_complex_exp_log_are_inverses() -> None:
-    from nneuroutil.torch_extras import ComplexExp, ComplexLog
+    from nneuroutil.interop.torch import ComplexExp, ComplexLog
 
     n = 5
     z = torch.complex(torch.randn(3, n), torch.randn(3, n))
@@ -425,7 +425,7 @@ def test_complex_exp_log_are_inverses() -> None:
 
 
 def test_bias() -> None:
-    from nneuroutil.torch_extras import Bias
+    from nneuroutil.interop.torch import Bias
 
     size = 10
     mod = Bias(size)
@@ -436,7 +436,7 @@ def test_bias() -> None:
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
-    from nneuroutil.torch_extras import ComplexLinear
+    from nneuroutil.interop.torch import ComplexLinear
 
     in_features = 4
     out_features = 6
@@ -472,7 +472,7 @@ def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-po
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
-    from nneuroutil.torch_extras import ComplexLinear
+    from nneuroutil.interop.torch import ComplexLinear
 
     in_features = 4
     out_features = 6
@@ -521,7 +521,7 @@ def test_kaiming_init(
     param: float | None,
     mode: Literal["fan_in", "fan_out"],
 ) -> None:
-    from nneuroutil.torch_extras import kaiming_normal_, kaiming_uniform_
+    from nneuroutil.interop.torch import kaiming_normal_, kaiming_uniform_
 
     shape = (10, 10)
     x = torch.empty(shape)
@@ -553,7 +553,7 @@ def test_kaiming_init(
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="GPU backend not available")
 def test_device_check_mode() -> None:
-    from nneuroutil.torch_extras import DeviceCheckMode, DeviceMismatchError
+    from nneuroutil.interop.torch import DeviceCheckMode, DeviceMismatchError
 
     torch.set_default_device("cuda")
     device = torch.get_default_device()
@@ -585,7 +585,7 @@ def test_device_check_mode() -> None:
 
 
 def test_memory_tracker() -> None:
-    from nneuroutil.torch_extras import TorchMemoryTracker
+    from nneuroutil.interop.torch import TorchMemoryTracker
 
     x = torch.randn(256, 256)
 

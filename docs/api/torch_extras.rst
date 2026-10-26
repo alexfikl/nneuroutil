@@ -1,4 +1,4 @@
 PyTorch Extras
 ==============
 
-.. automodule:: nneuroutil.torch_extras
+.. automodule:: nneuroutil.interop.torch

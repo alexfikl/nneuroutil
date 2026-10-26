@@ -5,8 +5,8 @@ Initializers
 
 We have several non-standard activation functions that require custom
 initialization. Below, we explain the general framework used to derive the
-initializer parameters used in :mod:`nneuroutil.torch_extras` and
-:mod:`nneuroutil.flax_extras`. For details, see classic works such as
+initializer parameters used in :mod:`nneuroutil.interop.torch` and
+:mod:`nneuroutil.interop.flax`. For details, see classic works such as
 [Glorot2010]_ (worked on sigmoid activations) or [He2015]_ (worked on ReLU
 activations).
 
@@ -104,7 +104,7 @@ assuming :math:`\sigma_{y_l}^2 = 1`, so
 
     \sigma_w^2 = \frac{1}{3 n},
 
-which is exactly the value computed in :func:`~nneuroutil.torch_extras.kaiming_uniform_`
+which is exactly the value computed in :func:`~nneuroutil.interop.torch.kaiming_uniform_`
 when using ``nonlinearity="quadratic"``.
 
 .. note::

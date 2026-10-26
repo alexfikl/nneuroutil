@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 
 def test_quadratic() -> None:
-    from nneuroutil.flax_extras import Quadratic
+    from nneuroutil.interop.flax import Quadratic
 
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
     mod = Quadratic()
@@ -34,7 +34,7 @@ def test_quadratic() -> None:
 
 
 def test_blended_quadratic() -> None:
-    from nneuroutil.flax_extras import BlendedQuadratic
+    from nneuroutil.interop.flax import BlendedQuadratic
 
     alpha = 0.2
     x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
@@ -47,7 +47,7 @@ def test_blended_quadratic() -> None:
 
 
 def test_complex_tanh() -> None:
-    from nneuroutil.flax_extras import ComplexTanh
+    from nneuroutil.interop.flax import ComplexTanh
 
     key1, key2 = jax.random.split(jax.random.PRNGKey(0))
     x_real = jax.random.normal(key1, (5, 5))
@@ -76,7 +76,7 @@ def test_complex_tanh() -> None:
 
 
 def test_complex_quadratic_interleave() -> None:
-    from nneuroutil.flax_extras import ComplexQuadratic
+    from nneuroutil.interop.flax import ComplexQuadratic
 
     n = 5
     key_re, key_im = jax.random.split(jax.random.PRNGKey(0))
@@ -109,7 +109,7 @@ def test_complex_quadratic_interleave() -> None:
 
 
 def test_bias() -> None:
-    from nneuroutil.flax_extras import Bias
+    from nneuroutil.interop.flax import Bias
 
     size = 10
     mod = Bias(size)
@@ -119,7 +119,7 @@ def test_bias() -> None:
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
-    from nneuroutil.flax_extras import ComplexLinear
+    from nneuroutil.interop.flax import ComplexLinear
 
     in_features = 4
     out_features = 6
@@ -156,7 +156,7 @@ def test_complex_linear(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-po
 
 @pytest.mark.parametrize("bias", [True, False])
 def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-type-hint-positional-argument]
-    from nneuroutil.flax_extras import ComplexLinear
+    from nneuroutil.interop.flax import ComplexLinear
 
     in_features = 4
     out_features = 6
@@ -207,7 +207,7 @@ def test_complex_linear_interleave(bias: bool) -> None:  # ruff:ignore[boolean-t
 
 @pytest.mark.parametrize("alpha", [1.0, 0.5])
 def test_kaiming_init(alpha: float) -> None:
-    from nneuroutil.flax_extras import (
+    from nneuroutil.interop.flax import (
         blended_quadratic_normal,
         blended_quadratic_uniform,
         quadratic_normal,
