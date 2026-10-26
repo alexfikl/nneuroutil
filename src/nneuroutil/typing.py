@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import Field
-from typing import Any, ClassVar, Protocol, TypeAlias
+from typing import Any, ClassVar, Protocol, TypeAlias, runtime_checkable
 
 import numpy as np
 from typing_extensions import TypeAliasType, TypeVar
@@ -29,7 +29,8 @@ ScalarTypeT = TypeVar("ScalarTypeT", bound=np.generic, default=Any)
 """An invariant type alias for :mod:`numpy` scalars."""
 
 
-class Array(Protocol[ShapeT_co, DTypeT]):  # ruff:ignore[too-many-public-methods]
+@runtime_checkable  # ruff: ignore[too-many-public-methods]
+class Array(Protocol[ShapeT_co, DTypeT]):
     """A minimal protocol compatible with the
     `Array API <https://data-apis.org/array-api/latest/API_specification/array_object.html>`__.
     """
