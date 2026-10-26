@@ -17,6 +17,8 @@ from torch.utils._python_dispatch import (  # ruff:ignore[import-private-name]
     TorchDispatchMode,
 )
 
+from nneuroutil import activations
+from nneuroutil.array_api_extras import view_as_complex, view_as_real
 from nneuroutil.helpers import MemorySnapshot, MemoryTracker
 
 log = logging.getLogger(__name__)
@@ -25,22 +27,12 @@ log = logging.getLogger(__name__)
 # {{{ activation functions
 
 
-def view_as_complex(x: torch.Tensor) -> torch.Tensor:
-    return torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2).contiguous())
-
-
-def view_as_real(x: torch.Tensor) -> torch.Tensor:
-    return torch.view_as_real(x).reshape(*x.shape[:-1], -1)
-
-
 class Quadratic(nn.Module):
     """A wrapper around :func:`~nneuroutil.activations.quadratic`."""
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # ruff:ignore[no-self-use]
         """Define the computation performed at every call."""
-        from nneuroutil.activations import quadratic
-
-        return quadratic(x)
+        return activations.quadratic(x)
 
 
 class ComplexQuadratic(nn.Module):
@@ -58,9 +50,9 @@ class ComplexQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_quadratic
-
-        return apply_complex(complex_quadratic, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.complex_quadratic, x, interleaved=self.interleaved
+        )
 
 
 class BlendedQuadratic(nn.Module):
@@ -111,9 +103,7 @@ class BlendedQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import blended_quadratic
-
-        return blended_quadratic(x, alpha=self.alpha)
+        return activations.blended_quadratic(x, alpha=self.alpha)
 
 
 class ComplexBlendedQuadratic(nn.Module):
@@ -173,10 +163,8 @@ class ComplexBlendedQuadratic(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_blended_quadratic
-
-        return apply_complex(
-            partial(complex_blended_quadratic, alpha=self.alpha),
+        return activations.apply_complex(
+            partial(activations.complex_blended_quadratic, alpha=self.alpha),
             x,
             interleaved=self.interleaved,
         )
@@ -197,9 +185,9 @@ class ComplexTanh(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_tanh
-
-        return apply_complex(complex_tanh, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.complex_tanh, x, interleaved=self.interleaved
+        )
 
 
 class ModReLU(nn.Module):
@@ -220,10 +208,10 @@ class ModReLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, modrelu
-
-        return apply_complex(
-            partial(modrelu, b=self.bias), x, interleaved=self.interleaved
+        return activations.apply_complex(
+            partial(activations.modrelu, b=self.bias),
+            x,
+            interleaved=self.interleaved,
         )
 
 
@@ -255,10 +243,8 @@ class LeakyModReLU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, leaky_modrelu
-
-        return apply_complex(
-            partial(leaky_modrelu, b=self.bias, alpha=self.alpha),
+        return activations.apply_complex(
+            partial(activations.leaky_modrelu, b=self.bias, alpha=self.alpha),
             x,
             interleaved=self.interleaved,
         )
@@ -279,9 +265,9 @@ class ComplexCardioid(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_cardioid
-
-        return apply_complex(complex_cardioid, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.complex_cardioid, x, interleaved=self.interleaved
+        )
 
 
 class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
@@ -299,9 +285,9 @@ class zReLU(nn.Module):  # ruff:ignore[invalid-class-name]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, zrelu
-
-        return apply_complex(zrelu, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.zrelu, x, interleaved=self.interleaved
+        )
 
 
 class ComplexLog(nn.Module):
@@ -319,9 +305,9 @@ class ComplexLog(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_log
-
-        return apply_complex(complex_log, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.complex_log, x, interleaved=self.interleaved
+        )
 
 
 class ComplexExp(nn.Module):
@@ -339,9 +325,9 @@ class ComplexExp(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        from nneuroutil.activations import apply_complex, complex_exp
-
-        return apply_complex(complex_exp, x, interleaved=self.interleaved)
+        return activations.apply_complex(
+            activations.complex_exp, x, interleaved=self.interleaved
+        )
 
 
 # }}}
