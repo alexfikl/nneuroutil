@@ -15,7 +15,6 @@ from flax import nnx
 from jax.nn.initializers import Initializer
 
 from nneuroutil import activations
-from nneuroutil.array_api_extras import deinterleave, interleave
 from nneuroutil.helpers import MemorySnapshot, MemoryTracker, calculate_gain, to_real
 
 log = logging.getLogger(__name__)
@@ -315,24 +314,32 @@ class ComplexLinear(nnx.Module):
         """Applies a complex linear transformation to the inputs along the last
         dimension.
         """
-        # x: [batch, 2 * in_features]
-        if self.interleaved:
-            x_re, x_im = deinterleave(x)
-        else:
-            x_re, x_im = jnp.split(x, 2, axis=-1)
+        # x: [..., 2 * in_features]
+        batch_shape = x.shape[:-1]
 
-        result_re = x_re @ self.kernel.value
+        if self.interleaved:
+            # (..., d, 2) -> (..., 2, d)
+            x = jnp.swapaxes(
+                jnp.reshape(x, (*batch_shape, self.in_features, 2)), -1, -2
+            )
+        else:
+            # (..., 2, d) is already the storage order
+            x = jnp.reshape(x, (*batch_shape, 2, self.in_features))
+
+        # one (2 * batch, in_features) @ (in_features, out_features) GEMM
+        result = jnp.reshape(x, (-1, self.in_features)) @ self.kernel.value
+        result = jnp.reshape(result, (*batch_shape, 2, self.out_features))
+
         if self.bias_re is not None:
-            result_re = result_re + self.bias_re.value
-
-        result_im = x_im @ self.kernel.value
-        if self.bias_im is not None:
-            result_im = result_im + self.bias_im.value
+            assert self.bias_im is not None
+            result = result + jnp.stack(
+                [self.bias_re.value, self.bias_im.value], axis=0
+            )
 
         if self.interleaved:
-            return interleave(result_re, result_im)  # ty: ignore[invalid-return-type]
-        else:
-            return jnp.concatenate([result_re, result_im], axis=-1)
+            result = jnp.swapaxes(result, -1, -2)  # (..., out_features, 2)
+
+        return jnp.reshape(result, (*batch_shape, 2 * self.out_features))
 
 
 # }}}
