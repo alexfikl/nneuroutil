@@ -455,23 +455,27 @@ class ComplexLinear(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Define the computation performed at every call."""
-        # x: [batch, 2 * in_features]
+        # x: [..., 2 * in_features]
+        batch_shape = x.shape[:-1]
+
         if self.interleaved:
-            z = view_as_complex(x)
-
-            bias = None
-            if self.bias_re is not None:
-                bias = torch.complex(self.bias_re, self.bias_im)
-
-            result = nn.functional.linear(z, self.weight.to(z.dtype), bias)
-            return view_as_real(result)
+            # (..., d, 2) -> (..., 2, d)
+            x = x.reshape(*batch_shape, self.in_features, 2).transpose(-1, -2)
         else:
-            x_re, x_im = x.chunk(2, dim=-1)
+            # (..., 2, d) is already the storage order
+            x = x.reshape(*batch_shape, 2, self.in_features)
 
-            result_re = nn.functional.linear(x_re, self.weight, self.bias_re)
-            result_im = nn.functional.linear(x_im, self.weight, self.bias_im)
+        # one (2 * batch, in_features) @ (in_features, out_features) GEMM
+        result = x.reshape(-1, self.in_features) @ self.weight.t()
+        result = result.reshape(*batch_shape, 2, self.out_features)
 
-            return torch.cat([result_re, result_im], dim=-1)
+        if self.bias_re is not None:
+            result = result + torch.stack([self.bias_re, self.bias_im])
+
+        if self.interleaved:
+            result = result.transpose(-1, -2)  # (..., out_features, 2)
+
+        return result.reshape(*batch_shape, 2 * self.out_features)
 
 
 class SymmetricLinear(nn.Module):
