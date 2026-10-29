@@ -19,6 +19,7 @@ PathLike: TypeAlias = os.PathLike[str] | str
 # FIXME: maybe https://github.com/data-apis/array-api-typing will work some day.
 # Now, it seems pretty empty, so not sure it's worth doing more than this..
 
+ShapeT = TypeVar("ShapeT", bound=tuple[int, ...], default=tuple[Any, ...])
 ShapeT_co = TypeVar(
     "ShapeT_co", bound=tuple[int, ...], default=tuple[Any, ...], covariant=True
 )
