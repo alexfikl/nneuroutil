@@ -505,7 +505,8 @@ def default_rng(
         raise TypeError(f"unsupported Array API namespace: {xp}")
 
     if seed is None:
-        seed = int(np.random.SeedSequence().entropy)  # ty: ignore[invalid-argument-type]
+        # NOTE: jax and torch take seeds as uint64
+        seed = int(np.random.SeedSequence().generate_state(1, dtype=np.uint64)[0] >> 1)
 
     if not isinstance(seed, numbers.Integral):
         raise TypeError(f"'seed' is not an integer type: {seed!r}")
