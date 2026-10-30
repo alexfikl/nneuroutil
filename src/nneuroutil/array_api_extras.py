@@ -494,12 +494,9 @@ def default_rng(
 ) -> RandomGenerator:
     """Create a :class:`RandomGenerator` for the Array API namespace *xp*.
 
-    :param seed: seed used to initialize the generator. It must be an integer.
-        If it is ``None``, a seed is generated from
-        :class:`numpy.random.SeedSequence`.
-    :param device: device used for the generated arrays. Support is backend
-        specific: 'numpy' only supports the 'cpu' device and 'jax' does not
-        accept a device.
+    :param seed: seed used to initialize the generator.
+    :param device: device used for the generated arrays, as supported by each
+        backend
     """
     if not hasattr(xp, "__name__"):
         raise TypeError(f"unsupported Array API namespace: {xp}")
@@ -624,13 +621,6 @@ class RandomGenerator(ABC):
 
 @dataclass(frozen=True)
 class SeedSequenceKey:
-    """A key for the 'numpy' and 'torch' backends.
-
-    The fields mirror those of :class:`numpy.random.SeedSequence`, so a key
-    can be turned into a generator with
-    ``SeedSequence(key.entropy, spawn_key=key.spawn_key)``.
-    """
-
     __slots__ = ("entropy", "spawn_key")
 
     entropy: tuple[int, ...]
@@ -650,6 +640,27 @@ class SeedSequenceKey:
         object.__setattr__(self, "entropy", tuple(entropy))  # ty: ignore[invalid-argument-type]
         object.__setattr__(self, "spawn_key", tuple(spawn_key))
 
+    def derive(self, index: int) -> Self:
+        if not isinstance(index, numbers.Integral):
+            raise TypeError(f"'index' is not an integer type: {index!r}")
+
+        index = int(index)
+        if not 0 <= index < 2**32:
+            raise ValueError(f"'index' must be in [0, 2**32): {index}")
+
+        ss = np.random.SeedSequence(self.entropy, spawn_key=(*self.spawn_key, index))
+        new_entropy = tuple(ss.generate_state(4, dtype=np.uint32).tolist())
+        return type(self)(new_entropy)
+
+    def split(self, num: int = 2) -> tuple[Self, ...]:
+        if num <= 0:
+            raise ValueError(f"'num' must be strictly positive: {num!r}")
+
+        return tuple(self.derive(i) for i in range(num))
+
+    def fold_in(self, index: int) -> Self:
+        return self.derive(index)
+
 
 @dataclass(frozen=True)
 class NumpyGenerator(RandomGenerator):
@@ -661,29 +672,12 @@ class NumpyGenerator(RandomGenerator):
         return cls(SeedSequenceKey(int(seed)), device=device)
 
     def split(self, num: int = 2) -> tuple[NumpyGenerator, ...]:
-        if num <= 0:
-            raise ValueError(f"'num' must be strictly positive: {num!r}")
-
         return tuple(
-            NumpyGenerator(
-                SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, i)),
-                device=self.device,
-            )
-            for i in range(num)
+            NumpyGenerator(key, device=self.device) for key in self.key.split(num)
         )
 
     def fold_in(self, index: int) -> Self:
-        if not isinstance(index, numbers.Integral):
-            raise TypeError(f"'index' is not an integer type: {index!r}")
-
-        index = int(index)
-        if not 0 <= index < 2**32:
-            raise ValueError(f"'index' must be in [0, 2**32): {index}")
-
-        return type(self)(
-            SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, index)),
-            device=self.device,
-        )
+        return type(self)(self.key.fold_in(index), device=self.device)
 
     @property
     def _rng(self) -> np.random.Generator:
@@ -901,29 +895,12 @@ class TorchGenerator(RandomGenerator):
         return cls(SeedSequenceKey(int(seed)), device=device)
 
     def split(self, num: int = 2) -> tuple[TorchGenerator, ...]:
-        if num <= 0:
-            raise ValueError(f"'num' must be strictly positive: {num!r}")
-
         return tuple(
-            TorchGenerator(
-                SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, i)),
-                device=self.device,
-            )
-            for i in range(num)
+            TorchGenerator(key, device=self.device) for key in self.key.split(num)
         )
 
     def fold_in(self, index: int) -> Self:
-        if not isinstance(index, numbers.Integral):
-            raise TypeError(f"'index' is not an integer type: {index!r}")
-
-        index = int(index)
-        if not 0 <= index < 2**32:
-            raise ValueError(f"'index' must be in [0, 2**32): {index}")
-
-        return type(self)(
-            SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, index)),
-            device=self.device,
-        )
+        return type(self)(self.key.fold_in(index), device=self.device)
 
     @property
     def _rng(self) -> Any:
