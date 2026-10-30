@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import array_api_compat
 import numpy as np
 
+from nneuroutil.helpers import register_dataclass
 from nneuroutil.typing import Array, Array1D, ArrayND, DTypeLike, ScalarTypeT, ShapeT
 
 if TYPE_CHECKING:
@@ -759,6 +760,7 @@ class NumpyGenerator(RandomGenerator):
 # {{{ JaxGenerator
 
 
+@register_dataclass
 @dataclass(frozen=True)
 class JaxGenerator(RandomGenerator):
     def __hash__(self) -> int:
