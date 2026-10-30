@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from nneuroutil.array_api_extras import array_equal
+from nneuroutil.array_api_extras import array_equal, default_rng
 
 TEST_FILENAME = pathlib.Path(__file__)
 TEST_DIRECTORY = TEST_FILENAME.parent
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 def test_sliced_data_loader(xp: Any) -> None:
     from nneuroutil.data import SlicedDataLoader
 
-    rng = np.random.default_rng(seed=42)
+    rng = default_rng(xp, seed=42)
 
     # size % batch_size == 0
     x = xp.reshape(xp.arange(12), (6, 2))
@@ -61,7 +61,7 @@ def test_sliced_data_loader(xp: Any) -> None:
 def test_sliced_data_loader_shuffle(xp: Any) -> None:
     from nneuroutil.data import SlicedDataLoader
 
-    rng = np.random.default_rng(seed=42)
+    rng = default_rng(xp, seed=42)
 
     x = xp.reshape(xp.arange(12), (6, 2))
     loader = SlicedDataLoader(x, batch_size=2, shuffle=True, rng=rng)
@@ -230,7 +230,7 @@ def test_sliding_window_dataset_overlap(xp: Any) -> None:
 def test_random_split_partitions(xp: Any) -> None:
     from nneuroutil.data import random_split
 
-    rng = np.random.default_rng(seed=42)
+    rng = default_rng(xp, seed=42)
     x = xp.arange(10)
 
     # integer partitions of different sizes
@@ -259,7 +259,7 @@ def test_random_split_partitions(xp: Any) -> None:
 def test_random_split_multi_array(xp: Any) -> None:
     from nneuroutil.data import random_split
 
-    rng = np.random.default_rng(seed=42)
+    rng = default_rng(xp, seed=42)
     x = xp.arange(10)
     y = x * 10
 

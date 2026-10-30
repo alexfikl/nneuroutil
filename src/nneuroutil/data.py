@@ -11,6 +11,7 @@ import array_api_compat
 import numpy as np
 from typing_extensions import TypeIs
 
+import nneuroutil.array_api_extras as xpx
 from nneuroutil.typing import ArrayND
 
 # {{{ SlicedDataLoader
@@ -40,7 +41,7 @@ class SlicedDataLoader:
         batch_size: int = 1,
         shuffle: bool = True,
         drop_last: bool = False,
-        rng: np.random.Generator | None = None,
+        rng: xpx.RandomGenerator | None = None,
         xp: Any = None,
     ) -> None:
         if len(ds) == 0:
@@ -55,15 +56,15 @@ class SlicedDataLoader:
         if batch_size <= 0:
             raise ValueError(f"'batch_size' must be positive: {batch_size}")
 
-        if rng is None:
-            rng = np.random.default_rng()
-
         num_samples = len(dataset)
         if drop_last:
             num_samples = (num_samples // batch_size) * batch_size
 
         if xp is None:
             xp = array_api_compat.array_namespace(*ds)
+
+        if rng is None:
+            rng = xpx.default_rng(xp)
 
         self.xp = xp
         self.ds = ds
@@ -80,8 +81,11 @@ class SlicedDataLoader:
 
     def __iter__(self) -> Iterator[tuple[ArrayND[np.inexact[Any]], ...]]:
         if self.shuffle:
+            # NOTE: RandomGenerator is key based, so advance its key to get a
+            # new permutation for every epoch instead of reusing the same one.
+            rng, self.rng = self.rng.split(2)
             indices = self.xp.asarray(
-                self.rng.permutation(self.num_samples),
+                xpx.permutation(rng, self.num_samples, xp=self.xp),
                 dtype=self.xp.int32,
                 device=self.device,
             )
@@ -187,7 +191,7 @@ def random_split(
     xs: Sequence[ArrayND[np.inexact[Any]]],
     splits: Sequence[int] | Sequence[float],
     *,
-    rng: np.random.Generator | None = None,
+    rng: xpx.RandomGenerator | None = None,
     xp: Any = None,
 ) -> tuple[tuple[ArrayND[np.inexact[Any]], ...], ...]:
     """Randomly split a sequence of arrays with the same leading dimension.
@@ -210,7 +214,7 @@ def random_split(
         xp = array_api_compat.array_namespace(*xs)
 
     if rng is None:
-        rng = np.random.default_rng()
+        rng = xpx.default_rng(xp)
 
     n = len(xs[0])
     if not all(len(x) == n for x in xs):
@@ -243,7 +247,9 @@ def random_split(
     from itertools import accumulate
 
     indices = xp.asarray(
-        rng.permutation(n), dtype=xp.int32, device=array_api_compat.device(xs[0])
+        xpx.permutation(rng, n, xp=xp),
+        dtype=xp.int32,
+        device=array_api_compat.device(xs[0]),
     )
     return tuple(
         tuple(x[indices[offset - length : offset]] for x in xs)
