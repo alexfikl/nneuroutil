@@ -75,15 +75,17 @@ class SlicedDataLoader:
 
         self.device = array_api_compat.device(dataset)
         self.rng = rng
+        self._epoch = 0
 
     def __len__(self) -> int:
         return (self.num_samples + self.batch_size - 1) // self.batch_size
 
     def __iter__(self) -> Iterator[tuple[ArrayND[np.inexact[Any]], ...]]:
         if self.shuffle:
-            # NOTE: RandomGenerator is key based, so advance its key to get a
-            # new permutation for every epoch instead of reusing the same one.
-            rng, self.rng = self.rng.split(2)
+            # NOTE: RandomGenerator is key based, so derive a new stream from
+            # the base key for every epoch instead of reusing the same one.
+            rng = self.rng.fold_in(self._epoch)
+            self._epoch += 1
             indices = self.xp.asarray(
                 xpx.permutation(rng, self.num_samples, xp=self.xp),
                 dtype=self.xp.int32,

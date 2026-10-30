@@ -529,7 +529,8 @@ class RandomGenerator(ABC):
     Each generator wraps an opaque, backend-specific *key* that is created from
     a seed by :meth:`from_seed`. The key is used to draw samples and can be
     split into independent generators with :meth:`split` (e.g. for parallel or
-    per-object streams). This is heavily inspired by the :mod:`jax`
+    per-object streams) or derived for indexed streams with :meth:`fold_in`
+    (e.g. one per epoch). This is heavily inspired by the :mod:`jax`
     implementation.
 
     The *key* and *device* are backend-specific, so generators should normally
@@ -557,6 +558,17 @@ class RandomGenerator(ABC):
 
         This does not modify or consume *key*, so splitting the same generator
         twice returns equivalent generators.
+        """
+
+    @abstractmethod
+    def fold_in(self, index: int) -> Self:
+        """Return a new generator derived from *key* and *index*.
+
+        This is useful for deriving independent streams from a stable base key,
+        such as one stream per epoch, without repeatedly splitting the
+        generator. The *index* must be an integer in ``[0, 2**32)``.
+
+        This does not modify or consume *key*.
         """
 
     @abstractmethod
@@ -658,6 +670,19 @@ class NumpyGenerator(RandomGenerator):
                 device=self.device,
             )
             for i in range(num)
+        )
+
+    def fold_in(self, index: int) -> Self:
+        if not isinstance(index, numbers.Integral):
+            raise TypeError(f"'index' is not an integer type: {index!r}")
+
+        index = int(index)
+        if not 0 <= index < 2**32:
+            raise ValueError(f"'index' must be in [0, 2**32): {index}")
+
+        return type(self)(
+            SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, index)),
+            device=self.device,
         )
 
     @property
@@ -772,6 +797,18 @@ class JaxGenerator(RandomGenerator):
             for key in jax.random.split(self.key, num=num)
         )
 
+    def fold_in(self, index: int) -> Self:
+        if not isinstance(index, numbers.Integral):
+            raise TypeError(f"'index' is not an integer type: {index!r}")
+
+        index = int(index)
+        if not 0 <= index < 2**32:
+            raise ValueError(f"'index' must be in [0, 2**32): {index}")
+
+        import jax.random
+
+        return type(self)(jax.random.fold_in(self.key, index), device=self.device)
+
     def integers(
         self,
         low: int,
@@ -873,6 +910,19 @@ class TorchGenerator(RandomGenerator):
                 device=self.device,
             )
             for i in range(num)
+        )
+
+    def fold_in(self, index: int) -> Self:
+        if not isinstance(index, numbers.Integral):
+            raise TypeError(f"'index' is not an integer type: {index!r}")
+
+        index = int(index)
+        if not 0 <= index < 2**32:
+            raise ValueError(f"'index' must be in [0, 2**32): {index}")
+
+        return type(self)(
+            SeedSequenceKey(self.key.entropy, (*self.key.spawn_key, index)),
+            device=self.device,
         )
 
     @property

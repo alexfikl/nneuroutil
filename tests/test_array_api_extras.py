@@ -476,6 +476,24 @@ def test_generator_split(xp: Any) -> None:
             assert not array_equal(draws[0], x)
 
 
+def test_generator_fold_in(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+
+    x = rng.fold_in(0).uniform(size=(8,))
+    y = rng.fold_in(0).uniform(size=(8,))
+    z = rng.fold_in(1).uniform(size=(8,))
+
+    # folding is deterministic for a given index
+    assert array_equal(x, y)
+    assert not array_equal(x, z)
+
+    with pytest.raises(ValueError, match="'index'"):
+        rng.fold_in(-1)
+
+    with pytest.raises(ValueError, match="'index'"):
+        rng.fold_in(2**32)
+
+
 # }}}
 
 
