@@ -13,9 +13,12 @@ import pytest
 
 from nneuroutil.array_api_extras import (
     array_equal,
+    default_rng,
     fill_diagonal,
     histogram,
+    permutation,
     sign,
+    to_namespace_dtype,
     view_as_complex,
     view_as_real,
 )
@@ -368,6 +371,161 @@ def test_histogram_fallback_validation(xp: Any) -> None:
     for bins in (0, -1):
         with pytest.raises(ValueError, match="positive"):
             histogram(xp.asarray(np.array([1.0, 2.0])), bins, fallback=True, xp=xp)
+
+
+# }}}
+
+
+# {{{ test_generator
+
+
+@pytest.mark.parametrize("shape", [(), (4,), (3, 5), (2, 3, 4)])
+@pytest.mark.parametrize(
+    ("method", "dtype"),
+    [
+        ("uniform", np.float32),
+        ("uniform", np.float64),
+        ("normal", np.float32),
+        ("normal", np.float64),
+        ("integers", np.int32),
+        ("integers", np.int64),
+    ],
+)
+def test_generator(xp: Any, method: str, dtype: Any, shape: tuple[int, ...]) -> None:
+    rng = default_rng(xp, seed=42)
+    ref = default_rng(xp, seed=42)
+    dtype = to_namespace_dtype(xp, dtype)
+
+    if method == "uniform":
+        x = rng.uniform(0.0, 1.0, size=shape, dtype=dtype)
+        y = ref.uniform(0.0, 1.0, size=shape, dtype=dtype)
+        assert xp.all(xp.logical_and(x >= 0.0, x < 1.0))  # ty: ignore[unsupported-operator]
+        assert xp.all(xp.logical_and(y >= 0.0, y < 1.0))  # ty: ignore[unsupported-operator]
+    elif method == "integers":
+        x = rng.integers(0, 10, size=shape, dtype=dtype)
+        y = ref.integers(0, 10, size=shape, dtype=dtype)
+        assert xp.all(xp.logical_and(x >= 0, x < 10))  # ty: ignore[unsupported-operator]
+        assert xp.all(xp.logical_and(y >= 0, y < 10))  # ty: ignore[unsupported-operator]
+    elif method == "normal":
+        x = rng.normal(size=shape, dtype=dtype)
+        y = ref.normal(size=shape, dtype=dtype)
+    else:
+        raise ValueError(f"unknown method: {method!r}")
+
+    # NOTE: the same seed always reproduces the same stream
+    assert tuple(x.shape) == shape
+    assert x.dtype == dtype
+    assert array_equal(x, y)
+
+
+def test_generator_integers_high_none(xp: Any) -> None:
+    rng = default_rng(xp, seed=42)
+
+    x = rng.integers(5, size=(256,))
+    assert tuple(x.shape) == (256,)
+    assert xp.all(xp.logical_and(x >= 0, x < 5))  # ty: ignore[unsupported-operator]
+
+
+def test_generator_dtype_validation(xp: Any) -> None:
+    rng = default_rng(xp, seed=42)
+
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+        rng.integers(0, 10, size=(4,), dtype=xp.float32)
+
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+        rng.uniform(size=(4,), dtype=xp.int32)
+
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+        rng.normal(size=(4,), dtype=xp.int32)
+
+
+def test_generator_default_dtype(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+
+    # the defaults follow the backend's own default dtypes
+    assert rng.uniform(size=(4,)).dtype == xp.asarray(0.0).dtype
+    assert rng.integers(0, 10, size=(4,)).dtype == xp.asarray(0).dtype
+    assert rng.normal(size=(4,)).dtype == xp.asarray(0.0).dtype
+
+
+def test_generator_size_none(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+
+    x = rng.uniform()
+    assert x.shape == ()
+    assert 0.0 <= x < 1.0  # ty: ignore[unsupported-operator]
+    assert 0 <= rng.integers(0, 10) < 10  # ty: ignore[unsupported-operator]
+
+
+def test_generator_split(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+
+    for num in (1, 3):
+        generators = rng.split(num)
+        assert len(generators) == num
+
+        # splitting is deterministic
+        draws = [g.uniform(size=(4,)) for g in generators]
+        for x, y in zip(
+            draws, [g.uniform(size=(4,)) for g in rng.split(num)], strict=True
+        ):
+            assert array_equal(x, y)
+
+        # each key drives a distinct stream
+        for x in draws[1:]:
+            assert not array_equal(draws[0], x)
+
+
+# }}}
+
+
+# {{{ test_permutation
+
+
+def test_permutation_int(xp: Any) -> None:
+    x = permutation(default_rng(xp, 42), 10)
+    y = permutation(default_rng(xp, 42), 10)
+    z = permutation(default_rng(xp, 43), 10)
+
+    assert tuple(x.shape) == (10,)
+    assert array_equal(xp.sort(x), xp.arange(10))
+    assert array_equal(x, y)
+    assert not array_equal(x, z)
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2, -1])
+def test_permutation_axis(xp: Any, axis: int) -> None:
+    rng = default_rng(xp, 42)
+    x = xp.asarray(np.arange(24).reshape(2, 3, 4))
+
+    y = permutation(rng, x, axis=axis)
+
+    assert tuple(y.shape) == tuple(x.shape)
+    # the same entries are left along each axis, only reordered
+    assert array_equal(xp.sort(y, axis=axis), xp.sort(x, axis=axis))
+
+
+def test_permutation_infers_xp(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+    x = xp.asarray(np.arange(12).reshape(4, 3))
+
+    y = permutation(rng, x)
+    z = permutation(rng, x, xp=xp)
+
+    assert array_equal(y, z)
+
+
+def test_permutation_validation(xp: Any) -> None:
+    rng = default_rng(xp, 42)
+
+    with pytest.raises(ValueError, match="'x'"):
+        permutation(rng, -1)
+
+    with pytest.raises(ValueError, match="'axis'"):
+        permutation(rng, 5, axis=1)
+
+    with pytest.raises(ValueError, match="'axis'"):
+        permutation(rng, xp.asarray(np.arange(6).reshape(2, 3)), axis=2)
 
 
 # }}}
