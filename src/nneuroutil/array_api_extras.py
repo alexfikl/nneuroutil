@@ -894,6 +894,14 @@ class JaxGenerator(RandomGenerator):
 class TorchGenerator(RandomGenerator):
     @classmethod
     def from_seed(cls, seed: int, device: Any = None) -> Self:
+        import torch
+
+        # NOTE: `torch.Generator` defaults to the 'cpu' device, while tensor
+        # creation follows the default device, so resolve it explicitly to keep
+        # the generator and the generated tensors on the same device
+        if device is None:
+            device = torch.get_default_device()
+
         return cls(SeedSequenceKey(int(seed)), device=device)
 
     def split(self, num: int = 2) -> tuple[TorchGenerator, ...]:
