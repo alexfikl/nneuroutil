@@ -63,6 +63,32 @@ def blended_quadratic(
     return alpha * x + (1.0 - alpha) * x * x
 
 
+def siren(
+    x: ArrayND[np.floating[Any]],
+    *,
+    omega: float = 1.0,
+    xp: Any = None,
+) -> ArrayND[np.floating[Any]]:
+    r"""The SIREN (sine) activation :math:`f(x) = \sin(\omega x)` from
+    [Sitzmann2020]_.
+
+    The frequency :math:`\omega` is usually taken to be :math:`30` for the
+    first layer and :math:`1` for the hidden layers.
+
+    :arg omega: the frequency :math:`\omega > 0`.
+
+    .. [Sitzmann2020] V. Sitzmann, J. N. P. Martel, A. W. Bergman,
+        D. B. Lindell, G. Wetzstein,
+        *Implicit Neural Representations with Periodic Activation Functions*,
+        2020,
+        `URL <https://arxiv.org/abs/2006.09661>`__.
+    """
+    if xp is None:
+        xp = array_api_compat.array_namespace(x)
+
+    return xp.sin(omega * x)
+
+
 # }}}
 
 

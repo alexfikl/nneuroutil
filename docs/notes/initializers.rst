@@ -191,6 +191,38 @@ have that
     from the unit variance fixed point are amplified by a factor between
     :math:`1` and :math:`2` per layer, decreasing with :math:`\alpha`.
 
+SIREN (Sine) Activation
+-----------------------
+
+The SIREN activation from [Sitzmann2020]_ is given by
+
+.. math::
+
+    f(y) = \sin(\omega y).
+
+Assuming, as above, that :math:`y` is Gaussian with zero mean and unit
+variance, we have
+
+.. math::
+
+    \mathbb{E}[x_l^2]
+        = \mathbb{E}[\sin^2(\omega y)]
+        = \frac{1}{2} \left(1 - e^{-2 \omega^2}\right),
+
+where we used :math:`\mathbb{E}[\cos(2 \omega y)] = e^{-2 \omega^2}`.
+Therefore, the pre-activation variance is preserved by taking
+
+.. math::
+
+    \sigma_w^2 = \frac{2}{n \left(1 - e^{-2 \omega^2}\right)}.
+
+For :math:`\omega \to \infty` the gain tends to :math:`2`, which recovers
+the initialization proposed in [Sitzmann2020]_, where the frequency is
+folded into the weights. At the commonly used :math:`\omega = 1`, the
+exact gain is :math:`2.3130`, i.e. slightly larger than the :math:`2`
+obtained from the original approximation
+:math:`\mathbb{E}[\sin^2(\omega y)] \approx 1/2`.
+
 Complex Blended Quadratic Activation
 --------------------------------------
 

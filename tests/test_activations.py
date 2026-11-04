@@ -72,6 +72,31 @@ def test_blended_quadratic(xp: Any) -> None:
     assert np.allclose(res, expected)
 
 
+@pytest.mark.parametrize("omega", [1.0, 30.0])
+def test_siren(xp: Any, omega: float) -> None:
+    rng = np.random.default_rng(seed=42)
+    x_np = rng.standard_normal((4, 6))
+    x = xp.asarray(x_np)
+
+    res = activations.siren(x, omega=omega)
+    assert np.allclose(res, np.sin(omega * x_np))
+
+
+@pytest.mark.parametrize("omega", [0.5, 1.0, 30.0])
+def test_siren_gain(omega: float) -> None:
+    from nneuroutil.helpers import calculate_gain
+
+    expected = 2.0 / -np.expm1(-2.0 * omega**2)
+    assert calculate_gain("siren", omega=omega) == pytest.approx(expected)
+
+
+def test_siren_gain_invalid() -> None:
+    from nneuroutil.helpers import calculate_gain
+
+    with pytest.raises(ValueError, match="'omega' must be positive"):
+        calculate_gain("siren", omega=0.0)
+
+
 # }}}
 
 

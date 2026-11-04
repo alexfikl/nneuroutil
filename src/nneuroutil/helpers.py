@@ -735,6 +735,13 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
             raise ValueError(f"'alpha' must be in [0, 1] for '{nonlinearity}': {alpha}")
 
         scale = 1.0 / (alpha**2 + 3.0 * (1.0 - alpha) ** 2)
+    elif nonlinearity == "siren":
+        omega = kwargs.get("omega", 1.0)
+        if omega <= 0.0:
+            raise ValueError(f"'omega' must be positive for '{nonlinearity}': {omega}")
+
+        # E[sin^2(omega y)] = (1 - exp(-2 omega^2)) / 2 for y ~ N(0, 1)
+        scale = 2.0 / -math.expm1(-2.0 * omega * omega)
     elif nonlinearity == "cquadratic":
         scale = 1.0 / 2.0
     elif nonlinearity == "cblended_quadratic":
