@@ -786,6 +786,8 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
             scale = 1.0
         elif nonlinearity == "sigmoid":
             scale = 1.0
+        elif nonlinearity == "tanh":
+            scale = 5.0 / 3.0
         elif nonlinearity == "relu":
             scale = math.sqrt(2)
         elif nonlinearity == "leaky_relu":
@@ -794,6 +796,9 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
             scale = math.sqrt(2.0 / (1.0 + alpha**2))
         elif nonlinearity == "gelu":
             scale = 6.0 * math.pi / (2.0 * math.pi + math.sqrt(3.0))
+        elif nonlinearity == "silu":
+            # NOTE: 1 / E[silu(y)^2] for y ~ N(0, 1), evaluated numerically
+            scale = 2.810761
         elif nonlinearity == "selu":
             scale = 3.0 / 4.0
         else:
