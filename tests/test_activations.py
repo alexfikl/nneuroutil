@@ -288,6 +288,42 @@ def test_complex_exp_log_are_inverses(xp: Any) -> None:
 # }}}
 
 
+# {{{ test_gains
+
+
+def test_clog_gain() -> None:
+    from scipy.integrate import quad
+
+    from nneuroutil.helpers import calculate_gain
+
+    # NOTE: for complex inputs r = |y| is Rayleigh distributed with unit
+    # second moment, i.e. p(r) = 2 r exp(-r^2).
+    value, _ = quad(lambda r: np.log1p(r) ** 2 * 2.0 * r * np.exp(-(r**2)), 0.0, np.inf)
+
+    assert calculate_gain("clog") == pytest.approx(1.0 / value, rel=1.0e-6)
+
+
+def test_silu_gain() -> None:
+    from scipy.integrate import quad
+    from scipy.special import expit
+
+    from nneuroutil.helpers import calculate_gain
+
+    def silu(y: float) -> float:
+        return y * expit(y)
+
+    def normal_pdf(y: float) -> float:
+        return np.exp(-0.5 * y**2) / np.sqrt(2.0 * np.pi)
+
+    # NOTE: y is standard normal, so the gain is 1 / E[silu(y)^2].
+    value, _ = quad(lambda y: silu(y) ** 2 * normal_pdf(y), -np.inf, np.inf)
+
+    assert calculate_gain("silu") == pytest.approx(1.0 / value, rel=1.0e-6)
+
+
+# }}}
+
+
 # {{{ test_validation
 
 
