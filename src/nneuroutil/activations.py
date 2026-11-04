@@ -77,11 +77,11 @@ def siren(
 
     :arg omega: the frequency :math:`\omega > 0`.
 
-    .. [Sitzmann2020] V. Sitzmann, J. N. P. Martel, A. W. Bergman,
-        D. B. Lindell, G. Wetzstein,
-        *Implicit Neural Representations with Periodic Activation Functions*,
-        2020,
-        `URL <https://arxiv.org/abs/2006.09661>`__.
+    .. [Sitzmann2020] V. Sitzmann, J. Martel, A. Bergman, D. Lindell, G. Wetzstein,
+        *Implicit Neural Representations With Periodic Activation Functions*,
+        Advances in Neural Information Processing Systems,
+        Vol. 33, pp. 7462--7473, 2020,
+        `URL <https://proceedings.neurips.cc/paper_files/paper/2020/hash/53c04118df112c13a8c34b38343b9c10-Abstract.html>`__.
     """
     if xp is None:
         xp = array_api_compat.array_namespace(x)
