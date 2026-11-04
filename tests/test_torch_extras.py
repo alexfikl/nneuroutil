@@ -83,6 +83,18 @@ def test_linear_quadratic() -> None:
     assert torch.allclose(res, alpha * x + (1.0 - alpha) * x * x)
 
 
+def test_siren() -> None:
+    from nneuroutil.interop.torch import SIREN
+
+    x = torch.randn(5, 5)
+    omega = 30.0
+
+    mod = SIREN(omega=omega)
+    res = mod(x)
+
+    assert torch.allclose(res, torch.sin(omega * x))
+
+
 def test_learnable_blended_quadratic() -> None:
     from nneuroutil.interop.torch import BlendedQuadratic, ComplexBlendedQuadratic
 
@@ -539,6 +551,33 @@ def test_kaiming_init(
         x.clone(),
         nonlinearity=nonlinearity,
         param=param,
+        mode=mode,
+    )
+    assert res_normal.shape == shape
+    assert not torch.allclose(res_normal, torch.zeros_like(res_normal))
+
+
+@pytest.mark.parametrize("omega", [0.5, 1.0, 30.0])
+@pytest.mark.parametrize("mode", ["fan_in", "fan_out"])
+def test_siren_init(omega: float, mode: Literal["fan_in", "fan_out"]) -> None:
+    from nneuroutil.interop.torch import kaiming_normal_, kaiming_uniform_
+
+    shape = (10, 10)
+    x = torch.empty(shape)
+
+    res_uniform = kaiming_uniform_(
+        x.clone(),
+        nonlinearity="siren",
+        param=omega,
+        mode=mode,
+    )
+    assert res_uniform.shape == shape
+    assert not torch.allclose(res_uniform, torch.zeros_like(res_uniform))
+
+    res_normal = kaiming_normal_(
+        x.clone(),
+        nonlinearity="siren",
+        param=omega,
         mode=mode,
     )
     assert res_normal.shape == shape

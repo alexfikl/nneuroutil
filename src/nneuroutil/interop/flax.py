@@ -40,6 +40,19 @@ class BlendedQuadratic(nnx.Module):
         return activations.blended_quadratic(x, alpha=self.alpha)  # ty: ignore[invalid-return-type]
 
 
+class SIREN(nnx.Module):
+    """A wrapper around :func:`~nneuroutil.activations.siren`."""
+
+    omega: float
+    r"""The frequency :math:`\omega`."""
+
+    def __init__(self, omega: float = 1.0) -> None:
+        self.omega = omega
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        return activations.siren(x, omega=self.omega)  # ty: ignore[invalid-return-type]
+
+
 class ComplexQuadratic(nnx.Module):
     """A wrapper around :func:`~nneuroutil.activations.complex_quadratic`."""
 

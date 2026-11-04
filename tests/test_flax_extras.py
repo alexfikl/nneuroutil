@@ -46,6 +46,18 @@ def test_blended_quadratic() -> None:
     assert jnp.allclose(res, expected)
 
 
+def test_siren() -> None:
+    from nneuroutil.interop.flax import SIREN
+
+    x = jax.random.normal(jax.random.PRNGKey(0), (5, 5))
+    omega = 30.0
+
+    mod = SIREN(omega=omega)
+    res = mod(x)
+
+    assert jnp.allclose(res, jnp.sin(omega * x))
+
+
 def test_complex_tanh() -> None:
     from nneuroutil.interop.flax import ComplexTanh
 

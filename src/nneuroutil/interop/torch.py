@@ -106,6 +106,21 @@ class BlendedQuadratic(nn.Module):
         return activations.blended_quadratic(x, alpha=self.alpha)
 
 
+class SIREN(nn.Module):
+    r"""A wrapper around :func:`~nneuroutil.activations.siren`."""
+
+    omega: float
+    r"""The frequency :math:`\omega`. A non-learnable hyperparameter."""
+
+    def __init__(self, omega: float = 1.0) -> None:
+        super().__init__()
+        self.omega = omega
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Define the computation performed at every call."""
+        return activations.siren(x, omega=self.omega)
+
+
 class ComplexBlendedQuadratic(nn.Module):
     r"""A wrapper around :func:`~nneuroutil.activations.complex_blended_quadratic`.
 
@@ -538,6 +553,7 @@ NONLINEARITY_TYPE_NAME = {
     LeakyModReLU: "leaky_modrelu",
     ModReLU: "modrelu",
     Quadratic: "quadratic",
+    SIREN: "siren",
     zReLU: "zrelu",
 }
 
@@ -567,7 +583,7 @@ def kaiming_uniform_(
       **not** :math:`\mathbb{E}[z z] = 1`!
 
     :arg param: parameter used in activations functions that require it, such as
-        "blended_quadratic", "leaky_relu", etc.
+        "blended_quadratic", "siren", "leaky_relu", etc.
     :arg paramb: additional parameter for "leaky_modrelu".
     """
     from nneuroutil.helpers import calculate_gain
@@ -577,6 +593,9 @@ def kaiming_uniform_(
     if nonlinearity in {"blended_quadratic", "cblended_quadratic", "leaky_relu"}:
         if param is not None:
             kwargs["alpha"] = param
+    elif nonlinearity in {"siren"}:
+        if param is not None:
+            kwargs["omega"] = param
     elif nonlinearity in {"modrelu"}:
         if param is not None:
             kwargs["b"] = param
@@ -611,7 +630,7 @@ def kaiming_normal_(
     assumptions match those in :func:`kaiming_uniform_`.
 
     :arg param: parameter used in activations functions that require it, such as
-        "blended_quadratic", "leaky_relu", etc.
+        "blended_quadratic", "siren", "leaky_relu", etc.
     :arg paramb: additional parameter for "leaky_modrelu".
     """
     from nneuroutil.helpers import calculate_gain
@@ -621,6 +640,9 @@ def kaiming_normal_(
     if nonlinearity in {"blended_quadratic", "cblended_quadratic", "leaky_relu"}:
         if param is not None:
             kwargs["alpha"] = param
+    elif nonlinearity in {"siren"}:
+        if param is not None:
+            kwargs["omega"] = param
     elif nonlinearity in {"modrelu"}:
         if param is not None:
             kwargs["b"] = param
