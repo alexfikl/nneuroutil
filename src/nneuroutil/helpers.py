@@ -715,8 +715,13 @@ def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
 def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
     """Calculate the recommended gain for the given *nonlinearity* function.
 
+    The gain is the variance multiplier ``1 / E[f(y) ** 2]`` for an input ``y``
+    with zero mean and unit variance. Note that
+    :func:`torch.nn.init.calculate_gain` uses a standard-deviation multiplier
+    instead.
+
     See :ref:`notes-initializers` for the values of the gain for custom
-    functions. This also supports all the activations mentioned in
+    functions. This also accepts all the activations mentioned in
     :func:`torch.nn.init.calculate_gain` for completeness.
 
     .. warning::
@@ -782,25 +787,28 @@ def calculate_gain(nonlinearity: str, **kwargs: float) -> float:
         # NOTE: https://docs.pytorch.org/docs/2.12/nn.init.html
         if nonlinearity in {"linear", "identity"}:  # ruff: ignore[if-with-same-arms]
             scale = 1.0
-        elif nonlinearity in {"conv1d", "conv2d", "conv3d"}:  # ruff: ignore[if-with-same-arms]
+        elif nonlinearity in {"conv1d", "conv2d", "conv3d"}:
             scale = 1.0
         elif nonlinearity == "sigmoid":
-            scale = 1.0
+            # NOTE: 1 / E[sigmoid(y)^2] for y ~ N(0, 1), evaluated numerically
+            scale = 3.408560
         elif nonlinearity == "tanh":
-            scale = 5.0 / 3.0
+            # NOTE: 1 / E[tanh(y)^2] for y ~ N(0, 1), evaluated numerically
+            scale = 2.536175
         elif nonlinearity == "relu":
-            scale = math.sqrt(2)
+            scale = 2.0
         elif nonlinearity == "leaky_relu":
             # NOTE: this uses the default value from torch and flax
             alpha = kwargs.get("alpha", 0.01)
-            scale = math.sqrt(2.0 / (1.0 + alpha**2))
+            scale = 2.0 / (1.0 + alpha**2)
         elif nonlinearity == "gelu":
             scale = 6.0 * math.pi / (2.0 * math.pi + math.sqrt(3.0))
         elif nonlinearity == "silu":
             # NOTE: 1 / E[silu(y)^2] for y ~ N(0, 1), evaluated numerically
             scale = 2.810761
         elif nonlinearity == "selu":
-            scale = 3.0 / 4.0
+            # NOTE: E[selu(y)^2] = 1 for the standard SELU constants
+            scale = 1.0
         else:
             raise ValueError(f"unknown nonlinearity: {nonlinearity}")
 
