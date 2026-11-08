@@ -64,7 +64,7 @@ def test_dmd_classic_linear(xp: Any, *, tls: bool) -> None:
 
         _ = jax.jit(build_reduced_dmd, static_argnames=("rank", "xp"))(X1, X2, xp=xp)
     elif array_api_compat.is_torch_namespace(xp):
-        import torch  # ty: ignore[unresolved-import,unused-ignore-comment]
+        import torch  # ty: ignore[import-not-found,unused-ignore-comment]
 
         _ = torch.compile(build_reduced_dmd)(X1, X2, xp=xp)
 
