@@ -12,6 +12,7 @@ from typing import Any, Generic, Literal
 import array_api_compat
 import numpy as np
 
+from nneuroutil.dmd import _fast_XmT_Y
 from nneuroutil.helpers import register_dataclass
 from nneuroutil.typing import Array0D, Array1D, Array2D, ArrayND, ScalarTypeT
 
@@ -240,8 +241,10 @@ def build_dense_dmdc(
             del R
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
-            UY = xp.conj(Ur).T @ (xp.conj(Q).T @ Y)
-            del Q, Ur
+            QY = _fast_XmT_Y(Q, Y, xp=xp)
+            del Q
+            UY = xp.conj(Ur).T @ QY
+            del QY, Ur
             VS = xp.conj(Vh).T * S
             W = VS @ UY
             del UY, VS
@@ -250,7 +253,7 @@ def build_dense_dmdc(
             del Omega
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
-            UY = xp.conj(U_om).T @ Y
+            UY = _fast_XmT_Y(U_om, Y, xp=xp)
             del U_om
             VS = xp.conj(Vh).T * S
             W = VS @ UY
@@ -260,7 +263,7 @@ def build_dense_dmdc(
         device = array_api_compat.device(Omega)
         Q1, R1 = xp.linalg.qr(Omega, mode="reduced")
         del Omega
-        B1 = xp.conj(Q1).T @ Y
+        B1 = _fast_XmT_Y(Q1, Y, xp=xp)
         del Q1
 
         I = xp.eye(  # ruff: ignore[ambiguous-variable-name]
@@ -385,16 +388,18 @@ def build_dense_symmetric_dmdc(
         S_u_inv = xp.where(mask_u, 1.0 / S_u_safe, xp.zeros_like(S_u))
         del S_u, S_u_safe
 
-        Qx = xp.conj(U_u).T @ X
-        Qy = xp.conj(U_u).T @ Y
+        UuH = xp.conj(U_u)
+        Qx = UuH.T @ X
+        Qy = UuH.T @ Y
+        del UuH
+
         Xt = X - U_u @ (mask_u[:, None] * Qx)
-        Yt = Y - U_u @ (mask_u[:, None] * Qy)
-        del U_u, mask_u
+        XtH = xp.conj(Xt)
+        G = XtH.T @ Y - (XtH.T @ U_u) @ (mask_u[:, None] * Qy)
+        del XtH, U_u, mask_u
 
         # C = Xt^T Yt + Yt^T Xt only needs a single matrix product as the
         # second term is the conjugate transpose of the first.
-        G = xp.conj(Xt).T @ Yt
-        del Yt
         C = G + xp.conj(G).T
         del G
 
@@ -418,11 +423,13 @@ def build_dense_symmetric_dmdc(
         B = (xp.conj(Vh_u).T * S_u_inv) @ (Qy - Qx @ A)
     elif method == "ridge":
         I_U = xp.eye(du, du, dtype=U.dtype, device=array_api_compat.device(U))
-        S_U = xp.conj(U).T @ U + eps * I_U
+        UH = xp.conj(U)
+        S_U = UH.T @ U + eps * I_U
         del I_U
 
-        Gx = xp.conj(U).T @ X
-        Gy = xp.conj(U).T @ Y
+        Gx = UH.T @ X
+        Gy = UH.T @ Y
+        del UH
         Zx = xp.linalg.solve(S_U, Gx)
         Zy = xp.linalg.solve(S_U, Gy)
 
@@ -437,15 +444,11 @@ def build_dense_symmetric_dmdc(
         # P not being idempotent. Since M is symmetric, diagonalizing it gives
         # A = Q (Ctilde / (lambda_i + lambda_j)) Q^T.
         I_X = xp.eye(dx, dx, dtype=X.dtype, device=array_api_compat.device(X))
-        M = (
-            xp.conj(X).T @ X
-            - xp.conj(Gx).T @ Zx
-            - eps * (xp.conj(Zx).T @ Zx)
-            + eps * I_X
-        )
+        XH = xp.conj(X)
+        M = XH.T @ X - xp.conj(Gx).T @ Zx - eps * (xp.conj(Zx).T @ Zx) + eps * I_X
         del I_X
-        G = xp.conj(X).T @ Y - xp.conj(Gx).T @ Zy - eps * (xp.conj(Zx).T @ Zy)
-        del Zx, Zy
+        G = XH.T @ Y - xp.conj(Gx).T @ Zy - eps * (xp.conj(Zx).T @ Zy)
+        del XH, Zx, Zy
         C = G + xp.conj(G).T
         del G
 
@@ -595,7 +598,7 @@ def build_dense_extended_dmdc(
 
         A = W_A[:, :d_lift]
         C = W_A[:, d_lift:]
-        B = W_B[:, :d_lift]
+        B = xp.astype(W_B[:, :d_lift], W_B.dtype, copy=True)
 
     return DenseExtendedDMDc(A=A, B=B, C=C, observables=tuple(observables))
 
