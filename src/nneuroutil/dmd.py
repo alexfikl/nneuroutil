@@ -148,6 +148,16 @@ class ReducedDMD(DMDBase[ScalarTypeT]):
         return xp.einsum("...j,ij->...i", xhat, self.A)
 
 
+def _fast_XmT_Y(  # ruff: ignore[invalid-function-name]
+    X: Array2D[ScalarTypeT], Y: Array2D[ScalarTypeT], *, xp: Any
+) -> Array2D[ScalarTypeT]:
+    # NOTE: compute ``X^H @ Y`` while conjugating the smaller operand.
+    if X.shape[1] <= Y.shape[1]:
+        return xp.conj(X).T @ Y
+    else:
+        return xp.conj(xp.conj(Y).T @ X).T
+
+
 def build_reduced_dmd(
     X: Array2D[ScalarTypeT],
     Y: Array2D[ScalarTypeT] | None = None,
@@ -210,7 +220,7 @@ def build_reduced_dmd(
             Ur, S, Vh = Ur[:, mask], S[mask], Vh[mask, :]
 
         # construct reduced order model
-        QTY = xp.conj(Q).T @ Y
+        QTY = _fast_XmT_Y(Q, Y, xp=xp)
         Ahat = Vh @ (xp.conj(QTY).T @ (Ur / S))
         del QTY
         U = Q @ Ur
@@ -226,8 +236,9 @@ def build_reduced_dmd(
             U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
         # construct reduced order model
-        # (r, dy) @ (dy, n) @ (n @ r): association avoids two large matrix multiplies
-        Ahat = Vh @ (xp.conj(Y).T @ (U / S))
+        # NOTE: dividing 'S' after the product avoids an (n, r) temporary
+        YtU = _fast_XmT_Y(Y, U, xp=xp)
+        Ahat = Vh @ (YtU / S)
 
     assert Ahat.ndim == 2
     assert Ahat.shape[0] == Ahat.shape[1]
@@ -344,8 +355,10 @@ def build_dense_dmd(
             del R
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
-            UY = xp.conj(Ur).T @ (xp.conj(Q).T @ Y)
-            del Q, Ur
+            QY = _fast_XmT_Y(Q, Y, xp=xp)
+            del Q
+            UY = xp.conj(Ur).T @ QY
+            del QY, Ur
             VS = xp.conj(Vh).T * S
             A = VS @ UY
             del UY, VS
@@ -353,7 +366,7 @@ def build_dense_dmd(
             U, S, Vh = xp.linalg.svd(X, full_matrices=False)
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
-            UY = xp.conj(U).T @ Y
+            UY = _fast_XmT_Y(U, Y, xp=xp)
             del U
             VS = xp.conj(Vh).T * S
             A = VS @ UY
@@ -373,7 +386,7 @@ def build_dense_dmd(
 
         # Step 1: Orthogonal reduction of X -> preserves kappa(X)
         Q1, R1 = xp.linalg.qr(X, mode="reduced")
-        B1 = xp.conj(Q1).T @ Y
+        B1 = _fast_XmT_Y(Q1, Y, xp=xp)
         del Q1
 
         # Step 2: Regularized QR on the small (2 * dx, dx) stacked R1 factor
@@ -537,12 +550,14 @@ def build_dense_extended_dmd(
         del X_lift, Y_lift
     else:
         # NOTE: this should avoid performing two SVDs on X_lift (for A and C)
+        ny = Y_lift.shape[1]
         YX_lift = xp.concat([Y_lift, X], axis=1)
+        del Y_lift
         result = build_dense_dmd(X_lift, YX_lift, method=method, eps=eps, xp=xp).A
 
-        A = result[:, : Y_lift.shape[1]]
-        C = result[:, Y_lift.shape[1] :]
-        del X_lift, Y_lift, YX_lift
+        A = result[:, :ny]
+        C = result[:, ny:]
+        del X_lift, YX_lift
 
     return DenseExtendedDMD(A=A, C=C, observables=tuple(observables))
 
@@ -739,8 +754,10 @@ def total_least_squares(
             mask = xp.abs(S) > eps
             U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
-        Z = (U * S) @ Vh
+        US = U * S
         del U
+        Z = US @ Vh
+        del US
         X = Z[:, :dx]
         Y = Z[:, dx:]
 
