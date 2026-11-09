@@ -235,26 +235,36 @@ def build_dense_dmdc(
     if method == "pinv":
         if n >= 2 * d_omega:
             Q, R = xp.linalg.qr(Omega, mode="reduced")
+            del Omega
             Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+            del R
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
             UY = xp.conj(Ur).T @ (xp.conj(Q).T @ Y)
+            del Q, Ur
             VS = xp.conj(Vh).T * S
             W = VS @ UY
+            del UY, VS
         else:
             U_om, S, Vh = xp.linalg.svd(Omega, full_matrices=False)
+            del Omega
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
             UY = xp.conj(U_om).T @ Y
+            del U_om
             VS = xp.conj(Vh).T * S
             W = VS @ UY
+            del UY, VS
     elif method == "ridge":
+        dtype = Omega.dtype
+        device = array_api_compat.device(Omega)
         Q1, R1 = xp.linalg.qr(Omega, mode="reduced")
+        del Omega
         B1 = xp.conj(Q1).T @ Y
         del Q1
 
         I = xp.eye(  # ruff: ignore[ambiguous-variable-name]
-            d_omega, d_omega, dtype=Omega.dtype, device=array_api_compat.device(Omega)
+            d_omega, d_omega, dtype=dtype, device=device
         )
         R_aug = xp.concat([R1, eps**0.5 * I], axis=0)
         del R1
@@ -266,6 +276,7 @@ def build_dense_dmdc(
         del Q2, B1
 
         W = xp.linalg.solve(R, rhs)
+        del R, rhs
     else:
         raise ValueError(f"unknown method: {method!r}")
 
@@ -372,20 +383,25 @@ def build_dense_symmetric_dmdc(
         mask_u = eps * S_u[0] < S_u
         S_u_safe = xp.where(mask_u, S_u, xp.ones_like(S_u))
         S_u_inv = xp.where(mask_u, 1.0 / S_u_safe, xp.zeros_like(S_u))
+        del S_u, S_u_safe
 
         Qx = xp.conj(U_u).T @ X
         Qy = xp.conj(U_u).T @ Y
         Xt = X - U_u @ (mask_u[:, None] * Qx)
         Yt = Y - U_u @ (mask_u[:, None] * Qy)
+        del U_u, mask_u
 
         # C = Xt^T Yt + Yt^T Xt only needs a single matrix product as the
         # second term is the conjugate transpose of the first.
         G = xp.conj(Xt).T @ Yt
+        del Yt
         C = G + xp.conj(G).T
+        del G
 
         # Solve the Sylvester equation in the right singular basis of Xt, so
         # that A = V (Ctilde / (s_i^2 + s_j^2)) V^T.
-        _, S, Vh = xp.linalg.svd(Xt, full_matrices=False)
+        U_x, S, Vh = xp.linalg.svd(Xt, full_matrices=False)
+        del Xt, U_x
         mask_x = eps * S[0] < S
         S = xp.where(mask_x, S, xp.zeros_like(S))
 
@@ -394,13 +410,16 @@ def build_dense_symmetric_dmdc(
         valid = (S[:, None] > 0) & (S[None, :] > 0)
 
         At = xp.where(valid, CV / xp.where(valid, denom, 1.0), xp.zeros_like(CV))
+        del C, CV, denom, valid
         A = xp.conj(Vh).T @ At @ Vh
+        del Vh, At
 
         # Recover the control operator without forming the (n, dx) residual.
         B = (xp.conj(Vh_u).T * S_u_inv) @ (Qy - Qx @ A)
     elif method == "ridge":
         I_U = xp.eye(du, du, dtype=U.dtype, device=array_api_compat.device(U))
         S_U = xp.conj(U).T @ U + eps * I_U
+        del I_U
 
         Gx = xp.conj(U).T @ X
         Gy = xp.conj(U).T @ Y
@@ -424,12 +443,18 @@ def build_dense_symmetric_dmdc(
             - eps * (xp.conj(Zx).T @ Zx)
             + eps * I_X
         )
+        del I_X
         G = xp.conj(X).T @ Y - xp.conj(Gx).T @ Zy - eps * (xp.conj(Zx).T @ Zy)
+        del Zx, Zy
         C = G + xp.conj(G).T
+        del G
 
         lam, Q = xp.linalg.eigh(M)
+        del M
         At = (xp.conj(Q).T @ C @ Q) / (lam[:, None] + lam[None, :])
+        del C
         A = Q @ At @ xp.conj(Q).T
+        del lam, Q, At
 
         # Recover the control operator from the (small) normal equations.
         B = xp.linalg.solve(S_U, Gy - Gx @ A)
@@ -556,12 +581,17 @@ def build_dense_extended_dmdc(
         A = dmdc_model.A
         B = dmdc_model.B
         C = xp.eye(d_lift, X.shape[1], dtype=X.dtype, device=array_api_compat.device(X))
+        del X_lift, Y_lift, dmdc_model
     else:
         # Fit A, B, and decoder C in a single factorization pass
         Y_combo = xp.concat([Y_lift, X], axis=1)
+        del Y_lift
         dmdc_combo = build_dense_dmdc(X_lift, U, Y_combo, method=method, eps=eps, xp=xp)
+        del X_lift, Y_combo
+
         W_A = dmdc_combo.A  # (d_lift, d_lift + d_x)
         W_B = dmdc_combo.B  # (d_u, d_lift + d_x)
+        del dmdc_combo
 
         A = W_A[:, :d_lift]
         C = W_A[:, d_lift:]
