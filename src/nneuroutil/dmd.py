@@ -200,6 +200,7 @@ def build_reduced_dmd(
         # NOTE: precondition with a QR to avoid SVD-ing very tall matrices
         Q, R = xp.linalg.qr(X, mode="reduced")
         Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+        del R
 
         if rank is not None:
             Ur, S, Vh = Ur[:, :rank], S[:rank], Vh[:rank, :]
@@ -211,7 +212,9 @@ def build_reduced_dmd(
         # construct reduced order model
         QTY = xp.conj(Q).T @ Y
         Ahat = Vh @ (xp.conj(QTY).T @ (Ur / S))
+        del QTY
         U = Q @ Ur
+        del Q, Ur
     else:
         U, S, Vh = xp.linalg.svd(X, full_matrices=False)
 
@@ -338,18 +341,23 @@ def build_dense_dmd(
 
             Q, R = xp.linalg.qr(X, mode="reduced")
             Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+            del R
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
             UY = xp.conj(Ur).T @ (xp.conj(Q).T @ Y)
+            del Q, Ur
             VS = xp.conj(Vh).T * S
             A = VS @ UY
+            del UY, VS
         else:
             U, S, Vh = xp.linalg.svd(X, full_matrices=False)
             S = xp.where(eps * S[0] < S, 1.0 / S, xp.zeros_like(S))
 
             UY = xp.conj(U).T @ Y
+            del U
             VS = xp.conj(Vh).T * S
             A = VS @ UY
+            del UY, VS
     elif method == "ridge":
         # NOTE: this tries to solve the regularized optimization problem
         #   A^* = argmin |X A - Y|^2 + \epsilon |A|^2
@@ -526,6 +534,7 @@ def build_dense_extended_dmd(
             dtype=X.dtype,
             device=array_api_compat.device(X),
         )
+        del X_lift, Y_lift
     else:
         # NOTE: this should avoid performing two SVDs on X_lift (for A and C)
         YX_lift = xp.concat([Y_lift, X], axis=1)
@@ -533,6 +542,7 @@ def build_dense_extended_dmd(
 
         A = result[:, : Y_lift.shape[1]]
         C = result[:, Y_lift.shape[1] :]
+        del X_lift, Y_lift, YX_lift
 
     return DenseExtendedDMD(A=A, C=C, observables=tuple(observables))
 
@@ -701,7 +711,9 @@ def total_least_squares(
         # NOTE: for tall matrices (n >= 2 d), compute thin QR first and perform
         # SVD on the small (d, d) factor R. Then project without materializing U.
         Q, R = xp.linalg.qr(Z, mode="reduced")
+        del Z
         Ur, S, Vh = xp.linalg.svd(R, full_matrices=False)
+        del R
 
         if rank is not None:
             Ur, S, Vh = Ur[:, :rank], S[:rank], Vh[:rank, :]
@@ -711,11 +723,14 @@ def total_least_squares(
             Ur, S, Vh = Ur[:, mask], S[mask], Vh[mask, :]
 
         W = Ur * S
+        del Ur
         Z = Q @ (W @ Vh)
+        del Q
         X = Z[:, :dx]
         Y = Z[:, dx:]
     else:
         U, S, Vh = xp.linalg.svd(Z, full_matrices=False)
+        del Z
 
         if rank is not None:
             U, S, Vh = U[:, :rank], S[:rank], Vh[:rank, :]
@@ -725,6 +740,7 @@ def total_least_squares(
             U, S, Vh = U[:, mask], S[mask], Vh[mask, :]
 
         Z = (U * S) @ Vh
+        del U
         X = Z[:, :dx]
         Y = Z[:, dx:]
 
