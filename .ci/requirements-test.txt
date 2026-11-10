@@ -325,7 +325,7 @@ snowballstemmer==3.1.1
     # via sphinx
 soupsieve==2.10 ; python_full_version < '3.11.5'
     # via beautifulsoup4
-soupsieve==4.0.1 ; python_full_version >= '3.11.5'
+soupsieve==4.1 ; python_full_version >= '3.11.5'
     # via beautifulsoup4
 sphinx==9.0.4 ; python_full_version < '3.12'
     # via
@@ -360,9 +360,9 @@ tensorstore==0.1.86
     # via
     #   flax
     #   orbax-checkpoint
-treescope==0.1.10
+treescope==0.1.11
     # via flax
-ty==0.0.99
+ty==0.0.100
     # via nneuroutil (pyproject.toml:test)
 typing-extensions==4.16.0
     # via
