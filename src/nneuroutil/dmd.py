@@ -645,7 +645,7 @@ def build_forward_backward_dmd(
     #     the value closest to eigenvalues of A_f (recommended in the paper).
     #   - picking is done by computing the Reyleigh quotient and comparing
 
-    P = xp.linalg.solve(A_b.T, A_f.T).T  # ty: ignore[unresolved-attribute]
+    P = xp.linalg.solve(A_b.T, A_f.T).T  # ty: ignore[missing-attribute]
     mu, v = xp.linalg.eig(P)
     s = xp.sqrt(mu)
 

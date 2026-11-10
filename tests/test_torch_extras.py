@@ -112,7 +112,7 @@ def test_learnable_blended_quadratic() -> None:
 
     # 2. Real learnable vector
     mod_real_vec = BlendedQuadratic(alpha=0.4, num_parameters=n, learnable=True)
-    assert mod_real_vec.alpha.shape == (n,)  # ty: ignore[unresolved-attribute]
+    assert mod_real_vec.alpha.shape == (n,)  # ty: ignore[missing-union-attribute]
 
     y = mod_real_vec(x)
     y.sum().backward()
@@ -131,7 +131,7 @@ def test_learnable_blended_quadratic() -> None:
     mod_c_vec = ComplexBlendedQuadratic(
         alpha=0.7, num_parameters=d, learnable=True, interleaved=True
     )
-    assert mod_c_vec.alpha.shape == (d,)  # ty: ignore[unresolved-attribute]
+    assert mod_c_vec.alpha.shape == (d,)  # ty: ignore[missing-union-attribute]
 
     y = mod_c_vec(x)
     y.sum().backward()
@@ -141,7 +141,7 @@ def test_learnable_blended_quadratic() -> None:
     mod_c_split = ComplexBlendedQuadratic(
         alpha=0.7, num_parameters=d, learnable=True, interleaved=False
     )
-    assert mod_c_split.alpha.shape == (d,)  # ty: ignore[unresolved-attribute]
+    assert mod_c_split.alpha.shape == (d,)  # ty: ignore[missing-union-attribute]
     y = mod_c_split(x)
     y.sum().backward()
     assert mod_c_split.alpha_param.grad is not None

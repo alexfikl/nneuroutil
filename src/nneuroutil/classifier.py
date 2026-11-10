@@ -62,7 +62,7 @@ class LinearDiscriminandAnalysisClassifier:
         if metric == "l2":
             d = (
                 xp.sum(Z**2, axis=1)[:, None]
-                - 2 * Z @ cz.T  # ty: ignore[unresolved-attribute]
+                - 2 * Z @ cz.T  # ty: ignore[missing-attribute]
                 + xp.sum(cz**2, axis=1)[None]
             )
 
@@ -245,7 +245,7 @@ def _svm_estimate_lipschitz_constant(
     v = v / xp.sqrt(xp.sum(v * v))
 
     for _ in range(niters):
-        v = A.T @ (A @ v)  # ty: ignore[unresolved-attribute]
+        v = A.T @ (A @ v)  # ty: ignore[missing-attribute]
         norm = xp.sqrt(xp.sum(v * v))
         v = xp.where(norm > 0, v / norm, v)
 
