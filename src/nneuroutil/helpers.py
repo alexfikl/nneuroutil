@@ -696,7 +696,7 @@ def to_real(dtype: Any) -> np.dtype[np.floating[Any]]:
 def to_complex(dtype: Any) -> np.dtype[np.complexfloating[Any]]:
     dtype = np.dtype(dtype)
     if dtype.kind == "c":
-        return dtype  # ty: ignore[invalid-return-type]
+        return dtype  # ty: ignore[invalid-explicit-return]
 
     try:
         return _REAL_TO_COMPLEX_DTYPE[dtype]

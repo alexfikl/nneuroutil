@@ -27,7 +27,7 @@ class Quadratic(nnx.Module):
     """A wrapper around :func:`~nneuroutil.activations.quadratic`."""
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.quadratic(x)  # ty: ignore[invalid-return-type]
+        return activations.quadratic(x)  # ty: ignore[invalid-explicit-return]
 
 
 class BlendedQuadratic(nnx.Module):
@@ -37,7 +37,7 @@ class BlendedQuadratic(nnx.Module):
         self.alpha = alpha
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.blended_quadratic(x, alpha=self.alpha)  # ty: ignore[invalid-return-type]
+        return activations.blended_quadratic(x, alpha=self.alpha)  # ty: ignore[invalid-explicit-return]
 
 
 class SIREN(nnx.Module):
@@ -50,7 +50,7 @@ class SIREN(nnx.Module):
         self.omega = omega
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.siren(x, omega=self.omega)  # ty: ignore[invalid-return-type]
+        return activations.siren(x, omega=self.omega)  # ty: ignore[invalid-explicit-return]
 
 
 class ComplexQuadratic(nnx.Module):
@@ -63,7 +63,7 @@ class ComplexQuadratic(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.complex_quadratic, x, interleaved=self.interleaved
         )
 
@@ -80,7 +80,7 @@ class ComplexBlendedQuadratic(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             partial(activations.complex_blended_quadratic, alpha=self.alpha),
             x,
             interleaved=self.interleaved,
@@ -97,7 +97,7 @@ class ComplexTanh(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.complex_tanh, x, interleaved=self.interleaved
         )
 
@@ -115,7 +115,7 @@ class ModReLU(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             partial(activations.modrelu, b=self.bias),
             x,
             interleaved=self.interleaved,
@@ -144,7 +144,7 @@ class LeakyModReLU(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             partial(activations.leaky_modrelu, b=self.bias, alpha=self.alpha),
             x,
             interleaved=self.interleaved,
@@ -161,7 +161,7 @@ class ComplexCardioid(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.complex_cardioid, x, interleaved=self.interleaved
         )
 
@@ -176,7 +176,7 @@ class zReLU(nnx.Module):  # ruff:ignore[invalid-class-name]
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.zrelu, x, interleaved=self.interleaved
         )
 
@@ -191,7 +191,7 @@ class ComplexLog(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.complex_log, x, interleaved=self.interleaved
         )
 
@@ -206,7 +206,7 @@ class ComplexExp(nnx.Module):
         self.interleaved = interleaved
 
     def __call__(self, x: jax.Array) -> jax.Array:
-        return activations.apply_complex(  # ty: ignore[invalid-return-type]
+        return activations.apply_complex(  # ty: ignore[invalid-explicit-return]
             activations.complex_exp, x, interleaved=self.interleaved
         )
 
